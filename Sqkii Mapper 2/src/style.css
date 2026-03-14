@@ -885,7 +885,7 @@
       background: #0e1420;
       border: 1px solid var(--border);
       box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
-      background-image: url('metal-sonar.png');
+      background-image: url('./assets/metal-sonar.png');
       background-size: contain;
       background-repeat: no-repeat;
       background-position: center;
