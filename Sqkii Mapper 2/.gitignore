@@ -1,0 +1,27 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Generated data
+plots/
+map_screenshots/
+*.tmp
+shrink_log.xlsx
+sent_coins.json
+track_state.json
+authorized_users.json
+
+# Logs
+*.log
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Node / Vite
+node_modules/
+dist/
