@@ -2962,8 +2962,12 @@
 
       function reflectEditUI() {
         if (!editToggle) return;
-        editToggle.textContent = 'Edit: ' + (editingEnabled ? 'ON' : 'OFF');
         editToggle.classList.toggle('off', !editingEnabled);
+        editToggle.setAttribute('aria-pressed', editingEnabled ? 'true' : 'false');
+        editToggle.title = editingEnabled ? 'Edit mode on' : 'Edit mode off';
+        editToggle.setAttribute('aria-label', editingEnabled ? 'Edit mode on' : 'Edit mode off');
+        const labelEl = editToggle.querySelector('.map-edit-fab-label');
+        if (labelEl) labelEl.textContent = editingEnabled ? 'Edit mode on' : 'Edit mode off';
         syncDeleteModeCursor();
       }
 

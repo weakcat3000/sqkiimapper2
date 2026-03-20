@@ -67,6 +67,12 @@
   </div>
   <div class="app" id="app">
     <button id="ui-reopen" class="ui-reopen" title="Open UI">Open UI</button>
+    <button id="edit-toggle" class="map-edit-fab off" title="Edit mode off" aria-label="Edit mode off"
+      aria-pressed="false">
+      <img src="edit-mode-icon.png" alt="" />
+      <span class="map-edit-status" aria-hidden="true"></span>
+      <span class="sr-only map-edit-fab-label">Edit mode off</span>
+    </button>
 
     <aside class="sidebar" id="sidebar">
       <!-- Dark Veil background canvas -->
@@ -88,7 +94,6 @@
         </div>
 
         <div class="toolbar">
-          <button id="edit-toggle" class="btn small" title="Toggle edit mode">Edit: OFF</button>
           <button id="delete-toggle" class="btn small off" title="Toggle delete mode">Delete: OFF</button>
 
           <!-- Geohashes button (move it here so it's visible in the header) -->

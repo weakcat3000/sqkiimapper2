@@ -134,9 +134,9 @@
     }
 
     .ui-reopen {
-      position: absolute;
-      left: 10px;
-      top: 15px;
+      position: fixed;
+      left: 16px;
+      top: 82px;
       z-index: 1100;
       display: none;
       background: var(--panel);
@@ -151,6 +151,76 @@
 
     .app.ui-collapsed .ui-reopen {
       display: inline-block
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .map-edit-fab {
+      position: fixed;
+      left: calc(var(--side) + 16px);
+      top: 16px;
+      z-index: 1105;
+      width: 56px;
+      height: 56px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(15, 17, 21, 0.94);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+      cursor: pointer;
+      transition: left .28s ease, transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+      backdrop-filter: blur(10px);
+    }
+
+    .map-edit-fab:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, .38);
+    }
+
+    .map-edit-fab img {
+      width: 28px;
+      height: 28px;
+      display: block;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .map-edit-fab .map-edit-status {
+      position: absolute;
+      right: 8px;
+      bottom: 8px;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #64748b;
+      border: 2px solid rgba(15, 17, 21, 0.95);
+      transition: background .18s ease, transform .18s ease;
+    }
+
+    .map-edit-fab.off {
+      opacity: .88;
+    }
+
+    .map-edit-fab:not(.off) {
+      border-color: rgba(96, 165, 250, 0.7);
+      background: rgba(18, 32, 58, 0.94);
+    }
+
+    .map-edit-fab:not(.off) .map-edit-status {
+      background: #22c55e;
+      transform: scale(1.08);
     }
 
     .sidebar {
@@ -461,7 +531,6 @@
     }
 
     .ui-hide,
-    #edit-toggle,
     #delete-toggle {
       background: var(--panel);
       border: 1px solid var(--border);
