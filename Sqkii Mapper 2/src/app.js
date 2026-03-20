@@ -4070,6 +4070,7 @@
           await joinRoom(code);
           saveLastServerCode(code);
           hideServerModal();
+          nudgeAudioAfterJoin();
         } catch (e) {
           console.error('Join failed', e);
           serverErr.textContent = 'Join failed: ' + (e?.message || 'Check connection / DNS / RLS / table.');
@@ -4086,6 +4087,7 @@
       // Handle "Continue without sync" button
       document.getElementById('server-continue').addEventListener('click', async () => {
         hideServerModal();
+        nudgeAudioAfterJoin();
         currentRoomCode = null;
         reconOverlayPoints = [];
         clearReconOverlay({ clearCache: false });
@@ -4197,6 +4199,15 @@
         audioBackgroundLocked = false;
         ensureAudioCtxResumed();
         resumeBgmIfAllowed();
+      };
+      const nudgeAudioAfterJoin = () => {
+        clearAudioBlurLockTimer();
+        if (!pageIsVisible()) return;
+        audioBackgroundLocked = false;
+        ensureAudioCtxResumed();
+        if (!audioEnabled) return;
+        requestAnimationFrame(() => { resumeBgmIfAllowed(); });
+        setTimeout(() => { resumeBgmIfAllowed(); }, 250);
       };
       const scheduleBlurAudioCheck = () => {
         clearAudioBlurLockTimer();
