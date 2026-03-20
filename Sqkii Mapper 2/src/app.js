@@ -5419,59 +5419,71 @@
           const steps = Array.isArray(entry.lifecycle) ? entry.lifecycle : [];
           const exactSpot = (Number.isFinite(Number(entry.exact_lat)) && Number.isFinite(Number(entry.exact_lng)))
             ? `${coinDbFormatCoord(entry.exact_lat)}, ${coinDbFormatCoord(entry.exact_lng)}`
-            : 'Not saved yet';
+            : '';
+
+          const statusBadge = entry.status === 'active'
+            ? '<span class="coin-db-badge active">● LIVE</span>'
+            : '<span class="coin-db-badge archived">● Archived</span>';
 
           return `
-            <section class="coin-db-entry" data-entry-id="${escapeHtml(entry.id)}">
-              <div class="coin-db-entry-head">
-                <div>
-                  <div class="coin-db-entry-title">${escapeHtml(entry.coin_label || 'Archived coin')}</div>
-                  <div class="hint">Archived ${escapeHtml(coinDbFormatDate(entry.created_at))}</div>
+            <details class="coin-db-dropdown" data-entry-id="${escapeHtml(entry.id)}">
+              <summary class="coin-db-dropdown-header">
+                <div class="coin-db-dropdown-left">
+                  ${statusBadge}
+                  <span class="coin-db-dropdown-title">${escapeHtml(entry.coin_label || 'Unnamed coin')}</span>
+                  <span class="coin-db-dropdown-date">${escapeHtml(coinDbFormatDate(entry.created_at))}</span>
                 </div>
-                <div class="coin-db-actions">
-                  <button class="btn small coin-db-load-snapshot" data-entry-id="${escapeHtml(entry.id)}">Load Snapshot</button>
+                <div class="coin-db-dropdown-right">
+                  <span class="coin-db-chip">${steps.length} shrink${steps.length !== 1 ? 's' : ''}</span>
+                  <span class="coin-db-dropdown-arrow">▸</span>
                 </div>
-              </div>
+              </summary>
 
-              <div class="coin-db-meta">
-                <span class="coin-db-chip">Room: ${escapeHtml(entry.room_code || '')}</span>
-                <span class="coin-db-chip">Shrinks: ${steps.length}</span>
-                <span class="coin-db-chip">Exact spot: ${escapeHtml(exactSpot)}</span>
-              </div>
+              <div class="coin-db-dropdown-body">
+                <div class="coin-db-meta">
+                  <span class="coin-db-chip">Room: ${escapeHtml(entry.room_code || '')}</span>
+                  <span class="coin-db-chip">Shrinks: ${steps.length}</span>
+                  ${exactSpot ? `<span class="coin-db-chip">Exact: ${escapeHtml(exactSpot)}</span>` : ''}
+                </div>
 
-              <div class="coin-db-steps">
-                ${steps.map((step) => `
-                  <div class="coin-db-step">
-                    <div>
-                      <strong>Step</strong>
-                      <span>${escapeHtml(String(step.step || ''))}</span>
+                <div class="coin-db-steps">
+                  ${steps.length === 0 ? '<div class="coin-db-empty" style="padding:10px">No shrink steps recorded yet.</div>' : ''}
+                  ${steps.map((step) => `
+                    <div class="coin-db-step">
+                      <div>
+                        <strong>Step</strong>
+                        <span>${escapeHtml(String(step.step || ''))}</span>
+                      </div>
+                      <div>
+                        <strong>Latitude</strong>
+                        <span>${escapeHtml(coinDbFormatCoord(step.lat))}</span>
+                      </div>
+                      <div>
+                        <strong>Longitude</strong>
+                        <span>${escapeHtml(coinDbFormatCoord(step.lng))}</span>
+                      </div>
+                      <div>
+                        <strong>Radius</strong>
+                        <span>${escapeHtml(coinDbFormatRadius(step.radiusMeters))}</span>
+                      </div>
                     </div>
-                    <div>
-                      <strong>Latitude</strong>
-                      <span>${escapeHtml(coinDbFormatCoord(step.lat))}</span>
-                    </div>
-                    <div>
-                      <strong>Longitude</strong>
-                      <span>${escapeHtml(coinDbFormatCoord(step.lng))}</span>
-                    </div>
-                    <div>
-                      <strong>Radius</strong>
-                      <span>${escapeHtml(coinDbFormatRadius(step.radiusMeters))}</span>
+                  `).join('')}
+                </div>
+
+                <div class="coin-db-note-form">
+                  <input type="number" step="any" class="coin-db-exact-lat" data-entry-id="${escapeHtml(entry.id)}" placeholder="Exact latitude" value="${entry.exact_lat ?? ''}">
+                  <input type="number" step="any" class="coin-db-exact-lng" data-entry-id="${escapeHtml(entry.id)}" placeholder="Exact longitude" value="${entry.exact_lng ?? ''}">
+                  <textarea class="coin-db-exact-note" data-entry-id="${escapeHtml(entry.id)}" placeholder="Notes about the revealed exact spot">${escapeHtml(entry.exact_note || '')}</textarea>
+                  <div class="coin-db-note-footer">
+                    <div class="coin-db-inline-status" id="coin-db-inline-status-${escapeHtml(entry.id)}"></div>
+                    <div class="coin-db-footer-btns">
+                      <button class="btn small coin-db-load-snapshot" data-entry-id="${escapeHtml(entry.id)}">Load Snapshot</button>
+                      <button class="btn small coin-db-save-note" data-entry-id="${escapeHtml(entry.id)}">Save Exact Spot</button>
                     </div>
                   </div>
-                `).join('')}
-              </div>
-
-              <div class="coin-db-note-form">
-                <input type="number" step="any" class="coin-db-exact-lat" data-entry-id="${escapeHtml(entry.id)}" placeholder="Exact latitude" value="${entry.exact_lat ?? ''}">
-                <input type="number" step="any" class="coin-db-exact-lng" data-entry-id="${escapeHtml(entry.id)}" placeholder="Exact longitude" value="${entry.exact_lng ?? ''}">
-                <textarea class="coin-db-exact-note" data-entry-id="${escapeHtml(entry.id)}" placeholder="Notes about the revealed exact spot">${escapeHtml(entry.exact_note || '')}</textarea>
-                <div class="coin-db-note-footer">
-                  <div class="coin-db-inline-status" id="coin-db-inline-status-${escapeHtml(entry.id)}"></div>
-                  <button class="btn small coin-db-save-note" data-entry-id="${escapeHtml(entry.id)}">Save Exact Spot</button>
                 </div>
               </div>
-            </section>
+            </details>
           `;
         }).join('');
       }

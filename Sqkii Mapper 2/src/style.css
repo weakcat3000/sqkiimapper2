@@ -701,13 +701,113 @@
       background: rgba(255, 255, 255, 0.02);
     }
 
-    .coin-db-entry {
+    /* --- Coin DB Dropdown Entries --- */
+    .coin-db-dropdown {
       border: 1px solid var(--border);
-      border-radius: 14px;
+      border-radius: 12px;
       background: var(--panel-2);
-      padding: 14px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+
+    .coin-db-dropdown[open] {
+      border-color: rgba(96, 165, 250, 0.35);
+    }
+
+    .coin-db-dropdown-header {
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px;
+      cursor: pointer;
+      gap: 12px;
+      user-select: none;
+      transition: background 0.15s;
+    }
+
+    .coin-db-dropdown-header:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .coin-db-dropdown-header::-webkit-details-marker {
+      display: none;
+    }
+
+    .coin-db-dropdown-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .coin-db-dropdown-title {
+      font-size: 14px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .coin-db-dropdown-date {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .coin-db-dropdown-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .coin-db-dropdown-arrow {
+      font-size: 14px;
+      color: var(--muted);
+      transition: transform 0.2s ease;
+    }
+
+    .coin-db-dropdown[open] .coin-db-dropdown-arrow {
+      transform: rotate(90deg);
+    }
+
+    .coin-db-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .coin-db-badge.active {
+      color: #86efac;
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    .coin-db-badge.archived {
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+    }
+
+    .coin-db-dropdown-body {
+      padding: 0 14px 14px;
       display: grid;
       gap: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .coin-db-dropdown-body > :first-child {
+      margin-top: 12px;
+    }
+
+    .coin-db-footer-btns {
+      display: flex;
+      gap: 8px;
     }
 
     .coin-db-entry-head {
