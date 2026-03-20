@@ -2371,6 +2371,11 @@
       async function loadKMLFromUrl(url, forceGroupName) { const res = await fetch(url); if (!res.ok) throw new Error('HTTP ' + res.status); const text = await res.text(); addKmlText(text, url.split('/').pop() || 'remote.kml', { baseUrl: url }, forceGroupName); }
       async function loadKMZFromUrl(url, forceGroupName) { const res = await fetch(url); if (!res.ok) throw new Error('HTTP ' + res.status); const blob = await res.blob(); const zip = await JSZip.loadAsync(blob); const kmlEntry = Object.values(zip.files).find(f => f.name.toLowerCase().endsWith('.kml')); if (!kmlEntry) throw new Error('No .kml inside KMZ'); const assetMap = await buildKmzAssetMap(zip); const text = await kmlEntry.async('text'); addKmlText(text, url.split('/').pop() || 'remote.kmz', { assetMap, baseUrl: url }, forceGroupName); }
 
+      function isSilverApiArchiveLayer(layerName) {
+        const normalized = String(layerName || '').trim().toLowerCase();
+        return currentRoomCode === 'silver' && ['shrink pattern', 'past coin shrinks'].includes(normalized);
+      }
+
       function addKmlText(text, filename, opts, forceGroupName) {
         const xml = new DOMParser().parseFromString(text, 'text/xml');
         const metaList = extractKmlMeta(xml, opts || {});
@@ -2381,6 +2386,7 @@
 
         for (const gname of Object.keys(grouped)) {
           const features = [], items = [];
+          const archiveEligible = isSilverApiArchiveLayer(gname);
           for (const idx of grouped[gname]) {
             const f = gj.features[idx], m = metaList[idx], fid = String(featureSeq++);
             const props = f.properties || {}; const itemName = m.name || props.name || props.Name || props.title || ('Feature ' + fid);
@@ -2412,7 +2418,21 @@
 
             const enriched = {
               type: 'Feature', geometry: f.geometry,
-              properties: { ...props, name: itemName, fid, hidden: false, _label: isPoint ? label : '', _icon: isPoint ? iconName : undefined, _iconUrl: isPoint ? iconUrl : undefined, _iconSize: 1, _ts: Date.now(), _gid: fid, ...style }
+              properties: {
+                ...props,
+                name: itemName,
+                fid,
+                hidden: false,
+                _label: isPoint ? label : '',
+                _icon: isPoint ? iconName : undefined,
+                _iconUrl: isPoint ? iconUrl : undefined,
+                _iconSize: 1,
+                _ts: Date.now(),
+                _gid: fid,
+                _coinArchiveEligible: archiveEligible,
+                _coinArchiveSource: archiveEligible ? 'silver-api' : 'import',
+                ...style
+              }
             };
             features.push(enriched); items.push({ fid, name: itemName, label, visible: true });
           }
@@ -2494,6 +2514,8 @@
 
           _circleCenter: centerLngLat,  // Store center for statistics
           _circleRadius: radius,        // Store radius for statistics
+          _coinArchiveEligible: false,
+          _coinArchiveSource: 'user',
 
           // ✅ store as numbers too (popup-safe)
           _circleLng: +centerLngLat[0],
@@ -2533,6 +2555,8 @@
 
           _circleCenter: centerLngLat,  // Store center for statistics
           _circleRadius: radius,        // Store radius for statistics
+          _coinArchiveEligible: false,
+          _coinArchiveSource: 'user',
 
           // ✅ store as numbers too (popup-safe)
           _circleLng: +lng,
@@ -3765,19 +3789,6 @@
         const snapshotState = Utils.deepClone(stateArr || shallowSerializableState());
         const allSteps = extractShrinkLifecycle(snapshotState);
 
-        // Group steps by layerName (each layer = one coin, e.g. "ShopBack Coin 20")
-        const grouped = {};
-        for (const step of allSteps) {
-          const key = step.layerName || 'Unknown Coin';
-          if (!grouped[key]) grouped[key] = [];
-          grouped[key].push(step);
-        }
-
-        // Re-number steps within each group
-        for (const key of Object.keys(grouped)) {
-          grouped[key].forEach((s, i) => { s.step = i + 1; });
-        }
-
         // Fetch all existing active records for this room
         const { data: existingRecords } = await supabase
           .from('coin_history_archive')
@@ -3787,15 +3798,26 @@
 
         const existingByLabel = {};
         for (const rec of (existingRecords || [])) {
-          existingByLabel[rec.coin_label] = rec.id;
+          existingByLabel[coinDbCanonicalLabel(rec.coin_label)] = rec.id;
         }
 
         const now = new Date().toISOString();
         const processedLabels = new Set();
 
-        // Upsert one record per coin group
+        const grouped = {};
+        for (const step of allSteps) {
+          const key = coinDbCanonicalLabel(step.coinLabel) || coinDbGetActiveLabel();
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push(step);
+        }
+
+        for (const key of Object.keys(grouped)) {
+          grouped[key].forEach((step, index) => { step.step = index + 1; });
+        }
+
+        // Upsert one record per coin instead of per layer
         for (const [coinName, steps] of Object.entries(grouped)) {
-          const coinLabel = `${coinName} - Active`;
+          const coinLabel = coinDbCanonicalLabel(coinName) || coinDbGetActiveLabel();
           processedLabels.add(coinLabel);
 
           const payload = {
@@ -4375,7 +4397,9 @@
           fid, name, hidden: false, _gid: fid, _ts: Date.now(),
           _fill: hex, _fillOpacity: 0.18, _stroke: hex, _strokeOpacity: 0.9, _weight: 2,
           _circleCenter: centerLngLat,  // Store center for statistics
-          _circleRadius: radius         // Store radius for statistics
+          _circleRadius: radius,        // Store radius for statistics
+          _coinArchiveEligible: false,
+          _coinArchiveSource: 'sonar'
         };
 
         entry.data.features.push({ type: 'Feature', geometry: geom, properties: props });
@@ -5332,6 +5356,7 @@
 
       /* ================= Coin Database ================= */
       const COIN_DB_TABLE = 'coin_history_archive';
+      const COIN_DB_ACTIVE_LABEL_PREFIX = 'sqkii-active-coin-label:';
       const coinDbModal = byId('coin-db-modal');
       const coinDbOpenBtn = byId('coin-db-open');
       const coinDbCloseBtn = byId('coin-db-close');
@@ -5380,6 +5405,34 @@
         return Number.isFinite(n) ? `${Math.round(n * 100) / 100} m` : 'n/a';
       }
 
+      function coinDbCanonicalLabel(label) {
+        return String(label || '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .replace(/\s*-\s*active$/i, '')
+          .trim();
+      }
+
+      function coinDbDraftKey(roomCode = currentRoomCode) {
+        return `${COIN_DB_ACTIVE_LABEL_PREFIX}${roomCode || 'default'}`;
+      }
+
+      function coinDbSaveDraftLabel(label, roomCode = currentRoomCode) {
+        try {
+          const normalized = coinDbCanonicalLabel(label);
+          if (normalized) localStorage.setItem(coinDbDraftKey(roomCode), normalized);
+          else localStorage.removeItem(coinDbDraftKey(roomCode));
+        } catch { }
+      }
+
+      function coinDbLoadDraftLabel(roomCode = currentRoomCode) {
+        try {
+          return coinDbCanonicalLabel(localStorage.getItem(coinDbDraftKey(roomCode)) || '');
+        } catch {
+          return '';
+        }
+      }
+
       function coinDbSerializeState() {
         return Utils.deepClone(shallowSerializableState());
       }
@@ -5406,12 +5459,15 @@
 
             if (!Number.isFinite(radius) || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
             if (/^sonar\b/i.test(String(props.name || ''))) continue;
+            if (props._coinArchiveEligible === false) continue;
+            if (props._coinArchiveEligible !== true && !isSilverApiArchiveLayer(layerName)) continue;
 
             const ts = Number(props._ts);
             steps.push({
               step: 0,
               layerName,
               featureName: String(props.name || `${layerName} shrink`),
+              coinLabel: coinDbCanonicalLabel(props._coinLabel || props.coin_label || ''),
               lat,
               lng,
               radiusMeters: radius,
@@ -5440,6 +5496,26 @@
         return `${(currentRoomCode || 'coin').toUpperCase()} coin - ${stamp}`;
       }
 
+      function coinDbGetActiveLabel() {
+        const inputLabel = coinDbCanonicalLabel(coinDbNameInput?.value || '');
+        if (inputLabel) return inputLabel;
+
+        const storedLabel = coinDbLoadDraftLabel();
+        if (storedLabel) return storedLabel;
+
+        const activeEntry = coinDbEntriesCache.find((entry) => String(entry?.status || '').toLowerCase() === 'active');
+        const activeLabel = coinDbCanonicalLabel(activeEntry?.coin_label || '');
+        if (activeLabel) return activeLabel;
+
+        return coinDbDefaultName();
+      }
+
+      function coinDbSyncNameInput(force = false) {
+        if (!coinDbNameInput) return;
+        if (!force && coinDbCanonicalLabel(coinDbNameInput.value)) return;
+        coinDbNameInput.value = coinDbGetActiveLabel();
+      }
+
       function renderCoinDbEntries(entries) {
         coinDbEntriesCache = Array.isArray(entries) ? entries : [];
 
@@ -5451,6 +5527,7 @@
 
         coinDbList.innerHTML = coinDbEntriesCache.map((entry) => {
           const steps = Array.isArray(entry.lifecycle) ? entry.lifecycle : [];
+          const displayLabel = coinDbCanonicalLabel(entry.coin_label || 'Unnamed coin') || 'Unnamed coin';
           const exactSpot = (Number.isFinite(Number(entry.exact_lat)) && Number.isFinite(Number(entry.exact_lng)))
             ? `${coinDbFormatCoord(entry.exact_lat)}, ${coinDbFormatCoord(entry.exact_lng)}`
             : '';
@@ -5466,7 +5543,7 @@
               <summary class="coin-db-dropdown-header">
                 <div class="coin-db-dropdown-left">
                   ${statusBadge}
-                  <span class="coin-db-dropdown-title">${escapeHtml(entry.coin_label || 'Unnamed coin')}</span>
+                  <span class="coin-db-dropdown-title">${escapeHtml(displayLabel)}</span>
                   <span class="coin-db-dropdown-date">${escapeHtml(coinDbFormatDate(entry.created_at))}</span>
                 </div>
                 <div class="coin-db-dropdown-right">
@@ -5555,6 +5632,7 @@
         try {
           const entries = await fetchCoinDbEntries();
           renderCoinDbEntries(entries);
+          coinDbSyncNameInput();
           coinDbSetStatus(entries.length ? `Loaded ${entries.length} archived coin record(s).` : 'No archived coins yet for this room.');
         } catch (error) {
           renderCoinDbEntries([]);
@@ -5576,11 +5654,24 @@
           return;
         }
 
-        const coinLabel = (coinDbNameInput?.value || '').trim() || coinDbDefaultName();
+        const coinLabel = coinDbCanonicalLabel((coinDbNameInput?.value || '').trim()) || coinDbGetActiveLabel();
+        coinDbSaveDraftLabel(coinLabel);
         coinDbSaveCurrentBtn.disabled = true;
         coinDbSetStatus('Archiving current coin...');
 
         try {
+          const { data: activeRecords, error: activeRecordsError } = await supabase
+            .from(COIN_DB_TABLE)
+            .select('id, coin_label')
+            .eq('room_code', currentRoomCode)
+            .eq('status', 'active');
+
+          if (activeRecordsError) throw activeRecordsError;
+
+          const matchingActive = (activeRecords || []).find((entry) => (
+            coinDbCanonicalLabel(entry.coin_label) === coinLabel
+          ));
+
           const payload = {
             room_code: currentRoomCode,
             coin_label: coinLabel,
@@ -5595,10 +5686,18 @@
             updated_at: new Date().toISOString()
           };
 
-          const { error } = await supabase.from(COIN_DB_TABLE).insert(payload);
+          let error = null;
+          if (matchingActive?.id) {
+            const result = await supabase.from(COIN_DB_TABLE).update(payload).eq('id', matchingActive.id);
+            error = result.error;
+          } else {
+            const result = await supabase.from(COIN_DB_TABLE).insert(payload);
+            error = result.error;
+          }
+
           if (error) throw error;
 
-          if (coinDbNameInput) coinDbNameInput.value = '';
+          if (coinDbNameInput) coinDbNameInput.value = coinLabel;
           await refreshCoinDatabase();
           coinDbSetStatus(`Archived "${coinLabel}" with ${lifecycle.length} shrink step(s).`);
         } catch (error) {
@@ -5665,7 +5764,7 @@
         try {
           await applyStateArray(entry.snapshot_state);
           localSaveOnly();
-          coinDbSetStatus(`Loaded snapshot for "${entry.coin_label}".`);
+          coinDbSetStatus(`Loaded snapshot for "${coinDbCanonicalLabel(entry.coin_label)}".`);
         } catch (error) {
           coinDbSetStatus(`Failed to load snapshot: ${coinDbFriendlyError(error)}`, true);
         }
@@ -5673,7 +5772,7 @@
 
       async function deleteCoinDbEntry(entryId) {
         const entry = coinDbEntriesCache.find((item) => String(item.id) === String(entryId));
-        const label = entry?.coin_label || 'this coin';
+        const label = coinDbCanonicalLabel(entry?.coin_label || '') || 'this coin';
         if (!confirm(`Delete "${label}"? This cannot be undone.`)) return;
 
         coinDbSetStatus('Deleting...');
@@ -5695,7 +5794,7 @@
 
         coinDbModal.classList.add('visible');
         appEl.classList.add('blocked-by-modal');
-        if (coinDbNameInput && !coinDbNameInput.value.trim()) coinDbNameInput.value = coinDbDefaultName();
+        coinDbSyncNameInput(true);
         refreshCoinDatabase();
       }
 
@@ -5709,6 +5808,9 @@
       coinDbRefreshBtn?.addEventListener('click', refreshCoinDatabase);
       coinDbSaveCurrentBtn?.addEventListener('click', archiveCurrentCoinLifecycle);
       coinDbExportBtn?.addEventListener('click', exportCoinDbExcel);
+      coinDbNameInput?.addEventListener('input', () => {
+        coinDbSaveDraftLabel(coinDbNameInput.value);
+      });
       coinDbModal?.addEventListener('click', (e) => {
         if (e.target === coinDbModal) closeCoinDbModal();
       });
@@ -5746,10 +5848,11 @@
         const rows = [];
         for (const entry of coinDbEntriesCache) {
           const steps = Array.isArray(entry.lifecycle) ? entry.lifecycle : [];
+          const entryLabel = coinDbCanonicalLabel(entry.coin_label || 'Unnamed') || 'Unnamed';
           if (steps.length === 0) {
             // Entry with no steps — still include a summary row
             rows.push({
-              'Coin Name': entry.coin_label || 'Unnamed',
+              'Coin Name': entryLabel,
               'Room': entry.room_code || '',
               'Status': entry.status || '',
               'Step': '',
@@ -5765,7 +5868,7 @@
           } else {
             for (const step of steps) {
               rows.push({
-                'Coin Name': entry.coin_label || 'Unnamed',
+                'Coin Name': entryLabel,
                 'Room': entry.room_code || '',
                 'Status': entry.status || '',
                 'Step': step.step ?? '',

@@ -12,11 +12,16 @@ import time
 import config as cfg
 import state
 import utils
+from Other_Alerts import run_other_alerts_loop
+from scheduled_announcements import scheduled_ai_broadcast_loop
 from telegram_bot import check_telegram_messages
 from scraper import setup_chrome_driver_safe, auto_refresh, monitor_api
 from mapper_sync import sync_mapper_circles, mapper_sync_loop
 
 log = cfg.log.getChild("main")
+
+# ---- Feature toggles ----
+ENABLE_OTHER_ALERTS = False
 
 # ===========================================================
 # Debounced mapper push
@@ -82,6 +87,14 @@ def main():
     # ---- Background threads ----
     threading.Thread(target=check_telegram_messages, daemon=True, name="TelegramPoll").start()
     threading.Thread(target=auto_refresh, args=(driver,), daemon=True, name="AutoRefresh").start()
+    if ENABLE_OTHER_ALERTS:
+        threading.Thread(target=run_other_alerts_loop, daemon=True, name="OtherAlerts").start()
+    else:
+        log.info("Other alerts disabled in main.py")
+    if cfg.ENABLE_SCHEDULED_AI_BROADCASTS:
+        threading.Thread(target=scheduled_ai_broadcast_loop, daemon=True, name="AIBroadcastLoop").start()
+    else:
+        log.info("Scheduled AI broadcasts disabled in config")
     threading.Thread(target=mapper_push_loop, daemon=True, name="MapperPushLoop").start()
     threading.Thread(
         target=mapper_sync_loop,

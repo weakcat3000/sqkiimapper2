@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#258cf4",
+                        "accent-purple": "#8b5cf6",
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#0a0a0d",
+                        "surface-dark": "#16181d",
+                        "surface-darker": "#111216",
+                        "panel-border": "rgba(255, 255, 255, 0.05)",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"],
+                        "sans": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "2xl": "1rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(22, 24, 29, 0.8);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--tw-colors-panel-border);
+        }
+        .map-bg {
+            background: radial-gradient(circle at center, #26174a 0%, #150b2e 100%);
+        }
+        .neon-glow {
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+        }
+        .neon-glow-blue {
+            box-shadow: 0 0 15px rgba(37, 140, 244, 0.3);
+        }::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2d3139;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3f444e;
+        }
+    </style>
+</head>
+<body class="bg-background-dark font-sans text-slate-200 overflow-hidden h-screen flex">
+<aside class="w-[340px] border-r border-panel-border flex flex-col bg-surface-darker z-50 overflow-y-auto">
+<div class="p-6 flex items-center justify-between border-b border-panel-border">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded flex items-center justify-center text-white font-bold text-xl tracking-tighter" style="background: linear-gradient(135deg, #8b5cf6, #258cf4);">
+<span class="material-symbols-outlined text-xl">map</span>
+</div>
+<h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                    Sqkii Mapper
+                </h1>
+</div>
+<button class="px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-md transition-colors border border-slate-700">
+                Hide
+            </button>
+</div>
+<div class="px-6 py-4">
+<div class="size-12 relative flex items-center justify-center">
+<span class="material-symbols-outlined text-4xl text-yellow-400 absolute -bottom-1">nightlight</span>
+<span class="material-symbols-outlined text-3xl text-slate-300 absolute z-10 -top-1 -right-1">pets</span>
+</div>
+</div>
+<div class="flex-1 px-4 pb-6 flex flex-col gap-6">
+<section class="bg-surface-dark rounded-xl p-5 flex flex-col gap-4 border border-panel-border">
+<div class="flex items-center justify-between">
+<h2 class="text-[10px] font-bold uppercase tracking-widest text-slate-500">Data Intake</h2>
+<button class="px-2 py-1 bg-slate-800 text-slate-300 text-xs rounded border border-slate-700 hover:bg-slate-700 transition-colors">Add layer</button>
+</div>
+<div>
+<h3 class="text-sm font-bold text-white mb-3">Import and Export</h3>
+<div class="flex gap-2">
+<button class="px-3 py-1.5 bg-background-dark border border-slate-800 rounded text-xs font-medium hover:bg-slate-800 transition-colors text-slate-300">
+                            Export KML
+                        </button>
+<button class="px-3 py-1.5 bg-background-dark border border-slate-800 rounded text-xs font-medium hover:bg-slate-800 transition-colors text-slate-300">
+                            Export KMZ
+                        </button>
+</div>
+</div>
+<div class="flex flex-col gap-2 mt-2">
+<label class="text-[10px] font-bold uppercase tracking-widest text-slate-500">REMOTE KML OR KMZ URL</label>
+<div class="flex bg-background-dark border border-slate-800 rounded overflow-hidden focus-within:border-slate-600 transition-colors">
+<input class="bg-transparent border-none text-xs w-full focus:ring-0 text-slate-300 px-3 py-2 placeholder-slate-600" placeholder="https://example.com/map.kml" type="text"/>
+<button class="px-3 py-2 bg-slate-800 text-xs font-bold text-slate-300 hover:bg-slate-700 border-l border-slate-800 transition-colors">
+                            Load URL
+                        </button>
+</div>
+</div>
+</section>
+<section class="bg-surface-dark rounded-xl p-5 flex flex-col gap-4 border border-panel-border">
+<div class="flex flex-col gap-1">
+<h2 class="text-[10px] font-bold uppercase tracking-widest text-slate-500">Geometry</h2>
+<h3 class="text-sm font-bold text-white">Draw Tools</h3>
+</div>
+<div class="flex flex-col gap-3 mt-2">
+<div class="flex items-center justify-between bg-background-dark border border-slate-800 rounded p-2">
+<span class="text-sm font-semibold text-white ml-2">Circle</span>
+<div class="flex gap-2">
+<button class="px-4 py-1.5 bg-slate-800 rounded text-xs font-semibold text-slate-300 hover:bg-slate-700 transition-colors border border-slate-700">Draw Circle</button>
+<button class="size-7 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-slate-400 hover:text-accent-purple transition-colors">
+<span class="material-symbols-outlined text-sm">push_pin</span>
+</button>
+</div>
+</div>
+<div class="flex items-center justify-between bg-background-dark border border-slate-800 rounded p-2">
+<span class="text-sm font-semibold text-white ml-2">Line</span>
+<div class="flex gap-2">
+<button class="px-4 py-1.5 bg-slate-800 rounded text-xs font-semibold text-slate-300 hover:bg-slate-700 transition-colors border border-slate-700">Draw Line</button>
+<button class="size-7 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-slate-400 hover:text-accent-purple transition-colors">
+<span class="material-symbols-outlined text-sm">push_pin</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<section class="bg-surface-dark rounded-xl p-5 flex flex-col gap-4 border border-panel-border">
+<div class="flex flex-col gap-1">
+<h2 class="text-[10px] font-bold uppercase tracking-widest text-slate-500">Visibility</h2>
+<h3 class="text-sm font-bold text-white">Groups</h3>
+</div>
+<div class="flex flex-col gap-2 mt-2">
+<h4 class="text-xs font-bold text-white mb-1">Groups visibility</h4>
+<div class="flex items-center justify-between">
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="rounded bg-background-dark border-slate-700 text-primary focus:ring-primary focus:ring-offset-background-dark" type="checkbox"/>
+<span class="text-sm text-slate-300">Circles</span>
+</label>
+<span class="text-xs text-slate-500 font-mono">13</span>
+</div>
+<div class="flex items-center justify-between">
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="rounded bg-background-dark border-slate-700 text-primary focus:ring-primary focus:ring-offset-background-dark" type="checkbox"/>
+<span class="text-sm text-slate-300">Coin Sonar Scans</span>
+</label>
+<span class="text-xs text-slate-500 font-mono">5</span>
+</div>
+<div class="flex items-center justify-between">
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="rounded bg-background-dark border-slate-700 text-primary focus:ring-primary focus:ring-offset-background-dark" type="checkbox"/>
+<span class="text-sm text-slate-300">Lines</span>
+</label>
+<span class="text-xs text-slate-500 font-mono">1</span>
+</div>
+<div class="flex items-center justify-between">
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="rounded bg-background-dark border-slate-700 text-primary focus:ring-primary focus:ring-offset-background-dark" type="checkbox"/>
+<span class="text-sm text-slate-300">Live Sqkii Circles</span>
+</label>
+<span class="text-xs text-slate-500 font-mono">1</span>
+</div>
+<div class="flex items-center justify-between">
+<label class="flex items-center gap-2 cursor-pointer">
+<input class="rounded bg-background-dark border-slate-700 text-primary focus:ring-primary focus:ring-offset-background-dark" type="checkbox"/>
+<span class="text-sm text-slate-300">Shrink Pattern</span>
+</label>
+<span class="text-xs text-slate-500 font-mono">84</span>
+</div>
+</div>
+</section>
+</div>
+</aside>
+<main class="flex-1 flex flex-col relative h-full">
+<header class="h-14 bg-surface-darker/90 backdrop-blur-md border-b border-panel-border flex items-center justify-between px-4 z-20 shrink-0">
+<div class="flex items-center gap-2">
+<div class="relative group">
+<button class="flex items-center gap-2 px-3 py-1.5 bg-background-dark border border-slate-700 text-slate-200 text-xs font-medium rounded hover:border-slate-500 transition-colors">
+                    Sqkii Purple Map
+                    <span class="material-symbols-outlined text-[16px] text-slate-500">expand_more</span>
+</button>
+</div>
+<button class="px-3 py-1.5 bg-background-dark border border-slate-800 text-slate-400 text-xs font-medium rounded hover:text-slate-200 transition-colors">
+                Edit: OFF
+            </button>
+<button class="px-3 py-1.5 bg-background-dark border border-slate-800 text-white text-xs font-medium rounded hover:bg-slate-800 transition-colors">
+                Upload
+            </button>
+<button class="px-3 py-1.5 bg-background-dark border border-slate-800 text-white text-xs font-medium rounded hover:bg-slate-800 transition-colors">
+                Geohashes
+            </button>
+<button class="px-3 py-1.5 bg-background-dark border border-slate-800 text-white text-xs font-medium rounded hover:bg-slate-800 transition-colors">
+                Pixel Grid
+            </button>
+<button class="size-8 flex items-center justify-center bg-background-dark border border-slate-800 text-slate-500 rounded hover:text-slate-300 transition-colors ml-2">
+<span class="material-symbols-outlined text-[18px]">volume_up</span>
+</button>
+</div>
+<div class="flex items-center gap-3">
+<button class="size-8 flex items-center justify-center bg-background-dark border border-slate-800 text-slate-500 rounded hover:text-slate-300 transition-colors">
+<span class="material-symbols-outlined text-[18px]">description</span>
+</button>
+<div class="flex items-center gap-3 px-3 py-1.5 bg-slate-800/50 rounded-full border border-slate-700/50 text-[11px] font-mono text-slate-400">
+<div class="flex items-center gap-1.5">
+<div class="size-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+<span class="text-emerald-400">1 online</span>
+</div>
+<span class="w-px h-3 bg-slate-700"></span>
+<span>Room: silver</span>
+<span class="w-px h-3 bg-slate-700"></span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-accent-purple">location_on</span>
+                    Singapore, SG
+                </span>
+<span class="w-px h-3 bg-slate-700"></span>
+<span>IP: 138.199.60.4</span>
+</div>
+</div>
+</header>
+<div class="flex-1 relative rounded-tl-2xl overflow-hidden border-t border-l border-panel-border mt-0 ml-0 bg-surface-darker">
+<div class="absolute inset-0 z-0 map-bg" data-location="Singapore Metropolitan Area" style="">
+<div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(#8b5cf6 1px, transparent 1px); background-size: 40px 40px;"></div>
+<div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(circle at 70% 60%, rgba(139, 92, 246, 0.15) 0%, transparent 40%);"></div>
+<svg class="absolute inset-0 w-full h-full pointer-events-none opacity-40" viewBox="0 0 1000 800" xmlns="http://www.w3.org/2000/svg">
+<path d="M100,500 C200,450 300,550 400,500 S600,600 800,400 S900,300 1000,350" fill="none" stroke="#4c3b7a" stroke-width="8"></path>
+<path d="M200,800 C250,700 350,650 400,750 S500,850 600,700 S800,600 900,800" fill="none" stroke="#4c3b7a" stroke-width="6"></path>
+<circle cx="700" cy="550" fill="none" r="80" stroke="#f8fafc" stroke-width="1.5"></circle>
+<circle cx="750" cy="450" fill="#ef4444" r="4"></circle>
+<circle cx="750" cy="450" fill="none" r="12" stroke="#ef4444" stroke-width="1"></circle>
+<circle cx="950" cy="450" fill="#ef4444" r="4"></circle>
+<circle cx="950" cy="450" fill="none" r="16" stroke="#ef4444" stroke-width="1"></circle>
+<circle cx="960" cy="440" fill="none" r="24" stroke="#ef4444" stroke-width="1"></circle>
+</svg>
+<div class="absolute top-[30%] left-[30%] text-[#a78bfa] text-xs font-medium tracking-wide pointer-events-none opacity-70">Bukit Panjang</div>
+<div class="absolute top-[40%] left-[60%] text-[#a78bfa] text-xs font-medium tracking-wide pointer-events-none opacity-70">Bishan</div>
+<div class="absolute top-[53%] left-[67%] text-white text-xs font-medium tracking-wide pointer-events-none">Toa Payoh</div>
+<div class="absolute bottom-[10%] left-[65%] text-white text-xl font-bold tracking-wide pointer-events-none drop-shadow-md">Singapore</div>
+</div>
+<div class="absolute inset-0 z-40 flex items-center justify-center bg-background-dark/60 backdrop-blur-sm">
+<div class="glass-panel w-full max-w-md p-10 rounded-2xl flex flex-col items-center gap-8 shadow-2xl relative overflow-hidden border border-slate-700/50">
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.15),transparent_60%)] pointer-events-none"></div>
+<div class="text-center flex flex-col items-center gap-4 relative z-10">
+<div class="size-16 bg-surface-dark border border-slate-700 rounded-2xl flex items-center justify-center mb-2 shadow-lg relative overflow-hidden">
+<div class="absolute inset-0 bg-accent-purple/10"></div>
+<span class="material-symbols-outlined text-4xl text-accent-purple neon-glow" style="box-shadow:none; filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.8));">hub</span>
+</div>
+<h2 class="text-3xl font-bold text-white tracking-tight">Join a server</h2>
+<p class="text-slate-400 text-sm max-w-[280px]">Collaborate in real-time by entering a workspace command code.</p>
+</div>
+<div class="w-full flex flex-col gap-5 relative z-10">
+<div class="flex flex-col gap-2">
+<label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Server Code</label>
+<input class="w-full bg-background-dark border border-slate-700 rounded-xl px-5 py-4 text-center text-xl font-mono tracking-widest text-white focus:border-accent-purple focus:ring-1 focus:ring-accent-purple/50 transition-all placeholder:text-slate-700 outline-none shadow-inner" placeholder="SQK-XXXX-XXXX" type="text"/>
+</div>
+<button class="w-full py-4 bg-accent-purple hover:bg-accent-purple/90 text-white font-bold rounded-xl neon-glow transition-all active:scale-95 flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(139,92,246,0.4)]">
+                            JOIN WORKSPACE
+                            <span class="material-symbols-outlined text-lg">arrow_forward</span>
+</button>
+<button class="w-full py-2 text-slate-500 hover:text-slate-300 text-sm font-medium transition-colors">
+                            Continue without sync
+                        </button>
+</div>
+</div>
+</div>
+<div class="absolute top-4 right-4 z-20 flex flex-col gap-1">
+<button class="size-9 bg-surface-dark/90 backdrop-blur border border-panel-border rounded-t flex items-center justify-center hover:bg-slate-800 transition-colors text-slate-300">
+<span class="material-symbols-outlined text-lg">near_me</span>
+</button>
+<button class="size-9 bg-surface-dark/90 backdrop-blur border border-panel-border flex items-center justify-center hover:bg-slate-800 transition-colors text-slate-300">
+<span class="material-symbols-outlined text-lg">add</span>
+</button>
+<button class="size-9 bg-surface-dark/90 backdrop-blur border border-panel-border rounded-b flex items-center justify-center hover:bg-slate-800 transition-colors text-slate-300">
+<span class="material-symbols-outlined text-lg">remove</span>
+</button>
+</div>
+</div>
+</main>
+</body></html>

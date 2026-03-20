@@ -498,7 +498,8 @@ def check_telegram_messages():
                             "/max - Show coins that have reached smallest public shrink, and can be sonared\n"
                             "/leaderboard - Show top 15 winners by name\n"
                             "/forfeit - Check the location of forfeited coins\n"
-                            "/ask - Ask Sqkii AI any question. Enter /ask...[Your Question]\n"
+                            "/ask - Ask Gemini 2.5 Flash with live Sqkii context\n"
+                            "/ask2 - Ask Gemini Flash Lite for a faster reply\n"
                             "/weather - Check for any rain across Singapore\n"
                             "/status - Check for the status of bot and coin map\n"
                             "/help - Show this help message"
@@ -684,20 +685,29 @@ def check_telegram_messages():
                     elif msg == "/ask2" or msg.startswith("/ask2 "):
                         query = message.get("text", "").strip()[5:].strip()
                         if not query:
-                            send_telegram_message("❓ Please type a question after `/ask2`. For example: `/ask2 [What model of AI are you?]?`", from_chat_id)
+                            send_telegram_message("❓ Please type a question after `/ask2`. For example: `/ask2 [What coin is nearest me?]`", from_chat_id)
                         else:
-                            send_telegram_message("🤖 Google Gemini is Thinking...", from_chat_id)
-                            reply = ai_assistant.chatgpt_response(query)
+                            send_telegram_message("🤖 Sqkii AI is thinking...", from_chat_id)
+                            reply = ai_assistant.ask_ai(
+                                query,
+                                provider="gemini-fast",
+                                user_id=user_id,
+                                chat_id=from_chat_id,
+                            )
                             send_telegram_message(reply, from_chat_id)
 
                     elif msg == "/ask" or msg.startswith("/ask "):
                         query = message.get("text", "").strip()[4:].strip()
                         if not query:
-                            send_telegram_message("❓ Please type a question after `/ask`. For example: `/ask [What model of AI are you?]`", from_chat_id)
+                            send_telegram_message("❓ Please type a question after `/ask`. For example: `/ask [What coins are at the smallest public circle?]`", from_chat_id)
                         else:
-                            send_telegram_message("🤖 Sqkii AI is thinking... Please wait patiently (~10 seconds), Teehee!", from_chat_id)
-                            full_prompt = ai_assistant.SQKII_PRE_PROMPT + query
-                            reply = ai_assistant.openrouter_ask(full_prompt)
+                            send_telegram_message("🤖 Sqkii AI is thinking...", from_chat_id)
+                            reply = ai_assistant.ask_ai(
+                                query,
+                                provider="gemini",
+                                user_id=user_id,
+                                chat_id=from_chat_id,
+                            )
                             send_telegram_message(reply, from_chat_id)
 
                     elif msg == "/weather":

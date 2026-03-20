@@ -52,3 +52,6 @@ _startup_suppress_alerts = True
 
 # ---- Map style (may be set later) ----
 SQKII_STYLE = ""
+
+# ---- Shared Selenium driver access ----
+driver_lock = threading.Lock()

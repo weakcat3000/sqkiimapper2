@@ -50,12 +50,13 @@ def setup_chrome_driver():
     driver = webdriver.Chrome(options=options)
     stealth(driver, languages=["en-US", "en"], vendor="Google Inc.", platform="Win32",
             webgl_vendor="Intel Inc.", renderer="Intel Iris OpenGL Engine", fix_hairline=True)
-    try:
-        driver.execute_cdp_cmd("Network.enable", {})
-        driver.execute_cdp_cmd("Page.enable", {})
-    except Exception:
-        pass
-    driver.get("https://huntthemouse.sqkii.com/")
+    with state.driver_lock:
+        try:
+            driver.execute_cdp_cmd("Network.enable", {})
+            driver.execute_cdp_cmd("Page.enable", {})
+        except Exception:
+            pass
+        driver.get("https://huntthemouse.sqkii.com/")
     return driver
 
 
@@ -82,7 +83,8 @@ def setup_chrome_driver_safe():
 def auto_refresh(driver):
     while True:
         try:
-            driver.refresh()
+            with state.driver_lock:
+                driver.refresh()
             log.info("Auto-refreshed browser")
         except Exception as e:
             log.error(f"Refresh error: {e}")
@@ -100,7 +102,8 @@ def monitor_api(driver):
         try:
             entries = []
             try:
-                entries = driver.get_log("performance")
+                with state.driver_lock:
+                    entries = driver.get_log("performance")
             except Exception as e:
                 log.warning(f"PerfLog error: {repr(e)}")
                 time.sleep(1)
@@ -135,7 +138,8 @@ def monitor_api(driver):
 
                 body_text = None
                 try:
-                    result = driver.execute_cdp_cmd('Network.getResponseBody', {'requestId': req_id})
+                    with state.driver_lock:
+                        result = driver.execute_cdp_cmd('Network.getResponseBody', {'requestId': req_id})
                     if result.get('base64Encoded'):
                         body_text = base64.b64decode(result.get('body', "")).decode('utf-8', errors='replace')
                     else:
