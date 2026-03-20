@@ -3763,55 +3763,71 @@
         if (!currentRoomCode || !window.supabase) return;
 
         const snapshotState = Utils.deepClone(stateArr || shallowSerializableState());
-        const lifecycle = extractShrinkLifecycle(snapshotState);
+        const allSteps = extractShrinkLifecycle(snapshotState);
 
-        const coinLabel = `${currentRoomCode.toUpperCase()} coin - active`;
-
-        // If no circles left on the map, mark any existing LIVE record as "found"
-        if (!lifecycle.length) {
-          const { data: liveRecord } = await supabase
-            .from('coin_history_archive')
-            .select('id')
-            .eq('room_code', currentRoomCode)
-            .eq('coin_label', coinLabel)
-            .eq('status', 'active')
-            .maybeSingle();
-
-          if (liveRecord?.id) {
-            await supabase.from('coin_history_archive').update({
-              status: 'found',
-              updated_by: clientId,
-              updated_at: new Date().toISOString()
-            }).eq('id', liveRecord.id);
-          }
-          return;
+        // Group steps by layerName (each layer = one coin, e.g. "ShopBack Coin 20")
+        const grouped = {};
+        for (const step of allSteps) {
+          const key = step.layerName || 'Unknown Coin';
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push(step);
         }
 
-        const { data: existing } = await supabase
+        // Re-number steps within each group
+        for (const key of Object.keys(grouped)) {
+          grouped[key].forEach((s, i) => { s.step = i + 1; });
+        }
+
+        // Fetch all existing active records for this room
+        const { data: existingRecords } = await supabase
           .from('coin_history_archive')
-          .select('id')
+          .select('id, coin_label')
           .eq('room_code', currentRoomCode)
-          .eq('coin_label', coinLabel)
-          .maybeSingle();
+          .eq('status', 'active');
 
-        const payload = {
-          room_code: currentRoomCode,
-          coin_label: coinLabel,
-          status: 'active',
-          shrink_count: lifecycle.length,
-          lifecycle,
-          snapshot_state: snapshotState,
-          first_shrink_at: lifecycle[0]?.timestampIso || null,
-          last_shrink_at: lifecycle[lifecycle.length - 1]?.timestampIso || null,
-          updated_by: clientId,
-          updated_at: new Date().toISOString()
-        };
+        const existingByLabel = {};
+        for (const rec of (existingRecords || [])) {
+          existingByLabel[rec.coin_label] = rec.id;
+        }
 
-        if (existing?.id) {
-          await supabase.from('coin_history_archive').update(payload).eq('id', existing.id);
-        } else {
-          payload.archived_by = clientId;
-          await supabase.from('coin_history_archive').insert(payload);
+        const now = new Date().toISOString();
+        const processedLabels = new Set();
+
+        // Upsert one record per coin group
+        for (const [coinName, steps] of Object.entries(grouped)) {
+          const coinLabel = `${coinName} - Active`;
+          processedLabels.add(coinLabel);
+
+          const payload = {
+            room_code: currentRoomCode,
+            coin_label: coinLabel,
+            status: 'active',
+            shrink_count: steps.length,
+            lifecycle: steps,
+            snapshot_state: snapshotState,
+            first_shrink_at: steps[0]?.timestampIso || null,
+            last_shrink_at: steps[steps.length - 1]?.timestampIso || null,
+            updated_by: clientId,
+            updated_at: now
+          };
+
+          if (existingByLabel[coinLabel]) {
+            await supabase.from('coin_history_archive')
+              .update(payload)
+              .eq('id', existingByLabel[coinLabel]);
+          } else {
+            payload.archived_by = clientId;
+            await supabase.from('coin_history_archive').insert(payload);
+          }
+        }
+
+        // Mark any active records whose coin circles no longer exist as "found"
+        for (const [label, id] of Object.entries(existingByLabel)) {
+          if (!processedLabels.has(label)) {
+            await supabase.from('coin_history_archive')
+              .update({ status: 'found', updated_by: clientId, updated_at: now })
+              .eq('id', id);
+          }
         }
       }
 
