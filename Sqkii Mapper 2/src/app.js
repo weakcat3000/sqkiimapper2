@@ -2797,6 +2797,7 @@
           else if (val === 'satellite') mapgl.setStyle(maptilersdk.MapStyle.SATELLITE);
 
           readdAllGroupsAfterGLStyleChange();
+          if (reconOverlayPoints.length) mapgl.once('idle', () => scheduleReconOverlayRestore());
           showGL();
         }
 
@@ -5199,10 +5200,6 @@
       document.getElementById('recon-modal')?.addEventListener('click', (e) => {
         if (e.target.id === 'recon-modal') closeReconModal();
       });
-      mapgl.on('styledata', () => {
-        if (reconOverlayPoints.length) scheduleReconOverlayRestore();
-      });
-
       if (engine === 'gl') {
         mapgl.on('mousemove', (e) => {
           if (!circleDragCtx) return;
