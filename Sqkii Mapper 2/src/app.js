@@ -3746,6 +3746,9 @@
           suppressNextRemoteApply = true;
           await upsertRoomState(currentRoomCode, state);
           localSaveOnly();
+
+          // Auto-archive shrink lifecycle alongside room state (same caller)
+          try { await autoArchiveShrinkNow(state); } catch (ae) { console.warn('[AutoArchive]', ae); }
         } catch (e) {
           console.warn('Supabase sync failed:', e);
         } finally {
@@ -3753,49 +3756,45 @@
         }
       }, 10000);
 
-      function saveState() { syncToServerDebounced(); autoArchiveShrinkDebounced(); }
+      function saveState() { syncToServerDebounced(); }
 
       /* ---- Auto-archive shrink lifecycle to coin_history_archive ---- */
-      const autoArchiveShrinkDebounced = Utils.debounce(async function () {
+      async function autoArchiveShrinkNow(stateArr) {
         if (!currentRoomCode || !window.supabase) return;
-        try {
-          const snapshotState = Utils.deepClone(shallowSerializableState());
-          const lifecycle = extractShrinkLifecycle(snapshotState);
-          if (!lifecycle.length) return;  // nothing to archive
 
-          const coinLabel = `${currentRoomCode.toUpperCase()} coin - active`;
+        const snapshotState = Utils.deepClone(stateArr || shallowSerializableState());
+        const lifecycle = extractShrinkLifecycle(snapshotState);
+        if (!lifecycle.length) return;
 
-          // Try to find an existing active record for this room
-          const { data: existing } = await supabase
-            .from('coin_history_archive')
-            .select('id')
-            .eq('room_code', currentRoomCode)
-            .eq('coin_label', coinLabel)
-            .maybeSingle();
+        const coinLabel = `${currentRoomCode.toUpperCase()} coin - active`;
 
-          const payload = {
-            room_code: currentRoomCode,
-            coin_label: coinLabel,
-            status: 'active',
-            shrink_count: lifecycle.length,
-            lifecycle,
-            snapshot_state: snapshotState,
-            first_shrink_at: lifecycle[0]?.timestampIso || null,
-            last_shrink_at: lifecycle[lifecycle.length - 1]?.timestampIso || null,
-            updated_by: clientId,
-            updated_at: new Date().toISOString()
-          };
+        const { data: existing } = await supabase
+          .from('coin_history_archive')
+          .select('id')
+          .eq('room_code', currentRoomCode)
+          .eq('coin_label', coinLabel)
+          .maybeSingle();
 
-          if (existing?.id) {
-            await supabase.from('coin_history_archive').update(payload).eq('id', existing.id);
-          } else {
-            payload.archived_by = clientId;
-            await supabase.from('coin_history_archive').insert(payload);
-          }
-        } catch (e) {
-          console.warn('[AutoArchive] Failed:', e);
+        const payload = {
+          room_code: currentRoomCode,
+          coin_label: coinLabel,
+          status: 'active',
+          shrink_count: lifecycle.length,
+          lifecycle,
+          snapshot_state: snapshotState,
+          first_shrink_at: lifecycle[0]?.timestampIso || null,
+          last_shrink_at: lifecycle[lifecycle.length - 1]?.timestampIso || null,
+          updated_by: clientId,
+          updated_at: new Date().toISOString()
+        };
+
+        if (existing?.id) {
+          await supabase.from('coin_history_archive').update(payload).eq('id', existing.id);
+        } else {
+          payload.archived_by = clientId;
+          await supabase.from('coin_history_archive').insert(payload);
         }
-      }, 15000);  // 15s debounce — runs after map sync settles
+      }
 
       let roomChannel = null;
       let presenceChannel = null;
