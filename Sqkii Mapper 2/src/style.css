@@ -1644,6 +1644,18 @@
         line-height: 1.2;
         min-height: 38px
       }
+
+      html.ios-device .map-edit-fab,
+      html.ios-device #connection-indicator,
+      html.ios-device #connection-dropdown {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+      }
+
+      html.ios-device .darkveil-canvas {
+        opacity: .24;
+        filter: none;
+      }
     }
 
     .maplibregl-ctrl-bottom-right {

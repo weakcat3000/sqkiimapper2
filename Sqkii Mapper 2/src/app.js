@@ -1404,9 +1404,17 @@
       })();
       /* ================= Map engines ================= */
       const ALL_FILL_LAYER_IDS = [];
+      const UA = navigator.userAgent || '';
+      const IS_IOS_DEVICE = /iPad|iPhone|iPod/.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const IS_TOUCH_DEVICE = (navigator.maxTouchPoints || 0) > 0 || !!window.matchMedia?.('(pointer: coarse)')?.matches;
+      if (IS_IOS_DEVICE) document.documentElement.classList.add('ios-device');
+      if (IS_TOUCH_DEVICE) document.documentElement.classList.add('touch-device');
       maptilersdk.config.apiKey = 'f9B8Wv0ythtbvpcK0QEw';
       const CUSTOM_STYLE = 'https://api.maptiler.com/maps/01994e5b-af91-7fae-b8bd-a68c497abf96/style.json?key=' + maptilersdk.config.apiKey;
-      const MAPGL_PIXEL_RATIO = Math.min((Number(window.devicePixelRatio || 1) * 1.25), 3);
+      const baseDevicePixelRatio = Number(window.devicePixelRatio || 1);
+      const MAPGL_PIXEL_RATIO = IS_IOS_DEVICE
+        ? Math.min(Math.max(1, baseDevicePixelRatio * 0.8), 1.8)
+        : Math.min(baseDevicePixelRatio * 1.25, 3);
 
       const mapgl = new maptilersdk.Map({
         container: 'mapgl',
@@ -1432,7 +1440,7 @@
           if (cat.dotLottie?.setRenderConfig) {
             cat.dotLottie.setRenderConfig({
               autoResize: true,
-              devicePixelRatio: 1.1,
+              devicePixelRatio: IS_IOS_DEVICE ? 0.75 : 1.1,
             });
           }
         };
@@ -4131,7 +4139,9 @@
       const stopAllSfx = () => document.querySelectorAll('audio').forEach(el => { if (el !== bgm) stopHtmlAudio(el); });
       const suspendWebAudio = async () => { try { if (audioCtx?.state !== 'suspended') await audioCtx.suspend(); } catch { } };
       const resumeWebAudio = async () => { try { if (audioCtx?.state === 'suspended') await audioCtx.resume(); } catch { } };
-      const canResumeAudio = () => !document.hidden && document.visibilityState === 'visible';
+      let audioBackgroundLocked = false;
+      const pageIsVisible = () => !document.hidden && document.visibilityState === 'visible';
+      const canResumeAudio = () => pageIsVisible() && !audioBackgroundLocked;
       async function pauseAllAudio() {
         try { await fadeAudio(bgm, 0, 200); } catch { }
         stopHtmlAudio(bgm);
@@ -4155,17 +4165,30 @@
         } catch { }
       }
 
+      const lockAudioToBackground = () => {
+        audioBackgroundLocked = true;
+        pauseAllAudio();
+      };
+      const tryUnlockAudioFromForeground = () => {
+        if (!pageIsVisible()) return;
+        audioBackgroundLocked = false;
+        resumeBgmIfAllowed();
+      };
+
       // Handle mobile/browser backgrounding more aggressively than visibilitychange alone.
       document.addEventListener('visibilitychange', () => {
-        if (document.hidden) pauseAllAudio();
-        else resumeBgmIfAllowed();
+        if (document.hidden) lockAudioToBackground();
+        else tryUnlockAudioFromForeground();
       });
-      window.addEventListener('pagehide', () => { pauseAllAudio(); });
+      document.addEventListener('freeze', lockAudioToBackground);
+      window.addEventListener('pagehide', lockAudioToBackground);
       window.addEventListener('blur', () => {
-        if (document.hidden || document.visibilityState !== 'visible') pauseAllAudio();
+        if (IS_IOS_DEVICE || document.hidden || document.visibilityState !== 'visible') {
+          lockAudioToBackground();
+        }
       });
-      window.addEventListener('pageshow', () => { resumeBgmIfAllowed(); });
-      window.addEventListener('focus', () => { resumeBgmIfAllowed(); });
+      window.addEventListener('pageshow', () => { requestAnimationFrame(tryUnlockAudioFromForeground); });
+      window.addEventListener('focus', () => { requestAnimationFrame(tryUnlockAudioFromForeground); });
 
 
       let audioCtx = null, buttonBuffer = null;
@@ -7334,7 +7357,7 @@
 
       /* ===== Dark Veil — pure WebGL (brighter & obvious purple) ===== */
       /* ===== EDITABLE KNOBS (Ultra-Blended) ===== */
-      const SPEED = 0.25, ANGLE_SPEED = 0.12, BRIGHTNESS = 1.10, RES_SCALE = 1.0;
+      const SPEED = 0.25, ANGLE_SPEED = 0.12, BRIGHTNESS = IS_IOS_DEVICE ? 1.04 : 1.10, RES_SCALE = IS_IOS_DEVICE ? 0.55 : 1.0;
       const BASE_PURPLE = [0.50, 0.32, 0.96], ACC_LIGHT = [0.98, 0.78, 1.00], ACC_DARK = [0.36, 0.08, 0.60];
       const STR1 = 0.55, WIDTH1 = 0.82, FREQ1 = 4.0, OFF1 = 0.05;  // light accent
       const STR2 = 0.45, WIDTH2 = 0.80, FREQ2 = 5.2, OFF2 = 0.24;  // dark accent
