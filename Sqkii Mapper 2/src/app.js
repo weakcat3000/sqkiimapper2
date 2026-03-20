@@ -3792,13 +3792,13 @@
         // Fetch all existing active records for this room
         const { data: existingRecords } = await supabase
           .from('coin_history_archive')
-          .select('id, coin_label')
+          .select('id, coin_label, lifecycle, first_shrink_at, last_shrink_at')
           .eq('room_code', currentRoomCode)
           .eq('status', 'active');
 
         const existingByLabel = {};
         for (const rec of (existingRecords || [])) {
-          existingByLabel[coinDbCanonicalLabel(rec.coin_label)] = rec.id;
+          existingByLabel[coinDbCanonicalLabel(rec.coin_label)] = rec;
         }
 
         const now = new Date().toISOString();
@@ -3807,7 +3807,8 @@
         // Upsert one active record per live coin
         for (const group of coinGroups.filter((item) => item.isLive)) {
           const coinLabel = coinDbCanonicalLabel(group.coinLabel) || coinDbGetActiveLabel();
-          const steps = group.steps || [];
+          const existingRecord = existingByLabel[coinLabel];
+          const steps = coinDbMergeLifecycle(existingRecord?.lifecycle || [], group.steps || []);
           processedLabels.add(coinLabel);
 
           const payload = {
@@ -3823,10 +3824,10 @@
             updated_at: now
           };
 
-          if (existingByLabel[coinLabel]) {
+          if (existingRecord?.id) {
             await supabase.from('coin_history_archive')
               .update(payload)
-              .eq('id', existingByLabel[coinLabel]);
+              .eq('id', existingRecord.id);
           } else {
             payload.archived_by = clientId;
             await supabase.from('coin_history_archive').insert(payload);
@@ -3834,11 +3835,11 @@
         }
 
         // Mark any active records whose coin circles no longer exist as "found"
-        for (const [label, id] of Object.entries(existingByLabel)) {
+        for (const [label, record] of Object.entries(existingByLabel)) {
           if (!processedLabels.has(label)) {
             await supabase.from('coin_history_archive')
               .update({ status: 'found', updated_by: clientId, updated_at: now })
-              .eq('id', id);
+              .eq('id', record.id);
           }
         }
       }
@@ -5573,6 +5574,63 @@
         return groups;
       }
 
+      function coinDbStepTimestamp(step) {
+        const tsMs = Number(step?.timestampMs);
+        if (Number.isFinite(tsMs) && tsMs > 0) return tsMs;
+        const tsIso = step?.timestampIso ? new Date(step.timestampIso).getTime() : NaN;
+        return Number.isFinite(tsIso) ? tsIso : Number.MAX_SAFE_INTEGER;
+      }
+
+      function coinDbStepIdentity(step) {
+        const coinId = coinDbRootCoinId(step?.coinId || step?.fid || '');
+        const lat = Number(step?.lat);
+        const lng = Number(step?.lng);
+        const radius = Number(step?.radiusMeters);
+        const ts = Number(step?.timestampMs);
+        return [
+          coinId,
+          Number.isFinite(lat) ? lat.toFixed(6) : '',
+          Number.isFinite(lng) ? lng.toFixed(6) : '',
+          Number.isFinite(radius) ? radius.toFixed(2) : '',
+          Number.isFinite(ts) ? String(ts) : String(step?.timestampIso || ''),
+          String(step?.featureName || '')
+        ].join('|');
+      }
+
+      function coinDbMergeLifecycle(existingSteps = [], incomingSteps = []) {
+        const merged = new Map();
+
+        for (const step of (existingSteps || [])) {
+          if (!step) continue;
+          merged.set(coinDbStepIdentity(step), {
+            ...step,
+            coinId: coinDbRootCoinId(step.coinId || step.fid || ''),
+            coinLabel: coinDbCanonicalLabel(step.coinLabel || ''),
+          });
+        }
+
+        for (const step of (incomingSteps || [])) {
+          if (!step) continue;
+          merged.set(coinDbStepIdentity(step), {
+            ...step,
+            coinId: coinDbRootCoinId(step.coinId || step.fid || ''),
+            coinLabel: coinDbCanonicalLabel(step.coinLabel || ''),
+          });
+        }
+
+        return [...merged.values()]
+          .sort((a, b) => {
+            const ta = coinDbStepTimestamp(a);
+            const tb = coinDbStepTimestamp(b);
+            if (ta !== tb) return ta - tb;
+            return String(a.featureName || '').localeCompare(String(b.featureName || ''));
+          })
+          .map((step, index) => ({
+            ...step,
+            step: index + 1
+          }));
+      }
+
       function coinDbDefaultName() {
         const stamp = new Date().toLocaleDateString();
         return `${(currentRoomCode || 'coin').toUpperCase()} coin - ${stamp}`;
@@ -5774,16 +5832,17 @@
           const matchingActive = (activeRecords || []).find((entry) => (
             coinDbCanonicalLabel(entry.coin_label) === coinLabel
           ));
+          const mergedLifecycle = coinDbMergeLifecycle(matchingActive?.lifecycle || [], lifecycle);
 
           const payload = {
             room_code: currentRoomCode,
             coin_label: coinLabel,
             status: 'found',
-            shrink_count: lifecycle.length,
-            lifecycle,
+            shrink_count: mergedLifecycle.length,
+            lifecycle: mergedLifecycle,
             snapshot_state: snapshotState,
-            first_shrink_at: lifecycle[0]?.timestampIso || null,
-            last_shrink_at: lifecycle[lifecycle.length - 1]?.timestampIso || null,
+            first_shrink_at: mergedLifecycle[0]?.timestampIso || null,
+            last_shrink_at: mergedLifecycle[mergedLifecycle.length - 1]?.timestampIso || null,
             archived_by: clientId,
             updated_by: clientId,
             updated_at: new Date().toISOString()
@@ -5802,7 +5861,7 @@
 
           if (coinDbNameInput) coinDbNameInput.value = coinLabel;
           await refreshCoinDatabase();
-          coinDbSetStatus(`Archived "${coinLabel}" with ${lifecycle.length} shrink step(s).`);
+          coinDbSetStatus(`Archived "${coinLabel}" with ${mergedLifecycle.length} shrink step(s).`);
         } catch (error) {
           coinDbSetStatus(coinDbFriendlyError(error), true);
         } finally {
