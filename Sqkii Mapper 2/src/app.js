@@ -1406,8 +1406,15 @@
       const ALL_FILL_LAYER_IDS = [];
       maptilersdk.config.apiKey = 'f9B8Wv0ythtbvpcK0QEw';
       const CUSTOM_STYLE = 'https://api.maptiler.com/maps/01994e5b-af91-7fae-b8bd-a68c497abf96/style.json?key=' + maptilersdk.config.apiKey;
+      const MAPGL_PIXEL_RATIO = Math.min((Number(window.devicePixelRatio || 1) * 1.25), 3);
 
-      const mapgl = new maptilersdk.Map({ container: 'mapgl', style: CUSTOM_STYLE, center: [103.8198, 1.3521], zoom: 12 });
+      const mapgl = new maptilersdk.Map({
+        container: 'mapgl',
+        style: CUSTOM_STYLE,
+        center: [103.8198, 1.3521],
+        zoom: 12,
+        pixelRatio: MAPGL_PIXEL_RATIO
+      });
 
       const pauseVeil = () => window.__pauseVeil?.();
       const resumeVeil = () => window.__resumeVeil?.();
