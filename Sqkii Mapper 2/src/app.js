@@ -4146,8 +4146,12 @@
       let audioBackgroundLocked = false;
       const pageIsVisible = () => !document.hidden && document.visibilityState === 'visible';
       const canResumeAudio = () => pageIsVisible() && !audioBackgroundLocked;
-      async function pauseAllAudio() {
-        try { await fadeAudio(bgm, 0, 200); } catch { }
+      async function pauseAllAudio({ immediate = false } = {}) {
+        if (immediate) {
+          try { bgm.volume = 0; } catch { }
+        } else {
+          try { await fadeAudio(bgm, 0, 200); } catch { }
+        }
         stopHtmlAudio(bgm);
         stopAllSfx();
         await suspendWebAudio();
@@ -4177,7 +4181,7 @@
       const lockAudioToBackground = () => {
         clearAudioBlurLockTimer();
         audioBackgroundLocked = true;
-        pauseAllAudio();
+        pauseAllAudio({ immediate: true });
       };
       const tryUnlockAudioFromForeground = () => {
         clearAudioBlurLockTimer();
