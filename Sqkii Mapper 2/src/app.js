@@ -4048,7 +4048,7 @@
       function hideServerModal() {
         modal.classList.remove('visible');
         appEl.classList.remove('blocked-by-modal');
-        requestAnimationFrame(() => { tryUnlockAudioFromForeground(); });
+        requestAnimationFrame(() => { unlockAudioFromUserGesture(); });
       }
 
       serverJoin.addEventListener('click', async () => {
@@ -4126,6 +4126,8 @@
       const bgm = new Audio('Evening Traveler - Road Trip.mp3');
       bgm.volume = Math.min(bgmTargetVolume(), 1);
       bgm.loop = true;
+      bgm.preload = 'auto';
+      bgm.playsInline = true;
 
       // Fade helper
       const fadeAudio = (a, to = 0, ms = 400) => new Promise(res => {
@@ -4189,6 +4191,13 @@
         audioBackgroundLocked = false;
         resumeBgmIfAllowed();
       };
+      const unlockAudioFromUserGesture = () => {
+        clearAudioBlurLockTimer();
+        if (!pageIsVisible()) return;
+        audioBackgroundLocked = false;
+        ensureAudioCtxResumed();
+        resumeBgmIfAllowed();
+      };
       const scheduleBlurAudioCheck = () => {
         clearAudioBlurLockTimer();
         audioBlurLockTimer = setTimeout(() => {
@@ -4241,8 +4250,7 @@
         } catch (e) { }
       }
       document.addEventListener('pointerdown', () => {
-        ensureAudioCtxResumed();
-        if (audioEnabled && canResumeAudio()) { bgm.play().catch(() => { }); }
+        unlockAudioFromUserGesture();
         playClick();
       }, { once: true, capture: true });
 
@@ -4257,7 +4265,7 @@
         audioEnabled = !audioEnabled;
         setAudioIcon(audioEnabled);
         if (!audioEnabled) pauseAllAudio();
-        else if (canResumeAudio()) resumeBgmIfAllowed();
+        else unlockAudioFromUserGesture();
       });
       document.addEventListener('click', (ev) => { if (ev.target.closest('button')) playClick(); }, { capture: true });
 
