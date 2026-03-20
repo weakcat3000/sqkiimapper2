@@ -4045,7 +4045,11 @@
         } catch { }
       }
       function showServerModal() { modal.classList.add('visible'); appEl.classList.add('blocked-by-modal'); }
-      function hideServerModal() { modal.classList.remove('visible'); appEl.classList.remove('blocked-by-modal'); }
+      function hideServerModal() {
+        modal.classList.remove('visible');
+        appEl.classList.remove('blocked-by-modal');
+        requestAnimationFrame(() => { tryUnlockAudioFromForeground(); });
+      }
 
       serverJoin.addEventListener('click', async () => {
         const code = (serverInput.value || '').trim();
@@ -4165,14 +4169,27 @@
         } catch { }
       }
 
+      let audioBlurLockTimer = 0;
+      const clearAudioBlurLockTimer = () => {
+        clearTimeout(audioBlurLockTimer);
+        audioBlurLockTimer = 0;
+      };
       const lockAudioToBackground = () => {
+        clearAudioBlurLockTimer();
         audioBackgroundLocked = true;
         pauseAllAudio();
       };
       const tryUnlockAudioFromForeground = () => {
+        clearAudioBlurLockTimer();
         if (!pageIsVisible()) return;
         audioBackgroundLocked = false;
         resumeBgmIfAllowed();
+      };
+      const scheduleBlurAudioCheck = () => {
+        clearAudioBlurLockTimer();
+        audioBlurLockTimer = setTimeout(() => {
+          if (!pageIsVisible()) lockAudioToBackground();
+        }, IS_IOS_DEVICE ? 180 : 0);
       };
 
       // Handle mobile/browser backgrounding more aggressively than visibilitychange alone.
@@ -4182,11 +4199,7 @@
       });
       document.addEventListener('freeze', lockAudioToBackground);
       window.addEventListener('pagehide', lockAudioToBackground);
-      window.addEventListener('blur', () => {
-        if (IS_IOS_DEVICE || document.hidden || document.visibilityState !== 'visible') {
-          lockAudioToBackground();
-        }
-      });
+      window.addEventListener('blur', scheduleBlurAudioCheck);
       window.addEventListener('pageshow', () => { requestAnimationFrame(tryUnlockAudioFromForeground); });
       window.addEventListener('focus', () => { requestAnimationFrame(tryUnlockAudioFromForeground); });
 
