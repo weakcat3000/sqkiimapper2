@@ -103,6 +103,222 @@ def _circle_polygon(lng: float, lat: float, radius_m: float, steps: int = CIRCLE
     return {"type": "Polygon", "coordinates": [coords]}
 
 
+def _canonical_coin_label(label: str) -> str:
+    s = " ".join(str(label or "").split()).strip()
+    if s.lower().endswith(" (past)"):
+        s = s[:-7].rstrip()
+    if s.lower().endswith(" - active"):
+        s = s[:-9].rstrip()
+    return s
+
+
+def _haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    R = 6371000.0
+    dlat = math.radians(lat2 - lat1)
+    dlng = math.radians(lng2 - lng1)
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(math.radians(lat1))
+        * math.cos(math.radians(lat2))
+        * math.sin(dlng / 2) ** 2
+    )
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(max(0.0, 1 - a)))
+
+
+def _circle_meta_from_feature(feature: dict):
+    props = (feature or {}).get("properties") or {}
+    try:
+        lat = float(props.get("_circleLat"))
+        lng = float(props.get("_circleLng"))
+        radius = float(props.get("_circleRadius"))
+        return lat, lng, radius
+    except Exception:
+        pass
+
+    geom = (feature or {}).get("geometry") or {}
+    coords = geom.get("coordinates") or []
+    if geom.get("type") != "Polygon" or not coords or not isinstance(coords[0], list):
+        return None, None, None
+
+    ring = coords[0][:-1] if len(coords[0]) > 1 else coords[0]
+    if not ring:
+        return None, None, None
+
+    try:
+        lng = sum(float(pt[0]) for pt in ring) / len(ring)
+        lat = sum(float(pt[1]) for pt in ring) / len(ring)
+        radius = _haversine_m(lat, lng, float(ring[0][1]), float(ring[0][0]))
+        return lat, lng, radius
+    except Exception:
+        return None, None, None
+
+
+def _ensure_archive_props(feature: dict, fid_root: str = "", coin_label: str = ""):
+    if not isinstance(feature, dict):
+        return
+    props = feature.setdefault("properties", {}) or {}
+    if fid_root:
+        props.setdefault("_coinId", fid_root)
+    if coin_label:
+        props.setdefault("_coinLabel", _canonical_coin_label(coin_label))
+    props["_coinArchiveEligible"] = True
+    props["_coinArchiveSource"] = "silver-api"
+
+    lat, lng, radius = _circle_meta_from_feature(feature)
+    if lat is not None and lng is not None and radius is not None:
+        props.setdefault("_circleLat", lat)
+        props.setdefault("_circleLng", lng)
+        props.setdefault("_circleCenter", [lng, lat])
+        props.setdefault("_circleRadius", radius)
+
+
+def _feature_to_archive_step(feature: dict, default_layer_name: str = "Shrink Pattern"):
+    if not isinstance(feature, dict):
+        return None
+    props = feature.get("properties") or {}
+    fid = str(props.get("fid") or props.get("_gid") or "")
+    coin_id = _root_coin_id(str(props.get("_coinId") or fid)) or str(props.get("_coinId") or fid)
+    coin_label = _canonical_coin_label(props.get("_coinLabel") or props.get("name") or coin_id)
+    lat, lng, radius = _circle_meta_from_feature(feature)
+    if lat is None or lng is None or radius is None:
+        return None
+
+    ts_ms = _parse_ts_ms(feature) or _now_ms()
+    return {
+        "step": 0,
+        "layerName": default_layer_name,
+        "featureName": str(props.get("name") or default_layer_name),
+        "coinId": coin_id,
+        "coinLabel": coin_label,
+        "lat": lat,
+        "lng": lng,
+        "radiusMeters": radius,
+        "timestampMs": ts_ms,
+        "timestampIso": datetime.fromtimestamp(ts_ms / 1000.0, tz=timezone.utc).isoformat(),
+        "fid": fid,
+    }
+
+
+def _step_identity(step: dict) -> str:
+    coin_id = _root_coin_id(str((step or {}).get("coinId") or (step or {}).get("fid") or ""))
+    try:
+        lat = f"{float((step or {}).get('lat')):.6f}"
+        lng = f"{float((step or {}).get('lng')):.6f}"
+        radius = f"{float((step or {}).get('radiusMeters')):.2f}"
+    except Exception:
+        lat = lng = radius = ""
+    ts = str((step or {}).get("timestampMs") or (step or {}).get("timestampIso") or "")
+    feature_name = str((step or {}).get("featureName") or "")
+    return "|".join([coin_id, lat, lng, radius, ts, feature_name])
+
+
+def _merge_lifecycle(existing_steps, incoming_steps):
+    merged = {}
+    for step in (existing_steps or []):
+        if isinstance(step, dict):
+            merged[_step_identity(step)] = dict(step)
+    for step in (incoming_steps or []):
+        if isinstance(step, dict):
+            merged[_step_identity(step)] = dict(step)
+
+    out = list(merged.values())
+    out.sort(key=lambda s: (
+        int(s.get("timestampMs") or 0),
+        str(s.get("featureName") or ""),
+    ))
+    for i, step in enumerate(out, 1):
+        step["step"] = i
+    return out
+
+
+def _sync_coin_history_archive(sb, code: str, live_layer: dict, shrink_layer: dict, snapshot_state):
+    live_features = ((live_layer or {}).get("data") or {}).get("features") or []
+    shrink_features = ((shrink_layer or {}).get("data") or {}).get("features") or []
+
+    groups = {}
+    for feature in live_features:
+        props = (feature or {}).get("properties") or {}
+        coin_id = _root_coin_id(str(props.get("_coinId") or props.get("fid") or props.get("_gid") or ""))
+        if not coin_id:
+            continue
+        coin_label = _canonical_coin_label(props.get("_coinLabel") or props.get("name") or coin_id)
+        groups[coin_id] = {
+            "coin_label": coin_label,
+            "is_live": True,
+            "steps": [],
+        }
+
+    for feature in shrink_features:
+        step = _feature_to_archive_step(feature, "Shrink Pattern")
+        if not step:
+            continue
+        coin_id = step["coinId"]
+        group = groups.setdefault(coin_id, {
+            "coin_label": step["coinLabel"],
+            "is_live": False,
+            "steps": [],
+        })
+        if not group.get("coin_label"):
+            group["coin_label"] = step["coinLabel"]
+        group["steps"].append(step)
+
+    for group in groups.values():
+        group["steps"] = _merge_lifecycle([], group.get("steps") or [])
+
+    existing_rows = (
+        sb.table("coin_history_archive")
+        .select("id, coin_label, lifecycle")
+        .eq("room_code", code)
+        .eq("status", "active")
+        .execute()
+        .data
+        or []
+    )
+    existing_by_label = {
+        _canonical_coin_label(row.get("coin_label")): row
+        for row in existing_rows
+        if isinstance(row, dict)
+    }
+
+    now_iso = datetime.now(tz=timezone.utc).isoformat()
+    processed = set()
+
+    for group in groups.values():
+        if not group.get("is_live"):
+            continue
+        coin_label = _canonical_coin_label(group.get("coin_label"))
+        processed.add(coin_label)
+        existing = existing_by_label.get(coin_label) or {}
+        merged_steps = _merge_lifecycle(existing.get("lifecycle") or [], group.get("steps") or [])
+        payload = {
+            "room_code": code,
+            "coin_label": coin_label,
+            "status": "active",
+            "shrink_count": len(merged_steps),
+            "lifecycle": merged_steps,
+            "snapshot_state": snapshot_state,
+            "first_shrink_at": merged_steps[0]["timestampIso"] if merged_steps else None,
+            "last_shrink_at": merged_steps[-1]["timestampIso"] if merged_steps else None,
+            "updated_by": "python-bot",
+            "updated_at": now_iso,
+        }
+
+        if existing.get("id"):
+            sb.table("coin_history_archive").update(payload).eq("id", existing["id"]).execute()
+        else:
+            payload["archived_by"] = "python-bot"
+            sb.table("coin_history_archive").insert(payload).execute()
+
+    for label, row in existing_by_label.items():
+        if label in processed:
+            continue
+        sb.table("coin_history_archive").update({
+            "status": "found",
+            "updated_by": "python-bot",
+            "updated_at": now_iso,
+        }).eq("id", row["id"]).execute()
+
+
 # ---- Blue-outline classification ----
 
 def _is_blue_outline_name(name: str) -> bool:
@@ -158,6 +374,14 @@ def _build_circles_layer(points, layer_name: str, opacity: float = 0.075) -> dic
                 "_gid": coin_id,
                 "_ts": ts,
                 "name": str(display_name),
+                "_coinId": coin_id,
+                "_coinLabel": _canonical_coin_label(display_name),
+                "_coinArchiveEligible": True,
+                "_coinArchiveSource": "silver-api",
+                "_circleLat": lat,
+                "_circleLng": lng,
+                "_circleCenter": [lng, lat],
+                "_circleRadius": radius_m,
                 "hidden": False,
                 "_fill": fill_color,
                 "_fillOpacity": opacity,
@@ -297,6 +521,7 @@ def sync_mapper_circles(silver_points):
                     live_feat = live_root_to_feature.get(fid_root) or {}
                     live_name = ((live_feat.get("properties") or {}).get("name") or "")
                     is_blue = _is_blue_outline_name(str(live_name))
+                    _ensure_archive_props(f, fid_root, live_name)
                     _normalise_history_feature(f, is_blue)
                     shrink_feats.append(f)
                     gh = _geom_hash(f.get("geometry") or {})
@@ -339,12 +564,14 @@ def sync_mapper_circles(silver_points):
                 "fillColor": fill_col,
                 "fillOpacity": 0.0,
             }
-            shrink_feats.append({
+            history_feature = {
                 "type": "Feature",
                 "geometry": geom_src,
                 "properties": props,
                 "style": style,
-            })
+            }
+            _ensure_archive_props(history_feature, fid_root, live_name)
+            shrink_feats.append(history_feature)
             seen_hashes_by_coin.setdefault(fid_root, set()).add(ghash)
 
         for fid, newf in new_live_map.items():
@@ -413,6 +640,7 @@ def sync_mapper_circles(silver_points):
                 pass
 
         _upsert_layers(sb, ROOM_CODE, final_layers)
+        _sync_coin_history_archive(sb, ROOM_CODE, new_live_layer, new_shrink_layer, final_layers)
 
     if pts:
         HAVE_SENT_NON_EMPTY = True
