@@ -3764,9 +3764,28 @@
 
         const snapshotState = Utils.deepClone(stateArr || shallowSerializableState());
         const lifecycle = extractShrinkLifecycle(snapshotState);
-        if (!lifecycle.length) return;
 
         const coinLabel = `${currentRoomCode.toUpperCase()} coin - active`;
+
+        // If no circles left on the map, mark any existing LIVE record as "found"
+        if (!lifecycle.length) {
+          const { data: liveRecord } = await supabase
+            .from('coin_history_archive')
+            .select('id')
+            .eq('room_code', currentRoomCode)
+            .eq('coin_label', coinLabel)
+            .eq('status', 'active')
+            .maybeSingle();
+
+          if (liveRecord?.id) {
+            await supabase.from('coin_history_archive').update({
+              status: 'found',
+              updated_by: clientId,
+              updated_at: new Date().toISOString()
+            }).eq('id', liveRecord.id);
+          }
+          return;
+        }
 
         const { data: existing } = await supabase
           .from('coin_history_archive')
@@ -5422,7 +5441,9 @@
 
           const statusBadge = entry.status === 'active'
             ? '<span class="coin-db-badge active">● LIVE</span>'
-            : '<span class="coin-db-badge archived">● Archived</span>';
+            : entry.status === 'found'
+              ? '<span class="coin-db-badge found">● Found</span>'
+              : '<span class="coin-db-badge archived">● Archived</span>';
 
           return `
             <details class="coin-db-dropdown" data-entry-id="${escapeHtml(entry.id)}">

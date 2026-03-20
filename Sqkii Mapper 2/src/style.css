@@ -794,6 +794,12 @@
       border: 1px solid var(--border);
     }
 
+    .coin-db-badge.found {
+      color: #fde68a;
+      background: rgba(234, 179, 8, 0.15);
+      border: 1px solid rgba(234, 179, 8, 0.3);
+    }
+
     .coin-db-dropdown-body {
       padding: 0 14px 14px;
       display: grid;
