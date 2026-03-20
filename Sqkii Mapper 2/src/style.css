@@ -810,6 +810,16 @@
       gap: 8px;
     }
 
+    .coin-db-footer-btns .danger {
+      border-color: rgba(239, 68, 68, 0.55);
+      background: rgba(127, 29, 29, 0.34);
+      color: #fecaca;
+    }
+
+    .coin-db-footer-btns .danger:hover {
+      background: rgba(153, 27, 27, 0.5);
+    }
+
     .coin-db-entry-head {
       display: flex;
       justify-content: space-between;

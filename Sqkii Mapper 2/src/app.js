@@ -5476,6 +5476,7 @@
                   <div class="coin-db-note-footer">
                     <div class="coin-db-inline-status" id="coin-db-inline-status-${escapeHtml(entry.id)}"></div>
                     <div class="coin-db-footer-btns">
+                      <button class="btn small coin-db-delete-entry danger" data-entry-id="${escapeHtml(entry.id)}" title="Delete this archived coin">Delete</button>
                       <button class="btn small coin-db-load-snapshot" data-entry-id="${escapeHtml(entry.id)}">Load Snapshot</button>
                       <button class="btn small coin-db-save-note" data-entry-id="${escapeHtml(entry.id)}">Save Exact Spot</button>
                     </div>
@@ -5633,6 +5634,22 @@
         }
       }
 
+      async function deleteCoinDbEntry(entryId) {
+        const entry = coinDbEntriesCache.find((item) => String(item.id) === String(entryId));
+        const label = entry?.coin_label || 'this coin';
+        if (!confirm(`Delete "${label}"? This cannot be undone.`)) return;
+
+        coinDbSetStatus('Deleting...');
+        try {
+          const { error } = await supabase.from(COIN_DB_TABLE).delete().eq('id', entryId);
+          if (error) throw error;
+          coinDbSetStatus(`Deleted "${label}".`);
+          await refreshCoinDatabase();
+        } catch (error) {
+          coinDbSetStatus(coinDbFriendlyError(error), true);
+        }
+      }
+
       function openCoinDbModal() {
         if (!currentRoomCode) {
           alert('Please join a server first to use the coin database.');
@@ -5668,6 +5685,12 @@
         const loadBtn = e.target.closest('.coin-db-load-snapshot');
         if (loadBtn) {
           await loadCoinDbSnapshot(loadBtn.dataset.entryId);
+          return;
+        }
+
+        const delBtn = e.target.closest('.coin-db-delete-entry');
+        if (delBtn) {
+          await deleteCoinDbEntry(delBtn.dataset.entryId);
         }
       });
 
