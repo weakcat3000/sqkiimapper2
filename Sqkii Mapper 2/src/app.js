@@ -4119,6 +4119,10 @@
 
       /* ====================== AUDIO + SFX (stable) ====================== */
       let audioEnabled = true;
+      let audioUnlockedByGesture = false;
+      let audioBackgroundLocked = false;
+      let audioSyncTimer = 0;
+      let audioSyncVersion = 0;
 
       // === BGM setup ===
       const BGM_CAP = 0.10;
@@ -4131,33 +4135,19 @@
       bgm.preload = 'auto';
       bgm.playsInline = true;
 
-      // Fade helper
-      const fadeAudio = (a, to = 0, ms = 400) => new Promise(res => {
-        const from = a.volume || 0, t0 = performance.now();
-        const step = t => {
-          const k = Math.min(1, (t - t0) / ms);
-          a.volume = from + (to - from) * k;
-          k < 1 ? requestAnimationFrame(step) : res();
-        };
-        requestAnimationFrame(step);
-      });
-
       // Stop helpers
       const stopHtmlAudio = a => { try { a.pause(); a.currentTime = 0; } catch { } };
       const stopAllSfx = () => document.querySelectorAll('audio').forEach(el => { if (el !== bgm) stopHtmlAudio(el); });
       const suspendWebAudio = async () => { try { if (audioCtx?.state !== 'suspended') await audioCtx.suspend(); } catch { } };
       const resumeWebAudio = async () => { try { if (audioCtx?.state === 'suspended') await audioCtx.resume(); } catch { } };
-      let audioBackgroundLocked = false;
       const pageIsVisible = () => !document.hidden && document.visibilityState === 'visible';
-      const canResumeAudio = () => pageIsVisible() && !audioBackgroundLocked;
+      const canPlayBgm = () => audioEnabled && audioUnlockedByGesture && pageIsVisible() && !audioBackgroundLocked;
+
       async function pauseAllAudio({ immediate = false } = {}) {
-        if (immediate) {
-          try { bgm.volume = 0; } catch { }
-        } else {
-          try { await fadeAudio(bgm, 0, 200); } catch { }
-        }
+        clearTimeout(audioSyncTimer);
+        audioSyncVersion += 1;
+        try { bgm.volume = immediate ? 0 : bgmTargetVolume(); } catch { }
         stopHtmlAudio(bgm);
-        stopAllSfx();
         await suspendWebAudio();
         try {
           if ('mediaSession' in navigator) {
@@ -4165,67 +4155,87 @@
             navigator.mediaSession.metadata = null;
           }
         } catch { }
+        stopAllSfx();
       }
-      async function resumeBgmIfAllowed() {
-        if (!audioEnabled || !canResumeAudio()) return;
+
+      function ensureAudioCtxResumed() { try { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); } catch { } }
+
+      async function syncAudioState({ immediatePause = false } = {}) {
+        const syncVersion = ++audioSyncVersion;
+        const shouldPlay = canPlayBgm();
+
+        if (!shouldPlay) {
+          try { bgm.volume = immediatePause ? 0 : bgmTargetVolume(); } catch { }
+          stopHtmlAudio(bgm);
+          await suspendWebAudio();
+          if (syncVersion !== audioSyncVersion) return;
+          try {
+            if ('mediaSession' in navigator) {
+              navigator.mediaSession.playbackState = 'none';
+              navigator.mediaSession.metadata = null;
+            }
+          } catch { }
+          return;
+        }
+
         await resumeWebAudio();
+        if (syncVersion !== audioSyncVersion || !canPlayBgm()) return;
         try {
-          bgm.volume = 0;
           bgm.loop = true;
-          await bgm.play();
-          await fadeAudio(bgm, bgmTargetVolume(), 250);
+          bgm.volume = bgmTargetVolume();
+          if (bgm.paused) await bgm.play();
+          if (syncVersion !== audioSyncVersion || !canPlayBgm()) {
+            stopHtmlAudio(bgm);
+            return;
+          }
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'playing';
+          }
         } catch { }
       }
 
-      let audioBlurLockTimer = 0;
-      const clearAudioBlurLockTimer = () => {
-        clearTimeout(audioBlurLockTimer);
-        audioBlurLockTimer = 0;
-      };
+      function scheduleAudioSync({ immediatePause = false, delayMs = 0 } = {}) {
+        clearTimeout(audioSyncTimer);
+        const run = () => { syncAudioState({ immediatePause }); };
+        if (delayMs > 0) audioSyncTimer = setTimeout(run, delayMs);
+        else run();
+      }
+
       const lockAudioToBackground = () => {
-        clearAudioBlurLockTimer();
         audioBackgroundLocked = true;
-        pauseAllAudio({ immediate: true });
+        scheduleAudioSync({ immediatePause: true });
       };
-      const tryUnlockAudioFromForeground = () => {
-        clearAudioBlurLockTimer();
+
+      const handleForegroundReturn = () => {
         if (!pageIsVisible()) return;
         audioBackgroundLocked = false;
-        resumeBgmIfAllowed();
+        scheduleAudioSync();
       };
+
       const unlockAudioFromUserGesture = () => {
-        clearAudioBlurLockTimer();
         if (!pageIsVisible()) return;
+        audioUnlockedByGesture = true;
         audioBackgroundLocked = false;
         ensureAudioCtxResumed();
-        resumeBgmIfAllowed();
+        scheduleAudioSync();
       };
+
       const nudgeAudioAfterJoin = () => {
-        clearAudioBlurLockTimer();
         if (!pageIsVisible()) return;
         audioBackgroundLocked = false;
-        ensureAudioCtxResumed();
-        if (!audioEnabled) return;
-        requestAnimationFrame(() => { resumeBgmIfAllowed(); });
-        setTimeout(() => { resumeBgmIfAllowed(); }, 250);
-      };
-      const scheduleBlurAudioCheck = () => {
-        clearAudioBlurLockTimer();
-        audioBlurLockTimer = setTimeout(() => {
-          if (!pageIsVisible()) lockAudioToBackground();
-        }, IS_IOS_DEVICE ? 180 : 0);
+        scheduleAudioSync();
+        scheduleAudioSync({ delayMs: 250 });
       };
 
       // Handle mobile/browser backgrounding more aggressively than visibilitychange alone.
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) lockAudioToBackground();
-        else tryUnlockAudioFromForeground();
+        else handleForegroundReturn();
       });
       document.addEventListener('freeze', lockAudioToBackground);
       window.addEventListener('pagehide', lockAudioToBackground);
-      window.addEventListener('blur', scheduleBlurAudioCheck);
-      window.addEventListener('pageshow', () => { requestAnimationFrame(tryUnlockAudioFromForeground); });
-      window.addEventListener('focus', () => { requestAnimationFrame(tryUnlockAudioFromForeground); });
+      window.addEventListener('pageshow', () => { requestAnimationFrame(handleForegroundReturn); });
+      window.addEventListener('focus', () => { requestAnimationFrame(handleForegroundReturn); });
 
 
       let audioCtx = null, buttonBuffer = null;
@@ -4247,7 +4257,6 @@
         } catch (e) { console.warn('button.mp3 preload failed', e); }
       })();
 
-      function ensureAudioCtxResumed() { try { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); } catch { } }
       function playClick() {
         try {
           ensureAudioCtxResumed();
@@ -4259,10 +4268,8 @@
           }
         } catch (e) { }
       }
-      document.addEventListener('pointerdown', () => {
-        unlockAudioFromUserGesture();
-        playClick();
-      }, { once: true, capture: true });
+
+      document.addEventListener('pointerdown', unlockAudioFromUserGesture, { capture: true });
 
       const audioBtn = document.getElementById('audio-toggle');
       function setAudioIcon(on) {
@@ -4274,7 +4281,7 @@
       audioBtn.addEventListener('click', () => {
         audioEnabled = !audioEnabled;
         setAudioIcon(audioEnabled);
-        if (!audioEnabled) pauseAllAudio();
+        if (!audioEnabled) pauseAllAudio({ immediate: true });
         else unlockAudioFromUserGesture();
       });
       document.addEventListener('click', (ev) => { if (ev.target.closest('button')) playClick(); }, { capture: true });
