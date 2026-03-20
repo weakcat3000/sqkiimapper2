@@ -1249,10 +1249,10 @@
       z-index: 900;
       width: 56px;
       height: 56px;
-      border-radius: 12px;
-      background: #0e1420;
-      border: 1px solid var(--border);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+      padding: 0;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
       cursor: pointer;
       display: grid;
       place-items: center;
@@ -1288,12 +1288,13 @@
       left: calc(var(--side) + 16px);
     }
 
-    #pixelgrid-fab svg {
-      width: 28px;
-      height: 28px;
-      stroke: #e5e7eb;
-      fill: none;
-      stroke-width: 2;
+    #pixelgrid-fab img {
+      width: 44px;
+      height: 44px;
+      display: block;
+      user-select: none;
+      pointer-events: none;
+      filter: drop-shadow(0 8px 16px rgba(0, 0, 0, .32));
     }
 
     .app.ui-collapsed .sheets-btn {
