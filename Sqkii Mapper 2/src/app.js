@@ -3770,9 +3770,6 @@
           suppressNextRemoteApply = true;
           await upsertRoomState(currentRoomCode, state);
           localSaveOnly();
-
-          // Auto-archive shrink lifecycle alongside room state (same caller)
-          try { await autoArchiveShrinkNow(state); } catch (ae) { console.warn('[AutoArchive]', ae); }
         } catch (e) {
           console.warn('Supabase sync failed:', e);
         } finally {
@@ -3781,68 +3778,6 @@
       }, 10000);
 
       function saveState() { syncToServerDebounced(); }
-
-      /* ---- Auto-archive shrink lifecycle to coin_history_archive ---- */
-      async function autoArchiveShrinkNow(stateArr) {
-        if (!currentRoomCode || !window.supabase) return;
-
-        const snapshotState = Utils.deepClone(stateArr || shallowSerializableState());
-        const coinGroups = buildSilverCoinArchiveGroups(snapshotState);
-
-        // Fetch all existing active records for this room
-        const { data: existingRecords } = await supabase
-          .from('coin_history_archive')
-          .select('id, coin_label, lifecycle, first_shrink_at, last_shrink_at')
-          .eq('room_code', currentRoomCode)
-          .eq('status', 'active');
-
-        const existingByLabel = {};
-        for (const rec of (existingRecords || [])) {
-          existingByLabel[coinDbCanonicalLabel(rec.coin_label)] = rec;
-        }
-
-        const now = new Date().toISOString();
-        const processedLabels = new Set();
-
-        // Upsert one active record per live coin
-        for (const group of coinGroups.filter((item) => item.isLive)) {
-          const coinLabel = coinDbCanonicalLabel(group.coinLabel) || coinDbGetActiveLabel();
-          const existingRecord = existingByLabel[coinLabel];
-          const steps = coinDbMergeLifecycle(existingRecord?.lifecycle || [], group.steps || []);
-          processedLabels.add(coinLabel);
-
-          const payload = {
-            room_code: currentRoomCode,
-            coin_label: coinLabel,
-            status: 'active',
-            shrink_count: steps.length,
-            lifecycle: steps,
-            snapshot_state: snapshotState,
-            first_shrink_at: steps[0]?.timestampIso || null,
-            last_shrink_at: steps[steps.length - 1]?.timestampIso || null,
-            updated_by: clientId,
-            updated_at: now
-          };
-
-          if (existingRecord?.id) {
-            await supabase.from('coin_history_archive')
-              .update(payload)
-              .eq('id', existingRecord.id);
-          } else {
-            payload.archived_by = clientId;
-            await supabase.from('coin_history_archive').insert(payload);
-          }
-        }
-
-        // Mark any active records whose coin circles no longer exist as "found"
-        for (const [label, record] of Object.entries(existingByLabel)) {
-          if (!processedLabels.has(label)) {
-            await supabase.from('coin_history_archive')
-              .update({ status: 'found', updated_by: clientId, updated_at: now })
-              .eq('id', record.id);
-          }
-        }
-      }
 
       let roomChannel = null;
       let presenceChannel = null;
@@ -5823,7 +5758,7 @@
         try {
           const { data: activeRecords, error: activeRecordsError } = await supabase
             .from(COIN_DB_TABLE)
-            .select('id, coin_label')
+            .select('id, coin_label, lifecycle')
             .eq('room_code', currentRoomCode)
             .eq('status', 'active');
 
