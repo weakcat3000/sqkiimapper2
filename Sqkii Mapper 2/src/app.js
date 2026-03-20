@@ -3787,7 +3787,7 @@
         if (!currentRoomCode || !window.supabase) return;
 
         const snapshotState = Utils.deepClone(stateArr || shallowSerializableState());
-        const allSteps = extractShrinkLifecycle(snapshotState);
+        const coinGroups = buildSilverCoinArchiveGroups(snapshotState);
 
         // Fetch all existing active records for this room
         const { data: existingRecords } = await supabase
@@ -3804,20 +3804,10 @@
         const now = new Date().toISOString();
         const processedLabels = new Set();
 
-        const grouped = {};
-        for (const step of allSteps) {
-          const key = coinDbCanonicalLabel(step.coinLabel) || coinDbGetActiveLabel();
-          if (!grouped[key]) grouped[key] = [];
-          grouped[key].push(step);
-        }
-
-        for (const key of Object.keys(grouped)) {
-          grouped[key].forEach((step, index) => { step.step = index + 1; });
-        }
-
-        // Upsert one record per coin instead of per layer
-        for (const [coinName, steps] of Object.entries(grouped)) {
-          const coinLabel = coinDbCanonicalLabel(coinName) || coinDbGetActiveLabel();
+        // Upsert one active record per live coin
+        for (const group of coinGroups.filter((item) => item.isLive)) {
+          const coinLabel = coinDbCanonicalLabel(group.coinLabel) || coinDbGetActiveLabel();
+          const steps = group.steps || [];
           processedLabels.add(coinLabel);
 
           const payload = {
@@ -5413,6 +5403,20 @@
           .trim();
       }
 
+      function coinDbCanonicalFeatureLabel(label) {
+        return coinDbCanonicalLabel(
+          String(label || '')
+            .replace(/\s*\(past\)\s*$/i, '')
+            .trim()
+        );
+      }
+
+      function coinDbRootCoinId(rawId) {
+        return String(rawId || '')
+          .trim()
+          .replace(/-\d{10,}$/i, '');
+      }
+
       function coinDbDraftKey(roomCode = currentRoomCode) {
         return `${COIN_DB_ACTIVE_LABEL_PREFIX}${roomCode || 'default'}`;
       }
@@ -5463,11 +5467,14 @@
             if (props._coinArchiveEligible !== true && !isSilverApiArchiveLayer(layerName)) continue;
 
             const ts = Number(props._ts);
+            const coinId = coinDbRootCoinId(props._coinId || props.coin_id || props.fid || props._gid || '');
+            const featureLabel = coinDbCanonicalFeatureLabel(props.name || `${layerName} shrink`);
             steps.push({
               step: 0,
               layerName,
               featureName: String(props.name || `${layerName} shrink`),
-              coinLabel: coinDbCanonicalLabel(props._coinLabel || props.coin_label || ''),
+              coinId,
+              coinLabel: coinDbCanonicalLabel(props._coinLabel || props.coin_label || featureLabel),
               lat,
               lng,
               radiusMeters: radius,
@@ -5491,6 +5498,81 @@
         }));
       }
 
+      function buildSilverCoinArchiveGroups(stateArr = []) {
+        const byCoin = new Map();
+
+        const ensureGroup = (coinId, coinLabel) => {
+          const key = coinId || coinLabel || `coin-${byCoin.size + 1}`;
+          if (!byCoin.has(key)) {
+            byCoin.set(key, {
+              coinId: key,
+              coinLabel: coinDbCanonicalLabel(coinLabel) || coinDbCanonicalLabel(coinId) || 'Unknown coin',
+              isLive: false,
+              steps: []
+            });
+          }
+          const group = byCoin.get(key);
+          if (!group.coinLabel || /^unknown coin$/i.test(group.coinLabel)) {
+            const nextLabel = coinDbCanonicalLabel(coinLabel);
+            if (nextLabel) group.coinLabel = nextLabel;
+          }
+          return group;
+        };
+
+        for (const layer of (stateArr || [])) {
+          const layerName = String(layer?.name || '').trim().toLowerCase();
+          if (layerName !== 'live sqkii circles') continue;
+
+          for (const feature of (layer?.data?.features || [])) {
+            const props = feature?.properties || {};
+            if (props._deleted) continue;
+
+            const coinId = coinDbRootCoinId(props._coinId || props.coin_id || props.fid || props._gid || '');
+            const coinLabel = coinDbCanonicalLabel(props._coinLabel || props.coin_label || props.name || props.title || coinId);
+            const group = ensureGroup(coinId, coinLabel);
+            group.isLive = true;
+          }
+        }
+
+        for (const step of extractShrinkLifecycle(stateArr)) {
+          const coinId = step.coinId || coinDbRootCoinId(step.fid);
+          const coinLabel = coinDbCanonicalLabel(step.coinLabel || coinDbCanonicalFeatureLabel(step.featureName) || coinId);
+          const group = ensureGroup(coinId, coinLabel);
+          group.steps.push({
+            ...step,
+            coinId: coinId || group.coinId,
+            coinLabel: coinLabel || group.coinLabel
+          });
+        }
+
+        const groups = [...byCoin.values()]
+          .filter((group) => group.isLive || group.steps.length > 0)
+          .map((group) => {
+            const steps = [...group.steps].sort((a, b) => {
+              const ta = a.timestampMs ?? Number.MAX_SAFE_INTEGER;
+              const tb = b.timestampMs ?? Number.MAX_SAFE_INTEGER;
+              if (ta !== tb) return ta - tb;
+              return String(a.featureName || '').localeCompare(String(b.featureName || ''));
+            }).map((step, index) => ({
+              ...step,
+              step: index + 1
+            }));
+
+            return {
+              ...group,
+              coinLabel: coinDbCanonicalLabel(group.coinLabel) || 'Unknown coin',
+              steps
+            };
+          });
+
+        groups.sort((a, b) => {
+          if (a.isLive !== b.isLive) return a.isLive ? -1 : 1;
+          return String(a.coinLabel || '').localeCompare(String(b.coinLabel || ''));
+        });
+
+        return groups;
+      }
+
       function coinDbDefaultName() {
         const stamp = new Date().toLocaleDateString();
         return `${(currentRoomCode || 'coin').toUpperCase()} coin - ${stamp}`;
@@ -5500,12 +5582,12 @@
         const inputLabel = coinDbCanonicalLabel(coinDbNameInput?.value || '');
         if (inputLabel) return inputLabel;
 
-        const storedLabel = coinDbLoadDraftLabel();
-        if (storedLabel) return storedLabel;
-
         const activeEntry = coinDbEntriesCache.find((entry) => String(entry?.status || '').toLowerCase() === 'active');
         const activeLabel = coinDbCanonicalLabel(activeEntry?.coin_label || '');
         if (activeLabel) return activeLabel;
+
+        const storedLabel = coinDbLoadDraftLabel();
+        if (storedLabel) return storedLabel;
 
         return coinDbDefaultName();
       }
@@ -5630,7 +5712,21 @@
 
         coinDbSetStatus('Loading archived coins...');
         try {
-          const entries = await fetchCoinDbEntries();
+          const entries = (await fetchCoinDbEntries()).sort((a, b) => {
+            const rank = (value) => {
+              const status = String(value?.status || '').toLowerCase();
+              if (status === 'active') return 0;
+              if (status === 'found') return 1;
+              return 2;
+            };
+
+            const diff = rank(a) - rank(b);
+            if (diff !== 0) return diff;
+
+            const ta = new Date(a?.updated_at || a?.created_at || 0).getTime();
+            const tb = new Date(b?.updated_at || b?.created_at || 0).getTime();
+            return tb - ta;
+          });
           renderCoinDbEntries(entries);
           coinDbSyncNameInput();
           coinDbSetStatus(entries.length ? `Loaded ${entries.length} archived coin record(s).` : 'No archived coins yet for this room.');
@@ -5647,14 +5743,21 @@
         }
 
         const snapshotState = coinDbSerializeState();
-        const lifecycle = extractShrinkLifecycle(snapshotState);
+        const coinGroups = buildSilverCoinArchiveGroups(snapshotState);
+        const requestedLabel = coinDbCanonicalLabel((coinDbNameInput?.value || '').trim()) || coinDbGetActiveLabel();
+        let selectedGroup = coinGroups.find((group) => coinDbCanonicalLabel(group.coinLabel) === requestedLabel);
 
-        if (!lifecycle.length) {
-          coinDbSetStatus('No shrink circles found in the current map state.', true);
+        if (!selectedGroup && coinGroups.length === 1) {
+          selectedGroup = coinGroups[0];
+        }
+
+        if (!selectedGroup) {
+          coinDbSetStatus('Type the exact ongoing coin name you want to archive, e.g. "ShopBack Coin 20".', true);
           return;
         }
 
-        const coinLabel = coinDbCanonicalLabel((coinDbNameInput?.value || '').trim()) || coinDbGetActiveLabel();
+        const lifecycle = selectedGroup.steps || [];
+        const coinLabel = coinDbCanonicalLabel(selectedGroup.coinLabel) || requestedLabel;
         coinDbSaveDraftLabel(coinLabel);
         coinDbSaveCurrentBtn.disabled = true;
         coinDbSetStatus('Archiving current coin...');
