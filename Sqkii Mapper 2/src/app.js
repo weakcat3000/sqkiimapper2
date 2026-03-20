@@ -3753,7 +3753,49 @@
         }
       }, 10000);
 
-      function saveState() { syncToServerDebounced(); }
+      function saveState() { syncToServerDebounced(); autoArchiveShrinkDebounced(); }
+
+      /* ---- Auto-archive shrink lifecycle to coin_history_archive ---- */
+      const autoArchiveShrinkDebounced = Utils.debounce(async function () {
+        if (!currentRoomCode || !window.supabase) return;
+        try {
+          const snapshotState = Utils.deepClone(shallowSerializableState());
+          const lifecycle = extractShrinkLifecycle(snapshotState);
+          if (!lifecycle.length) return;  // nothing to archive
+
+          const coinLabel = `${currentRoomCode.toUpperCase()} coin - active`;
+
+          // Try to find an existing active record for this room
+          const { data: existing } = await supabase
+            .from('coin_history_archive')
+            .select('id')
+            .eq('room_code', currentRoomCode)
+            .eq('coin_label', coinLabel)
+            .maybeSingle();
+
+          const payload = {
+            room_code: currentRoomCode,
+            coin_label: coinLabel,
+            status: 'active',
+            shrink_count: lifecycle.length,
+            lifecycle,
+            snapshot_state: snapshotState,
+            first_shrink_at: lifecycle[0]?.timestampIso || null,
+            last_shrink_at: lifecycle[lifecycle.length - 1]?.timestampIso || null,
+            updated_by: clientId,
+            updated_at: new Date().toISOString()
+          };
+
+          if (existing?.id) {
+            await supabase.from('coin_history_archive').update(payload).eq('id', existing.id);
+          } else {
+            payload.archived_by = clientId;
+            await supabase.from('coin_history_archive').insert(payload);
+          }
+        } catch (e) {
+          console.warn('[AutoArchive] Failed:', e);
+        }
+      }, 15000);  // 15s debounce — runs after map sync settles
 
       let roomChannel = null;
       let presenceChannel = null;
@@ -5262,6 +5304,7 @@
       const coinDbNameInput = byId('coin-db-name');
       const coinDbSaveCurrentBtn = byId('coin-db-save-current');
       const coinDbRefreshBtn = byId('coin-db-refresh');
+      const coinDbExportBtn = byId('coin-db-export');
       const coinDbStatus = byId('coin-db-status');
       const coinDbList = byId('coin-db-list');
       let coinDbEntriesCache = [];
@@ -5600,6 +5643,7 @@
       coinDbCloseBtn?.addEventListener('click', closeCoinDbModal);
       coinDbRefreshBtn?.addEventListener('click', refreshCoinDatabase);
       coinDbSaveCurrentBtn?.addEventListener('click', archiveCurrentCoinLifecycle);
+      coinDbExportBtn?.addEventListener('click', exportCoinDbExcel);
       coinDbModal?.addEventListener('click', (e) => {
         if (e.target === coinDbModal) closeCoinDbModal();
       });
@@ -5615,6 +5659,75 @@
           await loadCoinDbSnapshot(loadBtn.dataset.entryId);
         }
       });
+
+      /* ---- Export Coin DB to Excel ---- */
+      function exportCoinDbExcel() {
+        if (!coinDbEntriesCache.length) {
+          coinDbSetStatus('No archived coins to export. Refresh first.', true);
+          return;
+        }
+
+        if (typeof XLSX === 'undefined') {
+          coinDbSetStatus('SheetJS library not loaded. Check your internet connection.', true);
+          return;
+        }
+
+        const rows = [];
+        for (const entry of coinDbEntriesCache) {
+          const steps = Array.isArray(entry.lifecycle) ? entry.lifecycle : [];
+          if (steps.length === 0) {
+            // Entry with no steps — still include a summary row
+            rows.push({
+              'Coin Name': entry.coin_label || 'Unnamed',
+              'Room': entry.room_code || '',
+              'Status': entry.status || '',
+              'Step': '',
+              'Latitude': '',
+              'Longitude': '',
+              'Radius (m)': '',
+              'Timestamp': '',
+              'Exact Lat': entry.exact_lat ?? '',
+              'Exact Lng': entry.exact_lng ?? '',
+              'Notes': entry.exact_note || '',
+              'Archived': coinDbFormatDate(entry.created_at)
+            });
+          } else {
+            for (const step of steps) {
+              rows.push({
+                'Coin Name': entry.coin_label || 'Unnamed',
+                'Room': entry.room_code || '',
+                'Status': entry.status || '',
+                'Step': step.step ?? '',
+                'Latitude': step.lat ?? '',
+                'Longitude': step.lng ?? '',
+                'Radius (m)': step.radiusMeters != null ? Math.round(step.radiusMeters * 100) / 100 : '',
+                'Timestamp': step.timestampIso || '',
+                'Exact Lat': entry.exact_lat ?? '',
+                'Exact Lng': entry.exact_lng ?? '',
+                'Notes': entry.exact_note || '',
+                'Archived': coinDbFormatDate(entry.created_at)
+              });
+            }
+          }
+        }
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+        // Auto-size columns
+        const colWidths = Object.keys(rows[0] || {}).map((key) => {
+          const maxLen = Math.max(key.length, ...rows.map(r => String(r[key] ?? '').length));
+          return { wch: Math.min(maxLen + 2, 40) };
+        });
+        ws['!cols'] = colWidths;
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Coin Archive');
+
+        const roomName = (currentRoomCode || 'coins').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const dateStr = new Date().toISOString().slice(0, 10);
+        XLSX.writeFile(wb, `coin_archive_${roomName}_${dateStr}.xlsx`);
+
+        coinDbSetStatus(`Exported ${rows.length} row(s) to Excel.`);
+      }
 
       /* ================= Startup ================= */
       window.addEventListener('DOMContentLoaded', () => {

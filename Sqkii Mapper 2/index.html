@@ -44,6 +44,9 @@
   <!-- OGL (UMD) for Dark Veil - CRITICAL: Load synchronously -->
   <script src="https://cdn.jsdelivr.net/npm/ogl@1.0.6/dist/ogl.umd.js"></script>
 
+  <!-- SheetJS (xlsx) for Excel export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
   <!-- Preload button click sound for instant play -->
   <link rel="preload" href="button.mp3" as="audio" />
 
@@ -322,6 +325,7 @@
           <input id="coin-db-name" type="text" placeholder="Coin name, e.g. Great Gold Hunt #12" />
           <button id="coin-db-save-current" class="btn small">Archive Current Coin</button>
           <button id="coin-db-refresh" class="btn small">Refresh</button>
+          <button id="coin-db-export" class="btn small" title="Export all archived coins to Excel">Export Excel</button>
         </div>
 
         <div id="coin-db-status" class="hint coin-db-status"></div>
