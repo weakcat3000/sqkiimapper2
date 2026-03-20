@@ -4239,7 +4239,6 @@
       function ensureAudioCtxResumed() { try { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); } catch { } }
       function playClick() {
         try {
-          if (!audioEnabled) return;
           ensureAudioCtxResumed();
           if (buttonBuffer && audioCtx) {
             const src = audioCtx.createBufferSource(); src.buffer = buttonBuffer; src.connect(audioCtx.destination); src.start(0);
