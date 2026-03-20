@@ -3891,6 +3891,8 @@
 
       async function joinRoom(code) {
         currentRoomCode = code;
+        reconOverlayPoints = [];
+        clearReconOverlay({ clearCache: false });
         try {
           const existing = await fetchRoom(code);
 
@@ -4002,6 +4004,8 @@
             try { await refreshCoinDatabase(); } catch { }
           }
 
+          scheduleReconOverlayRestore(code);
+
         } catch (e) {
           console.error('Join failed', e);
           throw e;
@@ -4069,6 +4073,9 @@
       // Handle "Continue without sync" button
       document.getElementById('server-continue').addEventListener('click', async () => {
         hideServerModal();
+        currentRoomCode = null;
+        reconOverlayPoints = [];
+        clearReconOverlay({ clearCache: false });
 
         // Load local state if available
         try {
@@ -4090,6 +4097,8 @@
             reflectEditUI();
           }
         } catch { }
+
+        scheduleReconOverlayRestore(null);
       });
 
 
@@ -4368,6 +4377,88 @@
       const RECON_PASSWORD = '6482';
       const RECON_ACCESS_KEY = 'sqkii-recon-access';
       const RECON_ACCESS_MS = 4 * 60 * 60 * 1000;
+      const RECON_OVERLAY_CACHE_PREFIX = 'sqkii-recon-overlay-v1';
+      let reconOverlayPoints = [];
+
+      function reconOverlayStorageKey(roomCode = currentRoomCode) {
+        return `${RECON_OVERLAY_CACHE_PREFIX}:${roomCode || 'local'}`;
+      }
+
+      function normalizeReconOverlayPoints(points) {
+        const normalized = [];
+
+        for (const point of (points || [])) {
+          if (Array.isArray(point) && point.length >= 2) {
+            const lng = Number(point[0]);
+            const lat = Number(point[1]);
+            if (Number.isFinite(lng) && Number.isFinite(lat)) normalized.push([lng, lat]);
+            continue;
+          }
+
+          const coords = point?.geometry?.coordinates;
+          if (Array.isArray(coords) && coords.length >= 2) {
+            const lng = Number(coords[0]);
+            const lat = Number(coords[1]);
+            if (Number.isFinite(lng) && Number.isFinite(lat)) normalized.push([lng, lat]);
+          }
+        }
+
+        return normalized;
+      }
+
+      function persistReconOverlayCache(roomCode = currentRoomCode) {
+        try {
+          const key = reconOverlayStorageKey(roomCode);
+          if (!reconOverlayPoints.length) {
+            localStorage.removeItem(key);
+            return;
+          }
+
+          localStorage.setItem(key, JSON.stringify({
+            roomCode: roomCode || null,
+            points: reconOverlayPoints,
+            updatedAt: Date.now()
+          }));
+        } catch (error) {
+          console.warn('[Recon] Failed to persist overlay cache:', error);
+        }
+      }
+
+      function restoreReconOverlayFromCache(roomCode = currentRoomCode) {
+        clearReconOverlay({ clearCache: false });
+
+        try {
+          const raw = localStorage.getItem(reconOverlayStorageKey(roomCode));
+          if (!raw) {
+            reconOverlayPoints = [];
+            return;
+          }
+
+          const parsed = JSON.parse(raw);
+          const cachedPoints = normalizeReconOverlayPoints(parsed?.points || []);
+          if (!cachedPoints.length) {
+            reconOverlayPoints = [];
+            return;
+          }
+
+          renderReconOverlay(cachedPoints, { persist: false });
+        } catch (error) {
+          console.warn('[Recon] Failed to restore overlay cache:', error);
+          reconOverlayPoints = [];
+        }
+      }
+
+      let reconOverlayRestoreTimer = 0;
+      function scheduleReconOverlayRestore(roomCode = currentRoomCode) {
+        clearTimeout(reconOverlayRestoreTimer);
+        reconOverlayRestoreTimer = setTimeout(() => {
+          if (reconOverlayPoints.length) {
+            renderReconOverlay(reconOverlayPoints, { persist: false });
+          } else {
+            restoreReconOverlayFromCache(roomCode);
+          }
+        }, 120);
+      }
 
       function hasReconAccess() {
         try {
@@ -4790,6 +4881,7 @@
             `✅ Found ${matchingPoints.length} matching locations (tested ${testPoints.length} points at ${adaptivePrecision}m spacing)`;
 
           if (!matchingPoints.length) {
+            clearReconOverlay();
             alert('No locations found matching all constraints.');
           } else {
             renderReconOverlay(matchingPoints);
@@ -4991,20 +5083,23 @@
       }
 
 
-      function renderReconOverlay(points) {
+      function renderReconOverlay(points, { persist = true } = {}) {
         console.log('[Recon] Rendering overlay with', points.length, 'points');
 
-        // Clear old overlay first
-        clearReconOverlay();
+        // Clear old overlay first, but keep cached data unless explicitly replaced.
+        clearReconOverlay({ clearCache: false });
 
-        if (!points.length) {
+        reconOverlayPoints = normalizeReconOverlayPoints(points);
+        if (persist) persistReconOverlayCache();
+
+        if (!reconOverlayPoints.length) {
           console.log('[Recon] No points to render');
           return;
         }
 
         // Create buffer polygons around each point (5m radius for visualization)
-        const polygons = points.map(pt =>
-          turf.circle(pt.geometry.coordinates, 7, { steps: 12, units: 'meters' })
+        const polygons = reconOverlayPoints.map(coords =>
+          turf.circle(coords, 7, { steps: 12, units: 'meters' })
         );
 
         const fc = {
@@ -5013,7 +5108,7 @@
         };
 
         // ------------ MapLibre GL ------------
-        if (typeof mapgl !== 'undefined' && mapgl && mapgl.addSource && engine === 'gl') {
+        if (typeof mapgl !== 'undefined' && mapgl && mapgl.addSource && mapgl.getStyle?.()) {
           try {
             console.log('[Recon] Rendering on MapLibre GL');
 
@@ -5043,7 +5138,7 @@
         }
 
         // ------------ Leaflet ------------
-        if (typeof mapleaf !== 'undefined' && mapleaf && typeof L !== 'undefined' && L && engine === 'leaf') {
+        if (typeof mapleaf !== 'undefined' && mapleaf && typeof L !== 'undefined' && L) {
           console.log('[Recon] Rendering on Leaflet');
 
           try {
@@ -5064,7 +5159,7 @@
         }
       }
 
-      function clearReconOverlay() {
+      function clearReconOverlay({ clearCache = true } = {}) {
         console.log('[Recon] Clearing existing overlay');
 
         // MapLibre GL
@@ -5090,6 +5185,11 @@
           }
           leafletReconLayer = null;
         }
+
+        if (clearCache) {
+          reconOverlayPoints = [];
+          persistReconOverlayCache();
+        }
       }
 
       // Event listeners
@@ -5098,6 +5198,9 @@
       document.getElementById('recon-close')?.addEventListener('click', closeReconModal);
       document.getElementById('recon-modal')?.addEventListener('click', (e) => {
         if (e.target.id === 'recon-modal') closeReconModal();
+      });
+      mapgl.on('styledata', () => {
+        if (reconOverlayPoints.length) scheduleReconOverlayRestore();
       });
 
       if (engine === 'gl') {
