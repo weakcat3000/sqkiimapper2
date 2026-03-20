@@ -1407,7 +1407,53 @@
       maptilersdk.config.apiKey = 'f9B8Wv0ythtbvpcK0QEw';
       const CUSTOM_STYLE = 'https://api.maptiler.com/maps/01994e5b-af91-7fae-b8bd-a68c497abf96/style.json?key=' + maptilersdk.config.apiKey;
 
-      const mapgl = new maptilersdk.Map({ container: 'mapgl', style: CUSTOM_STYLE, center: [103.8198, 1.3521], zoom: 12 });
+      const mapgl = new maptilersdk.Map({
+        container: 'mapgl',
+        style: CUSTOM_STYLE,
+        center: [103.8198, 1.3521],
+        zoom: 12,
+        pixelRatio: Math.min(2, Math.max(1, Number(window.devicePixelRatio || 1)))
+      });
+
+      function syncMapPixelRatio() {
+        try {
+          mapgl.setPixelRatio(Math.min(2, Math.max(1, Number(window.devicePixelRatio || 1))));
+        } catch (error) {
+          console.warn('Map pixel ratio sync failed:', error);
+        }
+      }
+
+      function sharpenCurrentMapStyle() {
+        const style = mapgl?.getStyle?.();
+        const layers = style?.layers || [];
+
+        for (const layer of layers) {
+          const paint = layer?.paint || {};
+          try {
+            if (layer.type === 'symbol') {
+              if (paint['text-halo-blur'] != null) mapgl.setPaintProperty(layer.id, 'text-halo-blur', 0.2);
+              if (paint['text-halo-width'] != null) mapgl.setPaintProperty(layer.id, 'text-halo-width', 1);
+              if (paint['icon-halo-blur'] != null) mapgl.setPaintProperty(layer.id, 'icon-halo-blur', 0);
+              if (paint['icon-halo-width'] != null) mapgl.setPaintProperty(layer.id, 'icon-halo-width', 0.6);
+            }
+
+            if (layer.type === 'circle' && paint['circle-blur'] != null) {
+              mapgl.setPaintProperty(layer.id, 'circle-blur', 0.15);
+            }
+          } catch (error) {
+            console.warn(`Failed to sharpen style layer "${layer?.id || 'unknown'}":`, error);
+          }
+        }
+      }
+
+      let sharpenMapStyleTimer = 0;
+      function scheduleMapSharpen() {
+        clearTimeout(sharpenMapStyleTimer);
+        sharpenMapStyleTimer = setTimeout(() => {
+          syncMapPixelRatio();
+          sharpenCurrentMapStyle();
+        }, 80);
+      }
 
       const pauseVeil = () => window.__pauseVeil?.();
       const resumeVeil = () => window.__resumeVeil?.();
@@ -1416,6 +1462,9 @@
       mapgl.on('moveend', resumeVeil);
       mapgl.on('zoomstart', pauseVeil);
       mapgl.on('zoomend', resumeVeil);
+      mapgl.on('load', scheduleMapSharpen);
+      mapgl.on('styledata', scheduleMapSharpen);
+      window.addEventListener('resize', syncMapPixelRatio, { passive: true });
 
       (() => {
         const cat = document.getElementById('cat-lottie');
