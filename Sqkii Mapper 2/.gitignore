@@ -14,6 +14,7 @@ shrink_log.xlsx
 sent_coins.json
 track_state.json
 authorized_users.json
+ai_broadcast_state.json
 
 # Logs
 *.log

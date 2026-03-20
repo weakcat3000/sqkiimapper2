@@ -1536,6 +1536,7 @@
 
       // Global polygon click: choose the smallest polygon at the click point
       mapgl.on('click', (e) => {
+        if (popupsSuppressed()) return;
         // Only check layers that still exist
         const layers = ALL_FILL_LAYER_IDS.filter(id => mapgl.getLayer(id));
         if (!layers.length) return;
@@ -1967,6 +1968,7 @@
           // Keep clicks working for POINT markers only (icons + labels)
           [iconId, lblId].forEach(lid => {
             mapgl.on('click', lid, (e) => {
+              if (popupsSuppressed()) return;
               if (!e.features || !e.features.length) return;
               const feature = e.features[0];
               if (!feature || !feature.properties) return;
@@ -1977,6 +1979,23 @@
               e.originalEvent.stopPropagation();
             });
           });
+
+          function handleRapidDeleteGL(e) {
+            if (!deleteModeEnabled || !editingEnabled || circleDragCtx) return;
+            const chosen = pickSmallestPolygonAtPoint(e.point) || (e.features || []).find(isRapidDeleteTarget);
+            if (!chosen || !isRapidDeleteTarget(chosen)) return;
+
+            const srcId = chosen.layer && chosen.layer.source;
+            const owner = layerList.find(l => l.glSourceId === srcId);
+            const fid = chosen.properties && chosen.properties.fid;
+            if (!owner || !fid) return;
+
+            e.originalEvent?.preventDefault?.();
+            e.originalEvent?.stopPropagation?.();
+            deleteFeatureByFid(owner, String(fid), { confirmDelete: false, closeEditorOnDone: true });
+          }
+
+          [fillId, polyEdgeId].forEach(lid => mapgl.on('click', lid, handleRapidDeleteGL));
 
           attachLongPressGL(fillId, entry);
           attachLongPressGL(polyEdgeId, entry);
@@ -2045,6 +2064,7 @@
             const m = L.marker([lat, lng], { icon, bubblingMouseEvents: false });
 
             function openMarkerPopup(ev) {
+              if (popupsSuppressed()) return;
               if (ev?.originalEvent) {
                 ev.originalEvent.preventDefault();
                 ev.originalEvent.stopPropagation();
@@ -2077,6 +2097,17 @@
             });
 
             function openGeomPopup(ev) {
+              if (popupsSuppressed()) return;
+              if (deleteModeEnabled && editingEnabled && !circleDragCtx && isRapidDeleteTarget(f)) {
+                if (ev?.originalEvent) {
+                  ev.originalEvent.preventDefault();
+                  ev.originalEvent.stopPropagation();
+                }
+                L.DomEvent.stop(ev);
+                deleteFeatureByFid(entry, fid, { confirmDelete: false, closeEditorOnDone: true });
+                return;
+              }
+
               if (ev?.originalEvent) {
                 ev.originalEvent.preventDefault();
                 ev.originalEvent.stopPropagation();
@@ -2759,8 +2790,21 @@
 
       let editCtx = null, editingEnabled = false;
       let circleDragCtx = null; // { entry, fid } while dragging
+      let suppressPopupUntil = 0;
 
       const editToggle = document.getElementById('edit-toggle');
+      const deleteToggle = document.getElementById('delete-toggle');
+      let deleteModeEnabled = false;
+      const DELETE_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M5 5L19 19M19 5L5 19' stroke='black' stroke-width='6' stroke-linecap='round' opacity='0.45'/%3E%3Cpath d='M5 5L19 19M19 5L5 19' stroke='%23f8fafc' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair`;
+
+      function suppressPopups(ms = 550) {
+        suppressPopupUntil = Date.now() + ms;
+        closeActivePopup();
+      }
+
+      function popupsSuppressed() {
+        return !!circleDragCtx || Date.now() < suppressPopupUntil;
+      }
 
       // Add Calculate Statistics/Glimpse button element (will be created dynamically)
       let seCalcStats = null;
@@ -2782,6 +2826,7 @@
         }
 
         closeStyleEditor();
+        suppressPopups();
 
         // Start drag mode
         circleDragCtx = { entry, fid };
@@ -2797,9 +2842,41 @@
       }); // 
 
 
-      seDelete.addEventListener('click', () => {
-        if (!editCtx) return;
-        const { entry, fid } = editCtx;
+      function isRapidDeleteTarget(feature) {
+        const p = feature?.properties || {};
+        const geomType = feature?.geometry?.type;
+        const isPolygon = geomType === 'Polygon' || geomType === 'MultiPolygon';
+        const hasCircleMeta = Number.isFinite(+p._circleRadius) || Array.isArray(p._circleCenter);
+        const hasCircleName = /^circle\b/i.test(String(p.name || '').trim());
+        return isPolygon && (hasCircleMeta || hasCircleName);
+      }
+
+      function syncDeleteModeCursor() {
+        const cursor = (deleteModeEnabled && editingEnabled && !circleDragCtx) ? DELETE_CURSOR : '';
+        if (mapgl?.getCanvas) mapgl.getCanvas().style.cursor = circleDragCtx && engine === 'gl' ? 'grabbing' : cursor;
+        if (mapleaf?.getContainer) mapleaf.getContainer().style.cursor = circleDragCtx && engine === 'leaf' ? 'grabbing' : cursor;
+      }
+
+      function reflectDeleteUI() {
+        if (!deleteToggle) return;
+        deleteToggle.textContent = 'Delete: ' + (deleteModeEnabled ? 'ON' : 'OFF');
+        deleteToggle.classList.toggle('off', !deleteModeEnabled);
+        deleteToggle.classList.toggle('danger', deleteModeEnabled);
+        syncDeleteModeCursor();
+      }
+
+      function setDeleteMode(enabled) {
+        deleteModeEnabled = !!enabled;
+        if (deleteModeEnabled) {
+          editingEnabled = true;
+          closeStyleEditor();
+          reflectEditUI();
+        }
+        reflectDeleteUI();
+      }
+
+      function deleteFeatureByFid(entry, fid, { confirmDelete = true, closeEditorOnDone = true } = {}) {
+        if (!entry || !fid) return false;
 
         // Are we deleting the circle that Recon is using?
         const isReconCircle =
@@ -2816,9 +2893,9 @@
         }
 
         const ix = entry.data.features.findIndex(x => x.properties.fid === fid);
-        if (ix < 0) return;
+        if (ix < 0) return false;
         const p = entry.data.features[ix].properties || {};
-        if (!confirm('Delete this feature?')) return;
+        if (confirmDelete && !confirm('Delete this feature?')) return false;
 
         entry.data.features.splice(ix, 1);
         const key = p._gid || p.fid;
@@ -2839,25 +2916,45 @@
         renderLayers();
         renderGroupsVisibility();
         saveState();
-        closeStyleEditor();
-      });
+        if (closeEditorOnDone) closeStyleEditor();
+        return true;
+      }
+
+      function deleteEditedFeature() {
+        if (!editCtx) return;
+        const { entry, fid } = editCtx;
+        deleteFeatureByFid(entry, fid, { confirmDelete: true, closeEditorOnDone: true });
+      }
+
+      seDelete.addEventListener('click', deleteEditedFeature);
 
 
       function reflectEditUI() {
         if (!editToggle) return;
         editToggle.textContent = 'Edit: ' + (editingEnabled ? 'ON' : 'OFF');
         editToggle.classList.toggle('off', !editingEnabled);
+        syncDeleteModeCursor();
       }
 
       // initial paint
       reflectEditUI();
+      reflectDeleteUI();
 
       // Toggle button wiring
       if (editToggle) {
         editToggle.addEventListener('click', () => {
           editingEnabled = !editingEnabled;
-          if (!editingEnabled) closeStyleEditor();
+          if (!editingEnabled) {
+            setDeleteMode(false);
+            closeStyleEditor();
+          }
           reflectEditUI();
+        });
+      }
+
+      if (deleteToggle) {
+        deleteToggle.addEventListener('click', () => {
+          setDeleteMode(!deleteModeEnabled);
         });
       }
 
@@ -2869,23 +2966,28 @@
           if (!circleDragCtx) return;
           if (typeof endCircleDrag === 'function') return endCircleDrag(false);
 
-          if (engine === 'gl') { try { mapgl.dragPan.enable(); } catch { } mapgl.getCanvas().style.cursor = ''; }
-          else { try { mapleaf.dragging.enable(); } catch { } mapleaf.getContainer().style.cursor = ''; }
+          if (engine === 'gl') { try { mapgl.dragPan.enable(); } catch { } }
+          else { try { mapleaf.dragging.enable(); } catch { } }
           circleDragCtx = null;
+          syncDeleteModeCursor();
         };
 
         if (e.key === 'Escape') return stopDrag();
 
         if (e.key.toLowerCase() === 'e' && !e.metaKey && !e.ctrlKey && !e.altKey) {
           editingEnabled = !editingEnabled;
-          if (!editingEnabled) { stopDrag(); closeStyleEditor(); }
+          if (!editingEnabled) {
+            stopDrag();
+            setDeleteMode(false);
+            closeStyleEditor();
+          }
           reflectEditUI();
           try { localStorage.setItem('sqkii-editing', editingEnabled ? '1' : '0'); } catch { }
         }
       });
 
       function openStyleEditor(entry, fid, screenX, screenY) {
-        if (!editingEnabled) return;
+        if (!editingEnabled || deleteModeEnabled) return;
         const f = entry.data.features.find(x => x.properties.fid === fid); if (!f) return;
         const p = f.properties;
         const isLine = f.geometry?.type === 'LineString' || f.geometry?.type === 'MultiLineString';
@@ -3174,27 +3276,6 @@
       }
 
 
-      seDelete.addEventListener('click', () => {
-        if (!editCtx) return;
-        const { entry, fid } = editCtx;
-        const ix = entry.data.features.findIndex(x => x.properties.fid === fid);
-        if (ix < 0) return;
-        const p = entry.data.features[ix].properties || {};
-        if (!confirm('Delete this feature?')) return;
-
-        entry.data.features.splice(ix, 1);
-        const key = p._gid || p.fid;
-        entry.data.features.push({
-          type: 'Feature',
-          geometry: { type: 'Point', coordinates: [0, 0] },
-          properties: { fid: key, _gid: key, _deleted: true, _ts: Date.now(), name: p.name || 'Deleted feature' }
-        });
-        entry.items = rebuildItemsFromFeatures(entry.data.features);
-
-        refreshGroupBoth(entry); renderLayers(); renderGroupsVisibility(); saveState();
-        closeStyleEditor();
-      });
-
       const LONGPRESS_MS = 450;
       function attachLongPressGL(layerId, /*unused*/ _entry) {
         let timer = null;
@@ -3218,10 +3299,14 @@
             let chosen;
 
             if (isLineLayer) {
-              // For line layers, just pick the feature under the cursor in THIS layer
-              const hits = mapgl.queryRenderedFeatures(e.point, { layers: [layerId] });
+              // Give thin lines a forgiving hit box so long-press selection is reliable.
+              const hitPad = 10;
+              const hits = mapgl.queryRenderedFeatures([
+                [e.point.x - hitPad, e.point.y - hitPad],
+                [e.point.x + hitPad, e.point.y + hitPad]
+              ], { layers: [layerId] });
               if (!hits || !hits.length) return;
-              chosen = hits[0];
+              chosen = hits.find(hit => hit?.properties?.fid) || hits[0];
             } else {
               // For fills, keep old behaviour: smallest polygon at that point
               chosen = pickSmallestPolygonAtPoint(e.point);
@@ -3878,6 +3963,10 @@
             window.PixelGrid.bindToRoom({ supabase, currentRoomCode: code, clientId });
           }
 
+          if (document.getElementById('coin-db-modal')?.classList.contains('visible')) {
+            try { await refreshCoinDatabase(); } catch { }
+          }
+
         } catch (e) {
           console.error('Join failed', e);
           throw e;
@@ -3892,6 +3981,21 @@
       const serverInput = document.getElementById('server-code-input');
       const serverJoin = document.getElementById('server-code-join');
       const serverErr = document.getElementById('server-error');
+      const LAST_SERVER_CODE_KEY = 'sqkii-last-server-code';
+      function loadLastServerCode() {
+        try {
+          return (localStorage.getItem(LAST_SERVER_CODE_KEY) || '').trim();
+        } catch {
+          return '';
+        }
+      }
+      function saveLastServerCode(code) {
+        try {
+          const trimmed = (code || '').trim();
+          if (trimmed) localStorage.setItem(LAST_SERVER_CODE_KEY, trimmed);
+          else localStorage.removeItem(LAST_SERVER_CODE_KEY);
+        } catch { }
+      }
       function showServerModal() { modal.classList.add('visible'); appEl.classList.add('blocked-by-modal'); }
       function hideServerModal() { modal.classList.remove('visible'); appEl.classList.remove('blocked-by-modal'); }
 
@@ -3912,6 +4016,7 @@
 
         try {
           await joinRoom(code);
+          saveLastServerCode(code);
           hideServerModal();
         } catch (e) {
           console.error('Join failed', e);
@@ -3981,20 +4086,41 @@
       const stopAllSfx = () => document.querySelectorAll('audio').forEach(el => { if (el !== bgm) stopHtmlAudio(el); });
       const suspendWebAudio = async () => { try { if (audioCtx?.state !== 'suspended') await audioCtx.suspend(); } catch { } };
       const resumeWebAudio = async () => { try { if (audioCtx?.state === 'suspended') await audioCtx.resume(); } catch { } };
+      const canResumeAudio = () => !document.hidden && document.visibilityState === 'visible';
+      async function pauseAllAudio() {
+        try { await fadeAudio(bgm, 0, 200); } catch { }
+        stopHtmlAudio(bgm);
+        stopAllSfx();
+        await suspendWebAudio();
+        try {
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'none';
+            navigator.mediaSession.metadata = null;
+          }
+        } catch { }
+      }
+      async function resumeBgmIfAllowed() {
+        if (!audioEnabled || !canResumeAudio()) return;
+        await resumeWebAudio();
+        try {
+          bgm.volume = 0;
+          bgm.loop = true;
+          await bgm.play();
+          await fadeAudio(bgm, bgmTargetVolume(), 250);
+        } catch { }
+      }
 
-      // Handle tab visibility
-      document.addEventListener('visibilitychange', async () => {
-        if (document.hidden) {
-          await fadeAudio(bgm, 0, 350); stopHtmlAudio(bgm); stopAllSfx(); await suspendWebAudio();
-          try { if ('mediaSession' in navigator) { navigator.mediaSession.playbackState = 'none'; navigator.mediaSession.metadata = null; } } catch { }
-        } else {
-          await resumeWebAudio();
-          if (audioEnabled) { try { bgm.volume = 0; bgm.loop = true; await bgm.play(); await fadeAudio(bgm, bgmTargetVolume(), 350); } catch { } }
-        }
+      // Handle mobile/browser backgrounding more aggressively than visibilitychange alone.
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) pauseAllAudio();
+        else resumeBgmIfAllowed();
       });
-
-      // Start audio after user click (required by browsers)
-      document.addEventListener("pointerdown", () => { bgm.play().catch(() => { }); }, { once: true, capture: true });
+      window.addEventListener('pagehide', () => { pauseAllAudio(); });
+      window.addEventListener('blur', () => {
+        if (document.hidden || document.visibilityState !== 'visible') pauseAllAudio();
+      });
+      window.addEventListener('pageshow', () => { resumeBgmIfAllowed(); });
+      window.addEventListener('focus', () => { resumeBgmIfAllowed(); });
 
 
       let audioCtx = null, buttonBuffer = null;
@@ -4031,7 +4157,7 @@
       }
       document.addEventListener('pointerdown', () => {
         ensureAudioCtxResumed();
-        if (audioEnabled && !document.hidden) { bgm.play().catch(() => { }); }
+        if (audioEnabled && canResumeAudio()) { bgm.play().catch(() => { }); }
         playClick();
       }, { once: true, capture: true });
 
@@ -4045,7 +4171,8 @@
       audioBtn.addEventListener('click', () => {
         audioEnabled = !audioEnabled;
         setAudioIcon(audioEnabled);
-        if (!audioEnabled) bgm.pause(); else if (!document.hidden) bgm.play().catch(() => { });
+        if (!audioEnabled) pauseAllAudio();
+        else if (canResumeAudio()) resumeBgmIfAllowed();
       });
       document.addEventListener('click', (ev) => { if (ev.target.closest('button')) playClick(); }, { capture: true });
 
@@ -4201,15 +4328,44 @@
       const RECON_OVERLAY_SOURCE = 'recon-overlay-src';
       const RECON_OVERLAY_LAYER = 'recon-overlay-layer';
       let leafletReconLayer = null;
+      const RECON_PASSWORD = '6482';
+      const RECON_ACCESS_KEY = 'sqkii-recon-access';
+      const RECON_ACCESS_MS = 4 * 60 * 60 * 1000;
+
+      function hasReconAccess() {
+        try {
+          const raw = localStorage.getItem(RECON_ACCESS_KEY);
+          if (!raw) return false;
+          const parsed = JSON.parse(raw);
+          const expiresAt = Number(parsed?.expiresAt || 0);
+          if (!Number.isFinite(expiresAt) || Date.now() >= expiresAt) {
+            localStorage.removeItem(RECON_ACCESS_KEY);
+            return false;
+          }
+          return true;
+        } catch {
+          try { localStorage.removeItem(RECON_ACCESS_KEY); } catch { }
+          return false;
+        }
+      }
+
+      function grantReconAccess() {
+        try {
+          localStorage.setItem(RECON_ACCESS_KEY, JSON.stringify({
+            expiresAt: Date.now() + RECON_ACCESS_MS
+          }));
+        } catch { }
+      }
 
       function openReconModal(fid, center, radius) {
-        // Password protection
-        const correctPassword = '6482'; // Change this to your desired password
-        const enteredPassword = prompt('🔐 Enter password to use Recon Coin:');
-
-        if (enteredPassword !== correctPassword) {
-          alert('❌ Incorrect password. Access denied.');
-          return;
+        if (!hasReconAccess()) {
+          const enteredPassword = prompt('🔐 Enter password to use Recon Coin:');
+          if (enteredPassword == null) return;
+          if ((enteredPassword || '').trim() !== RECON_PASSWORD) {
+            alert('❌ Incorrect password. Access denied.');
+            return;
+          }
+          grantReconAccess();
         }
 
         currentReconCircle = { fid, center, radius };
@@ -4393,6 +4549,32 @@
         return fc;
       }
 
+      function getRequiredReconDatasets(constraints) {
+        const required = new Set();
+        for (const c of (constraints || [])) {
+          switch (c?.type) {
+            case 'LAMP_POST':
+              required.add('LAMP_POST');
+              break;
+            case 'HDB':
+              required.add('HDB');
+              break;
+            case 'AED':
+              required.add('AED');
+              break;
+            case 'BUS_STOP':
+              required.add('BUS_STOP');
+              break;
+            case 'NO_ENTRY':
+            case 'SLOW':
+            case 'STOP':
+              required.add('TRAFFIC_SIGN');
+              break;
+          }
+        }
+        return required;
+      }
+
 
       /**
        * Requires:
@@ -4425,29 +4607,46 @@
 
         try {
           const w = window;
+          const requiredDatasets = getRequiredReconDatasets(reconConstraints);
 
-          // Ensure cached fetch promises exist
-          w.__LAMPPOST_CACHE_PROMISE ??= fetchDataGovGeoJson(DATASET_IDS.LAMP_POST, 'Lamp Post');
-          w.__HDB_CACHE_PROMISE ??= fetchDataGovGeoJson(DATASET_IDS.HDB, 'HDB');
-          w.__AED_CACHE_PROMISE ??= fetchDataGovGeoJson(DATASET_IDS.AED, 'AED');
-          w.__BUS_CACHE_PROMISE ??= fetchDataGovGeoJson(DATASET_IDS.BUS_STOP, 'Bus Stop');
-          w.__TRAFFIC_SIGN_CACHE_PROMISE ??= fetchDataGovGeoJson(DATASET_IDS.TRAFFIC_SIGN, 'Traffic Sign');
+          if (requiredDatasets.has('LAMP_POST')) {
+            w.__LAMPPOST_CACHE_PROMISE ??= fetchDataGovGeoJson(DATASET_IDS.LAMP_POST, 'Lamp Post');
+          }
+          if (requiredDatasets.has('HDB')) {
+            w.__HDB_CACHE_PROMISE ??= fetchDataGovGeoJson(DATASET_IDS.HDB, 'HDB');
+          }
+          if (requiredDatasets.has('AED')) {
+            w.__AED_CACHE_PROMISE ??= fetchDataGovGeoJson(DATASET_IDS.AED, 'AED');
+          }
+          if (requiredDatasets.has('BUS_STOP')) {
+            w.__BUS_CACHE_PROMISE ??= fetchDataGovGeoJson(DATASET_IDS.BUS_STOP, 'Bus Stop');
+          }
+          if (requiredDatasets.has('TRAFFIC_SIGN')) {
+            w.__TRAFFIC_SIGN_CACHE_PROMISE ??= fetchDataGovGeoJson(DATASET_IDS.TRAFFIC_SIGN, 'Traffic Sign');
+          }
 
-          // Load + preprocess once
-          let [lampData, hdbData, aedData, busData, trafficData] = await Promise.all([
-            w.__LAMPPOST_CACHE_PROMISE,
-            w.__HDB_CACHE_PROMISE,
-            w.__AED_CACHE_PROMISE,
-            w.__BUS_CACHE_PROMISE,
-            w.__TRAFFIC_SIGN_CACHE_PROMISE
-          ]);
+          let lampData = null;
+          let hdbData = null;
+          let aedData = null;
+          let busData = null;
+          let trafficData = null;
 
-          lampData = prepDataset(lampData);
-          hdbData = prepDataset(hdbData);
-          ensureHdbIndex(hdbData);           // ✅ build rbush once
-          aedData = prepDataset(aedData);
-          busData = prepDataset(busData);
-          trafficData = prepDataset(trafficData);
+          if (requiredDatasets.has('LAMP_POST')) {
+            lampData = prepDataset(await w.__LAMPPOST_CACHE_PROMISE);
+          }
+          if (requiredDatasets.has('HDB')) {
+            hdbData = prepDataset(await w.__HDB_CACHE_PROMISE);
+            ensureHdbIndex(hdbData);
+          }
+          if (requiredDatasets.has('AED')) {
+            aedData = prepDataset(await w.__AED_CACHE_PROMISE);
+          }
+          if (requiredDatasets.has('BUS_STOP')) {
+            busData = prepDataset(await w.__BUS_CACHE_PROMISE);
+          }
+          if (requiredDatasets.has('TRAFFIC_SIGN')) {
+            trafficData = prepDataset(await w.__TRAFFIC_SIGN_CACHE_PROMISE);
+          }
 
           // Build recon search circle + adaptive precision
           const searchCircle = turf.circle(
@@ -4591,6 +4790,7 @@
 
       function endCircleDrag(save = true) {
         if (!circleDragCtx) return;
+        suppressPopups();
 
         // Re-enable normal map panning
         if (engine === 'gl') {
@@ -4602,6 +4802,7 @@
         }
 
         circleDragCtx = null;
+        syncDeleteModeCursor();
         if (save) saveState();
       }
 
@@ -5053,13 +5254,375 @@
         if (e.target === sheetsModal) hideSheetsModal();
       });
 
+      /* ================= Coin Database ================= */
+      const COIN_DB_TABLE = 'coin_history_archive';
+      const coinDbModal = byId('coin-db-modal');
+      const coinDbOpenBtn = byId('coin-db-open');
+      const coinDbCloseBtn = byId('coin-db-close');
+      const coinDbNameInput = byId('coin-db-name');
+      const coinDbSaveCurrentBtn = byId('coin-db-save-current');
+      const coinDbRefreshBtn = byId('coin-db-refresh');
+      const coinDbStatus = byId('coin-db-status');
+      const coinDbList = byId('coin-db-list');
+      let coinDbEntriesCache = [];
+
+      function coinDbSetStatus(message, isError = false) {
+        if (!coinDbStatus) return;
+        coinDbStatus.textContent = message || '';
+        coinDbStatus.style.color = isError ? '#fca5a5' : 'var(--muted)';
+      }
+
+      function coinDbFriendlyError(error) {
+        const message = String(error?.message || error || 'Unknown error');
+        if (/relation .*coin_history_archive.*does not exist/i.test(message)) {
+          return 'Supabase archive table is missing. Run supabase/coin_history_archive.sql first.';
+        }
+        if (/column .* does not exist/i.test(message)) {
+          return 'Supabase archive table is outdated. Re-run supabase/coin_history_archive.sql.';
+        }
+        if (/row-level security|permission denied|not allowed/i.test(message)) {
+          return 'Supabase blocked the request. Check the RLS policies in supabase/coin_history_archive.sql.';
+        }
+        return message;
+      }
+
+      function coinDbFormatDate(value) {
+        if (!value) return 'Unknown date';
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return 'Unknown date';
+        return d.toLocaleString();
+      }
+
+      function coinDbFormatCoord(value) {
+        const n = Number(value);
+        return Number.isFinite(n) ? n.toFixed(6) : 'n/a';
+      }
+
+      function coinDbFormatRadius(value) {
+        const n = Number(value);
+        return Number.isFinite(n) ? `${Math.round(n * 100) / 100} m` : 'n/a';
+      }
+
+      function coinDbSerializeState() {
+        return Utils.deepClone(shallowSerializableState());
+      }
+
+      function extractShrinkLifecycle(stateArr = []) {
+        const steps = [];
+
+        for (const layer of (stateArr || [])) {
+          const layerName = String(layer?.name || 'Layer');
+          if (/sonar|glimpse/i.test(layerName)) continue;
+
+          for (const feature of (layer?.data?.features || [])) {
+            const props = feature?.properties || {};
+            if (props._deleted) continue;
+
+            const radius = Number(props._circleRadius);
+            let lng = Number(props._circleLng);
+            let lat = Number(props._circleLat);
+
+            if ((!Number.isFinite(lng) || !Number.isFinite(lat)) && Array.isArray(props._circleCenter) && props._circleCenter.length >= 2) {
+              lng = Number(props._circleCenter[0]);
+              lat = Number(props._circleCenter[1]);
+            }
+
+            if (!Number.isFinite(radius) || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+            if (/^sonar\b/i.test(String(props.name || ''))) continue;
+
+            const ts = Number(props._ts);
+            steps.push({
+              step: 0,
+              layerName,
+              featureName: String(props.name || `${layerName} shrink`),
+              lat,
+              lng,
+              radiusMeters: radius,
+              timestampMs: Number.isFinite(ts) ? ts : null,
+              timestampIso: Number.isFinite(ts) ? new Date(ts).toISOString() : null,
+              fid: String(props.fid ?? props._gid ?? '')
+            });
+          }
+        }
+
+        steps.sort((a, b) => {
+          const ta = a.timestampMs ?? Number.MAX_SAFE_INTEGER;
+          const tb = b.timestampMs ?? Number.MAX_SAFE_INTEGER;
+          if (ta !== tb) return ta - tb;
+          return a.featureName.localeCompare(b.featureName);
+        });
+
+        return steps.map((step, index) => ({
+          ...step,
+          step: index + 1
+        }));
+      }
+
+      function coinDbDefaultName() {
+        const stamp = new Date().toLocaleDateString();
+        return `${(currentRoomCode || 'coin').toUpperCase()} coin - ${stamp}`;
+      }
+
+      function renderCoinDbEntries(entries) {
+        coinDbEntriesCache = Array.isArray(entries) ? entries : [];
+
+        if (!coinDbList) return;
+        if (!coinDbEntriesCache.length) {
+          coinDbList.innerHTML = '<div class="coin-db-empty">No archived coins yet for this room.</div>';
+          return;
+        }
+
+        coinDbList.innerHTML = coinDbEntriesCache.map((entry) => {
+          const steps = Array.isArray(entry.lifecycle) ? entry.lifecycle : [];
+          const exactSpot = (Number.isFinite(Number(entry.exact_lat)) && Number.isFinite(Number(entry.exact_lng)))
+            ? `${coinDbFormatCoord(entry.exact_lat)}, ${coinDbFormatCoord(entry.exact_lng)}`
+            : 'Not saved yet';
+
+          return `
+            <section class="coin-db-entry" data-entry-id="${escapeHtml(entry.id)}">
+              <div class="coin-db-entry-head">
+                <div>
+                  <div class="coin-db-entry-title">${escapeHtml(entry.coin_label || 'Archived coin')}</div>
+                  <div class="hint">Archived ${escapeHtml(coinDbFormatDate(entry.created_at))}</div>
+                </div>
+                <div class="coin-db-actions">
+                  <button class="btn small coin-db-load-snapshot" data-entry-id="${escapeHtml(entry.id)}">Load Snapshot</button>
+                </div>
+              </div>
+
+              <div class="coin-db-meta">
+                <span class="coin-db-chip">Room: ${escapeHtml(entry.room_code || '')}</span>
+                <span class="coin-db-chip">Shrinks: ${steps.length}</span>
+                <span class="coin-db-chip">Exact spot: ${escapeHtml(exactSpot)}</span>
+              </div>
+
+              <div class="coin-db-steps">
+                ${steps.map((step) => `
+                  <div class="coin-db-step">
+                    <div>
+                      <strong>Step</strong>
+                      <span>${escapeHtml(String(step.step || ''))}</span>
+                    </div>
+                    <div>
+                      <strong>Latitude</strong>
+                      <span>${escapeHtml(coinDbFormatCoord(step.lat))}</span>
+                    </div>
+                    <div>
+                      <strong>Longitude</strong>
+                      <span>${escapeHtml(coinDbFormatCoord(step.lng))}</span>
+                    </div>
+                    <div>
+                      <strong>Radius</strong>
+                      <span>${escapeHtml(coinDbFormatRadius(step.radiusMeters))}</span>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+
+              <div class="coin-db-note-form">
+                <input type="number" step="any" class="coin-db-exact-lat" data-entry-id="${escapeHtml(entry.id)}" placeholder="Exact latitude" value="${entry.exact_lat ?? ''}">
+                <input type="number" step="any" class="coin-db-exact-lng" data-entry-id="${escapeHtml(entry.id)}" placeholder="Exact longitude" value="${entry.exact_lng ?? ''}">
+                <textarea class="coin-db-exact-note" data-entry-id="${escapeHtml(entry.id)}" placeholder="Notes about the revealed exact spot">${escapeHtml(entry.exact_note || '')}</textarea>
+                <div class="coin-db-note-footer">
+                  <div class="coin-db-inline-status" id="coin-db-inline-status-${escapeHtml(entry.id)}"></div>
+                  <button class="btn small coin-db-save-note" data-entry-id="${escapeHtml(entry.id)}">Save Exact Spot</button>
+                </div>
+              </div>
+            </section>
+          `;
+        }).join('');
+      }
+
+      function coinDbInlineStatus(entryId, message, isError = false) {
+        const el = document.getElementById(`coin-db-inline-status-${entryId}`);
+        if (!el) return;
+        el.textContent = message || '';
+        el.style.color = isError ? '#fca5a5' : 'var(--muted)';
+      }
+
+      async function fetchCoinDbEntries() {
+        if (!currentRoomCode) return [];
+        const { data, error } = await supabase
+          .from(COIN_DB_TABLE)
+          .select('*')
+          .eq('room_code', currentRoomCode)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data || [];
+      }
+
+      async function refreshCoinDatabase() {
+        if (!currentRoomCode) {
+          renderCoinDbEntries([]);
+          coinDbSetStatus('Join a room first to use the coin database.', true);
+          return;
+        }
+
+        coinDbSetStatus('Loading archived coins...');
+        try {
+          const entries = await fetchCoinDbEntries();
+          renderCoinDbEntries(entries);
+          coinDbSetStatus(entries.length ? `Loaded ${entries.length} archived coin record(s).` : 'No archived coins yet for this room.');
+        } catch (error) {
+          renderCoinDbEntries([]);
+          coinDbSetStatus(coinDbFriendlyError(error), true);
+        }
+      }
+
+      async function archiveCurrentCoinLifecycle() {
+        if (!currentRoomCode) {
+          coinDbSetStatus('Join a room first before archiving a coin.', true);
+          return;
+        }
+
+        const snapshotState = coinDbSerializeState();
+        const lifecycle = extractShrinkLifecycle(snapshotState);
+
+        if (!lifecycle.length) {
+          coinDbSetStatus('No shrink circles found in the current map state.', true);
+          return;
+        }
+
+        const coinLabel = (coinDbNameInput?.value || '').trim() || coinDbDefaultName();
+        coinDbSaveCurrentBtn.disabled = true;
+        coinDbSetStatus('Archiving current coin...');
+
+        try {
+          const payload = {
+            room_code: currentRoomCode,
+            coin_label: coinLabel,
+            status: 'found',
+            shrink_count: lifecycle.length,
+            lifecycle,
+            snapshot_state: snapshotState,
+            first_shrink_at: lifecycle[0]?.timestampIso || null,
+            last_shrink_at: lifecycle[lifecycle.length - 1]?.timestampIso || null,
+            archived_by: clientId,
+            updated_by: clientId,
+            updated_at: new Date().toISOString()
+          };
+
+          const { error } = await supabase.from(COIN_DB_TABLE).insert(payload);
+          if (error) throw error;
+
+          if (coinDbNameInput) coinDbNameInput.value = '';
+          await refreshCoinDatabase();
+          coinDbSetStatus(`Archived "${coinLabel}" with ${lifecycle.length} shrink step(s).`);
+        } catch (error) {
+          coinDbSetStatus(coinDbFriendlyError(error), true);
+        } finally {
+          coinDbSaveCurrentBtn.disabled = false;
+        }
+      }
+
+      async function saveCoinDbExactSpot(entryId) {
+        const latInput = coinDbList?.querySelector(`.coin-db-exact-lat[data-entry-id="${entryId}"]`);
+        const lngInput = coinDbList?.querySelector(`.coin-db-exact-lng[data-entry-id="${entryId}"]`);
+        const noteInput = coinDbList?.querySelector(`.coin-db-exact-note[data-entry-id="${entryId}"]`);
+
+        if (!latInput || !lngInput || !noteInput) return;
+
+        const rawLat = String(latInput.value || '').trim();
+        const rawLng = String(lngInput.value || '').trim();
+        const exactLat = rawLat === '' ? null : Number(rawLat);
+        const exactLng = rawLng === '' ? null : Number(rawLng);
+
+        if ((exactLat == null) !== (exactLng == null)) {
+          coinDbInlineStatus(entryId, 'Latitude and longitude must both be filled, or both left blank.', true);
+          return;
+        }
+
+        if (exactLat != null && (!Number.isFinite(exactLat) || exactLat < -90 || exactLat > 90)) {
+          coinDbInlineStatus(entryId, 'Latitude must be between -90 and 90.', true);
+          return;
+        }
+
+        if (exactLng != null && (!Number.isFinite(exactLng) || exactLng < -180 || exactLng > 180)) {
+          coinDbInlineStatus(entryId, 'Longitude must be between -180 and 180.', true);
+          return;
+        }
+
+        coinDbInlineStatus(entryId, 'Saving...');
+
+        try {
+          const { error } = await supabase
+            .from(COIN_DB_TABLE)
+            .update({
+              exact_lat: exactLat,
+              exact_lng: exactLng,
+              exact_note: String(noteInput.value || '').trim() || null,
+              updated_by: clientId,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', entryId);
+
+          if (error) throw error;
+
+          coinDbInlineStatus(entryId, 'Saved.');
+          await refreshCoinDatabase();
+        } catch (error) {
+          coinDbInlineStatus(entryId, coinDbFriendlyError(error), true);
+        }
+      }
+
+      async function loadCoinDbSnapshot(entryId) {
+        const entry = coinDbEntriesCache.find((item) => String(item.id) === String(entryId));
+        if (!entry?.snapshot_state) return;
+
+        try {
+          await applyStateArray(entry.snapshot_state);
+          localSaveOnly();
+          coinDbSetStatus(`Loaded snapshot for "${entry.coin_label}".`);
+        } catch (error) {
+          coinDbSetStatus(`Failed to load snapshot: ${coinDbFriendlyError(error)}`, true);
+        }
+      }
+
+      function openCoinDbModal() {
+        if (!currentRoomCode) {
+          alert('Please join a server first to use the coin database.');
+          return;
+        }
+
+        coinDbModal.classList.add('visible');
+        appEl.classList.add('blocked-by-modal');
+        if (coinDbNameInput && !coinDbNameInput.value.trim()) coinDbNameInput.value = coinDbDefaultName();
+        refreshCoinDatabase();
+      }
+
+      function closeCoinDbModal() {
+        coinDbModal.classList.remove('visible');
+        appEl.classList.remove('blocked-by-modal');
+      }
+
+      coinDbOpenBtn?.addEventListener('click', openCoinDbModal);
+      coinDbCloseBtn?.addEventListener('click', closeCoinDbModal);
+      coinDbRefreshBtn?.addEventListener('click', refreshCoinDatabase);
+      coinDbSaveCurrentBtn?.addEventListener('click', archiveCurrentCoinLifecycle);
+      coinDbModal?.addEventListener('click', (e) => {
+        if (e.target === coinDbModal) closeCoinDbModal();
+      });
+      coinDbList?.addEventListener('click', async (e) => {
+        const saveBtn = e.target.closest('.coin-db-save-note');
+        if (saveBtn) {
+          await saveCoinDbExactSpot(saveBtn.dataset.entryId);
+          return;
+        }
+
+        const loadBtn = e.target.closest('.coin-db-load-snapshot');
+        if (loadBtn) {
+          await loadCoinDbSnapshot(loadBtn.dataset.entryId);
+        }
+      });
 
       /* ================= Startup ================= */
       window.addEventListener('DOMContentLoaded', () => {
         try {
           const urlParams = new URLSearchParams(location.search);
-          const preCode = urlParams.get('server') || '';
-          if (preCode) { serverInput.value = preCode; }
+          const preCode = (urlParams.get('server') || '').trim();
+          const cachedCode = loadLastServerCode();
+          serverInput.value = preCode || cachedCode;
 
           // 👇 auto-open the server modal on load
           showServerModal();

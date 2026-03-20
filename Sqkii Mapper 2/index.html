@@ -86,9 +86,12 @@
 
         <div class="toolbar">
           <button id="edit-toggle" class="btn small" title="Toggle edit mode">Edit: OFF</button>
+          <button id="delete-toggle" class="btn small off" title="Toggle delete mode">Delete: OFF</button>
 
           <!-- Geohashes button (move it here so it's visible in the header) -->
           <button id="geohash-open" class="btn small" title="Open Geohashes Editor">Geohashes</button>
+
+          <button id="coin-db-open" class="btn small" title="Open archived coin database">Coin DB</button>
 
           <!-- Pixel Grid button -->
           <button id="pixelgrid-open" class="btn small" title="Open Pixel Grid">Pixel Grid</button>
@@ -301,6 +304,28 @@
           <button id="sheets-cancel" class="btn small">Cancel</button>
         </div>
         <div id="sheets-error" class="err"></div>
+      </div>
+    </div>
+
+    <!-- Coin Database Modal -->
+    <div id="coin-db-modal" class="modal">
+      <div class="modal-card coin-db-card">
+        <div class="coin-db-header">
+          <div>
+            <h3>Coin Database</h3>
+            <small class="hint">Archive a finished coin and keep every shrink step with latitude, longitude, and radius.</small>
+          </div>
+          <button id="coin-db-close" class="btn small">Close</button>
+        </div>
+
+        <div class="coin-db-toolbar">
+          <input id="coin-db-name" type="text" placeholder="Coin name, e.g. Great Gold Hunt #12" />
+          <button id="coin-db-save-current" class="btn small">Archive Current Coin</button>
+          <button id="coin-db-refresh" class="btn small">Refresh</button>
+        </div>
+
+        <div id="coin-db-status" class="hint coin-db-status"></div>
+        <div id="coin-db-list" class="coin-db-list"></div>
       </div>
     </div>
 
