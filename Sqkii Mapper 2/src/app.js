@@ -3613,6 +3613,7 @@
 
       let currentRoomCode = null;
       const clientId = (() => crypto.getRandomValues(new Uint32Array(4)).join('-'))();
+      const presenceSessionId = `${clientId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       let connectedUsers = 1; // Start with self
 
       // Update connection indicator
@@ -3850,7 +3851,7 @@
           presenceChannel = supabase.channel('presence-' + code, {
             config: {
               presence: {
-                key: clientId
+                key: presenceSessionId
               }
             }
           });
@@ -3858,16 +3859,11 @@
           presenceChannel
             .on('presence', { event: 'sync' }, () => {
               const state = presenceChannel.presenceState();
-              connectedUsers = Object.keys(state).length;
+              const users = Object.values(state)
+                .flatMap((userArray) => Array.isArray(userArray) ? userArray : [])
+                .filter(Boolean);
 
-              // Store all users info
-              const users = [];
-              for (const key in state) {
-                const userArray = state[key];
-                if (userArray && userArray[0]) {
-                  users.push(userArray[0]);
-                }
-              }
+              connectedUsers = users.length || 1;
 
               window.connectedUsersList = users;
               updateConnectionIndicator();
