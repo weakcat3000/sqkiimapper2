@@ -3910,6 +3910,7 @@
 
 
       let suppressNextRemoteApply = false;
+      let hasUnsavedMapChanges = false;
 
       const syncToServerDebounced = debounce(async function () {
         if (!currentRoomCode) return;
@@ -3918,14 +3919,25 @@
           suppressNextRemoteApply = true;
           await upsertRoomState(currentRoomCode, state);
           localSaveOnly();
+          hasUnsavedMapChanges = false;
         } catch (e) {
           console.warn('Supabase sync failed:', e);
         } finally {
           setTimeout(() => { suppressNextRemoteApply = false; }, 250);
         }
-      }, 3000);
+      }, 8000);
 
-      function saveState() { syncToServerDebounced(); }
+      function saveState() {
+        hasUnsavedMapChanges = true;
+        syncToServerDebounced();
+      }
+
+      window.addEventListener('beforeunload', (e) => {
+        if (hasUnsavedMapChanges) {
+          e.preventDefault();
+          e.returnValue = '';
+        }
+      });
 
       let roomChannel = null;
 
