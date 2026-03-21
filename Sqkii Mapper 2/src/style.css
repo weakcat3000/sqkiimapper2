@@ -731,6 +731,7 @@
       width: 96%;
       max-height: 90vh;
       overflow: hidden;
+      min-height: 0;
       display: grid;
       grid-template-rows: auto auto auto 1fr;
       gap: 12px;
@@ -756,9 +757,18 @@
 
     .coin-db-list {
       overflow: auto;
+      min-height: 0;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
       display: grid;
       gap: 12px;
       padding-right: 4px;
+    }
+
+    #coin-db-modal {
+      overflow: auto;
+      padding: 20px 0;
+      align-items: start;
     }
 
     .coin-db-empty {
