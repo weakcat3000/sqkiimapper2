@@ -3616,6 +3616,49 @@
       const presenceSessionId = `${clientId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       let connectedUsers = 1; // Start with self
 
+      function getPresenceUsers(state) {
+        const rawUsers = [];
+
+        for (const value of Object.values(state || {})) {
+          if (!value) continue;
+          if (Array.isArray(value)) {
+            rawUsers.push(...value.filter(Boolean));
+            continue;
+          }
+          if (Array.isArray(value.metas)) {
+            rawUsers.push(...value.metas.filter(Boolean));
+            continue;
+          }
+          rawUsers.push(value);
+        }
+
+        const seen = new Set();
+        return rawUsers.filter((user) => {
+          const key =
+            user.presence_session_id ||
+            user.phx_ref ||
+            `${user.client_id || 'unknown'}-${user.online_at || ''}-${user.device || ''}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+
+      function refreshPresenceIndicator() {
+        if (!presenceChannel) {
+          connectedUsers = currentRoomCode ? 1 : 0;
+          window.connectedUsersList = currentRoomCode ? [] : [];
+          updateConnectionIndicator();
+          return;
+        }
+
+        const state = presenceChannel.presenceState?.() || {};
+        const users = getPresenceUsers(state);
+        connectedUsers = Math.max(1, users.length);
+        window.connectedUsersList = users;
+        updateConnectionIndicator();
+      }
+
       // Update connection indicator
       function updateConnectionIndicator() {
         const indicator = document.getElementById('connection-indicator');
@@ -3858,33 +3901,28 @@
 
           presenceChannel
             .on('presence', { event: 'sync' }, () => {
-              const state = presenceChannel.presenceState();
-              const users = Object.values(state)
-                .flatMap((userArray) => Array.isArray(userArray) ? userArray : [])
-                .filter(Boolean);
-
-              connectedUsers = users.length || 1;
-
-              window.connectedUsersList = users;
-              updateConnectionIndicator();
+              refreshPresenceIndicator();
             })
             .on('presence', { event: 'join' }, ({ newPresences }) => {
               console.log('User joined:', newPresences);
+              setTimeout(refreshPresenceIndicator, 0);
             })
             .on('presence', { event: 'leave' }, ({ leftPresences }) => {
               console.log('User left:', leftPresences);
+              setTimeout(refreshPresenceIndicator, 0);
             })
             .subscribe(async (status) => {
               if (status === 'SUBSCRIBED') {
                 await presenceChannel.track({
                   client_id: clientId,
+                  presence_session_id: presenceSessionId,
                   device: userInfo.device,
                   browser: userInfo.browser,
                   city: userInfo.city,
                   country: userInfo.countryCode,
                   online_at: new Date().toISOString()
                 });
-                updateConnectionIndicator();
+                setTimeout(refreshPresenceIndicator, 0);
               }
             });
 
