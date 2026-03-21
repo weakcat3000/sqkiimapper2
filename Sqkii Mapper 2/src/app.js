@@ -985,8 +985,16 @@
         // --- Expose applyIfReady globally so joinRoom can use it ---
         window.applyGeohashOverlays = applyIfReady;
 
+        const scheduleAfterBootstrap = (fn) => {
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => { setTimeout(fn, 0); }, { once: true });
+          } else {
+            setTimeout(fn, 0);
+          }
+        };
+
         // --- Auto-apply on initial page load (for 'Continue without sync') ---
-        (async function initGeohashes() {
+        scheduleAfterBootstrap(async () => {
           // Only run if NOT joining a room (room will handle it)
           if (!window.currentRoomCode) {
             await loadGeohashState();
@@ -1001,7 +1009,7 @@
               }, 500);
             });
           }
-        })();
+        });
 
         // Optional: prefill example (only if no saved data and both textareas are empty)
         const maybePrefillGeohashExamples = () => {
@@ -1018,11 +1026,7 @@
             taEliminated.value = ['w21xqp_0', 'w21zkw_1', 'w21zv5_1', 'w21z90_1'].join('\n');
           }
         };
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', maybePrefillGeohashExamples, { once: true });
-        } else {
-          maybePrefillGeohashExamples();
-        }
+        scheduleAfterBootstrap(maybePrefillGeohashExamples);
 
       })();
 
