@@ -884,6 +884,11 @@
       display: grid;
       gap: 12px;
       border-top: 1px solid var(--border);
+      max-height: min(62vh, 720px);
+      overflow: auto;
+      min-height: 0;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
     }
 
     .coin-db-dropdown-body > :first-child {
