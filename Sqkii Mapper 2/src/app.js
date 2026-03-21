@@ -1421,6 +1421,7 @@
       const IS_IOS_DEVICE = /iPad|iPhone|iPod/.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       const IS_TOUCH_DEVICE = (navigator.maxTouchPoints || 0) > 0 || !!window.matchMedia?.('(pointer: coarse)')?.matches;
       const IS_LOCALHOST = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
+      const BASE_URL = import.meta.env.BASE_URL || '/';
       if (IS_IOS_DEVICE) document.documentElement.classList.add('ios-device');
       if (IS_TOUCH_DEVICE) document.documentElement.classList.add('touch-device');
       maptilersdk.config.apiKey = 'f9B8Wv0ythtbvpcK0QEw';
@@ -1451,6 +1452,13 @@
       (() => {
         const cat = document.getElementById('cat-lottie');
         if (!cat) return;
+        const catLottieSrc = `${BASE_URL}cat-fishing-on-moon.lottie`;
+
+        const ensureCatSrc = () => {
+          if (cat.getAttribute('src') !== catLottieSrc) {
+            cat.setAttribute('src', catLottieSrc);
+          }
+        };
 
         const applyLowDPR = () => {
           if (cat.dotLottie?.setRenderConfig) {
@@ -1461,8 +1469,32 @@
           }
         };
 
+        const tryStartCat = () => {
+          ensureCatSrc();
+          applyLowDPR();
+          try { cat.play?.(); } catch { }
+        };
+
+        ensureCatSrc();
+        cat.setAttribute('autoplay', '');
+        cat.setAttribute('loop', '');
         cat.addEventListener('ready', applyLowDPR, { once: true });
-        applyLowDPR();
+        cat.addEventListener('ready', tryStartCat);
+        cat.addEventListener('load', tryStartCat);
+        cat.addEventListener('error', (e) => {
+          console.warn('cat-lottie failed to load', e);
+        });
+        if (window.customElements?.whenDefined) {
+          window.customElements.whenDefined('dotlottie-player')
+            .then(() => {
+              tryStartCat();
+              setTimeout(tryStartCat, 250);
+              setTimeout(tryStartCat, 1000);
+            })
+            .catch(() => { });
+        } else {
+          tryStartCat();
+        }
       })();
 
       const _glReadyQueue = [];
@@ -1598,11 +1630,6 @@
       let engine = 'gl';
       function showGL() { const c = mapleaf.getCenter(), z = mapleaf.getZoom(); document.getElementById('mapleaf').style.display = 'none'; document.getElementById('mapgl').style.display = 'block'; mapgl.resize(); mapgl.jumpTo({ center: [c.lng, c.lat], zoom: z }); engine = 'gl'; }
       function showLeaf() { const c = mapgl.getCenter(), z = mapgl.getZoom(); document.getElementById('mapgl').style.display = 'none'; document.getElementById('mapleaf').style.display = 'block'; mapleaf.invalidateSize(true); mapleaf.setView([c.lat, c.lng], Math.round(z)); engine = 'leaf'; }
-      if (IS_LOCALHOST) {
-        const basemapSelect = document.getElementById('basemap');
-        if (basemapSelect) basemapSelect.value = 'osm';
-        showLeaf();
-      }
       if (IS_LOCALHOST) {
         setTimeout(() => {
           if (mapglStyleLoaded) return;
