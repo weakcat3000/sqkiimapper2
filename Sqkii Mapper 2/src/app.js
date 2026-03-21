@@ -3923,7 +3923,7 @@
         } finally {
           setTimeout(() => { suppressNextRemoteApply = false; }, 250);
         }
-      }, 10000);
+      }, 3000);
 
       function saveState() { syncToServerDebounced(); }
 
