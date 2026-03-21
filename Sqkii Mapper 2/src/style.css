@@ -1196,10 +1196,12 @@
 
     /* canvas container: big view but contained */
     #pixelgrid-modal .pg-right {
-      display: grid;
-      gap: 8px;
-      justify-items: center;
-      align-content: start;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      width: 100%;
     }
 
     #pixelgrid-modal .pg-canvas-wrap {
@@ -1683,4 +1685,245 @@
     #mapgl .maptilersdk-ctrl-logo,
     #mapgl .maplibregl-ctrl-bottom-left {
       display: none !important;
+    }
+
+    /* Pixel Grid Mobile Fixes */
+    @media (max-width: 768px) {
+      #pixelgrid-modal .pg-modal-card {
+        display: flex !important;
+        flex-direction: column;
+        overflow-y: auto !important;
+        padding: 16px !important;
+      }
+      #pixelgrid-modal .pg-controls {
+        grid-template-columns: 1fr !important;
+      }
+      #pixelgrid-modal .pg-row,
+      #pixelgrid-modal .pg-photo {
+        display: flex !important;
+        flex-wrap: wrap;
+      }
+      #pixelgrid-modal .pg-row > div,
+      #pixelgrid-modal .pg-photo > div {
+        flex: 1 1 auto;
+      }
+      #pixelgrid-modal .pg-row > button,
+      #pixelgrid-modal .pg-photo > button {
+        flex: 1 1 100%;
+        margin-top: 4px;
+      }
+      #pixelgrid-modal .pg-canvas-wrap {
+        max-width: 100% !important;
+        width: 100%;
+      }
+    }
+
+    /* ===================== STITCH UI: Neon Observatory ===================== */
+    :root {
+      --stitch-primary: #a855f7;
+      --stitch-primary-container: #b76dff;
+      --stitch-surface-high: rgba(51, 53, 57, 0.7);
+      --stitch-surface-low: #1a1c20;
+      --stitch-text-on-surface: #e2e2e8;
+      --stitch-text-variant: #cfc2d6;
+    }
+
+    /* Loading Progress Bar */
+    .stitch-loading-container {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      margin-top: -56px;
+      transform: translate(-50%, -50%);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column; /* Stack text above the bar */
+      align-items: center;
+      gap: 12px;
+      pointer-events: none;
+    }
+    
+    .stitch-loading-bar {
+      width: 80vw;
+      max-width: 280px;
+      height: 18px;
+      background: linear-gradient(180deg, rgba(24, 10, 38, 0.94), rgba(14, 7, 22, 0.92));
+      border: 2px solid rgba(201, 147, 255, 0.95);
+      border-radius: 99px;
+      position: relative;
+      overflow: hidden;
+      box-shadow:
+        0 0 18px rgba(168, 85, 247, 0.45),
+        0 0 34px rgba(168, 85, 247, 0.22),
+        inset 0 0 10px rgba(0, 0, 0, 0.8);
+    }
+
+    .stitch-loading-bar::before {
+      content: '';
+      position: absolute;
+      inset: -8px;
+      border-radius: 99px;
+      background: radial-gradient(circle, rgba(183, 109, 255, 0.35) 0%, rgba(183, 109, 255, 0.08) 48%, transparent 72%);
+      filter: blur(10px);
+      opacity: 0.95;
+      animation: stitch-bar-pulse 1.8s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+    
+    .stitch-loading-bar::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; bottom: 0;
+      width: 0%; /* Animated */
+      background: linear-gradient(90deg, rgba(245, 219, 255, 0.15) 0%, #b76dff 30%, #db8cff 72%, rgba(255, 239, 255, 0.9) 100%);
+      border-radius: 99px;
+      animation: stitch-slide 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      box-shadow:
+        0 0 16px rgba(214, 147, 255, 0.95),
+        0 0 28px rgba(183, 109, 255, 0.55),
+        0 0 4px var(--stitch-primary-container) inset;
+    }
+    
+    @keyframes stitch-slide {
+      0% { width: 0%; opacity: 0.8; }
+      50% { width: 70%; opacity: 1; }
+      100% { width: 100%; opacity: 0.5; }
+    }
+
+    @keyframes stitch-bar-pulse {
+      0% { transform: scaleX(0.98); opacity: 0.72; }
+      100% { transform: scaleX(1.02); opacity: 1; }
+    }
+    
+    @keyframes stitch-text-glow {
+      0% { text-shadow: 0 0 4px rgba(168, 85, 247, 0.5); }
+      100% { text-shadow: 0 0 16px rgba(183, 109, 255, 1); }
+    }
+    
+    .stitch-loading-text {
+      margin: 0;
+      color: #e5caff;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      font-size: 15px;
+      text-transform: uppercase;
+      animation: stitch-text-glow 1.5s infinite alternate ease-in-out;
+    }
+
+    /* Join Server Modal - Glassmorphism */
+    .stitch-modal-card {
+      background: #251b33 !important; /* Blackish purple solid background */
+      border: 1px solid rgba(168, 85, 247, 0.2) !important;
+      border-radius: 20px !important;
+      box-shadow: 0 32px 64px rgba(0, 0, 0, 0.8), inset 0 2px 4px rgba(255,255,255,0.05) !important;
+      text-align: center;
+      padding: 24px 20px !important;
+      max-width: 320px !important;
+      width: 90% !important;
+      display: flex;
+      flex-direction: column;
+      gap: 12px; /* Balanced spacing */
+    }
+
+    .stitch-title {
+      color: #ffffff;
+      font-size: 20px !important;
+      letter-spacing: -0.2px;
+      margin: 0 !important;
+      font-weight: 800;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+
+    .stitch-subtitle {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 13px;
+      margin: 0 0 4px 0 !important;
+      line-height: 1.4;
+    }
+    .stitch-subtitle strong { color: #ffffff; }
+
+    .stitch-modal-row {
+      display: flex !important;
+      flex-direction: column; /* Stack input and button */
+      gap: 12px;
+      width: 100%;
+      margin-top: 4px;
+    }
+
+    .stitch-input {
+      box-sizing: border-box !important;
+      width: 100%;
+      background: #e2e2e8 !important; /* Light gray pill */
+      border: none !important;
+      border-radius: 99px !important;
+      color: #111317 !important;
+      font-size: 14px !important;
+      font-weight: 600;
+      padding: 10px 14px !important;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.1) !important;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .stitch-input::placeholder {
+      color: #777;
+      font-weight: 500;
+    }
+    .stitch-input:focus {
+      outline: none;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.1), 0 0 0 4px rgba(168, 85, 247, 0.4) !important;
+    }
+
+    .stitch-primary-btn {
+      box-sizing: border-box !important;
+      width: 100%;
+      background: linear-gradient(180deg, #aa66e2 0%, #7622bd 100%) !important;
+      border: 1px solid #4a117a !important;
+      border-radius: 99px !important;
+      color: #ffffff !important; 
+      font-weight: 700 !important;
+      padding: 12px 16px !important;
+      transition: all 0.2s;
+      font-size: 15px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.4), inset 0 2px 0 rgba(255,255,255,0.2), inset 0 -2px 0 rgba(0,0,0,0.2) !important;
+      position: relative;
+    }
+    .stitch-primary-btn:hover {
+      filter: brightness(1.15);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(168, 85, 247, 0.4), inset 0 2px 0 rgba(255,255,255,0.2), inset 0 -2px 0 rgba(0,0,0,0.2) !important;
+    }
+    .stitch-primary-btn:active {
+      transform: translateY(1px);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4), inset 0 2px 4px rgba(0,0,0,0.4) !important;
+    }
+
+    .stitch-subtle-btn {
+      box-sizing: border-box !important;
+      background: transparent !important;
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+      border-radius: 99px !important;
+      color: rgba(255, 255, 255, 0.7) !important;
+      width: 100%;
+      margin: 4px 0 0 0 !important;
+      padding: 10px !important;
+      font-weight: 600;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .stitch-subtle-btn:hover {
+      background: rgba(255, 255, 255, 0.05) !important;
+      color: #ffffff !important;
+      border-color: rgba(255,255,255,0.3) !important;
+    }
+
+    .stitch-footer-text {
+      margin-top: 8px;
+      color: rgba(255, 255, 255, 0.4);
+      font-size: 11px;
+    }
+
+    .stitch-err {
+      margin-top: 12px;
+      color: #ffb4ab;
+      font-size: 13px;
     }

@@ -1451,50 +1451,39 @@
 
       (() => {
         const cat = document.getElementById('cat-lottie');
-        if (!cat) return;
-        const catLottieSrc = `${BASE_URL}cat-fishing-on-moon.lottie`;
-
-        const ensureCatSrc = () => {
-          if (cat.getAttribute('src') !== catLottieSrc) {
-            cat.setAttribute('src', catLottieSrc);
-          }
-        };
-
-        const applyLowDPR = () => {
-          if (cat.dotLottie?.setRenderConfig) {
-            cat.dotLottie.setRenderConfig({
-              autoResize: true,
-              devicePixelRatio: IS_IOS_DEVICE ? 0.75 : 1.1,
-            });
-          }
-        };
+        if (!cat || !window.lottie) return;
+        const catLottieSrc = `${BASE_URL}cat-fishing-on-moon.json`;
+        let catAnimation = null;
 
         const tryStartCat = () => {
-          ensureCatSrc();
-          applyLowDPR();
-          try { cat.play?.(); } catch { }
+          if (catAnimation) {
+            catAnimation.play();
+            return;
+          }
+          try {
+            catAnimation = window.lottie.loadAnimation({
+              container: cat,
+              renderer: 'canvas',
+              loop: true,
+              autoplay: true,
+              path: catLottieSrc,
+              rendererSettings: {
+                clearCanvas: true,
+                progressiveLoad: true,
+                preserveAspectRatio: 'xMidYMid meet',
+              },
+            });
+            catAnimation.setSpeed(0.5);
+            cat._lottieAnimation = catAnimation;
+            catAnimation.addEventListener('data_failed', (e) => {
+              console.warn('cat-lottie failed to load', e);
+            });
+          } catch (e) {
+            console.warn('cat-lottie failed to initialize', e);
+          }
         };
 
-        ensureCatSrc();
-        cat.setAttribute('autoplay', '');
-        cat.setAttribute('loop', '');
-        cat.addEventListener('ready', applyLowDPR, { once: true });
-        cat.addEventListener('ready', tryStartCat);
-        cat.addEventListener('load', tryStartCat);
-        cat.addEventListener('error', (e) => {
-          console.warn('cat-lottie failed to load', e);
-        });
-        if (window.customElements?.whenDefined) {
-          window.customElements.whenDefined('dotlottie-player')
-            .then(() => {
-              tryStartCat();
-              setTimeout(tryStartCat, 250);
-              setTimeout(tryStartCat, 1000);
-            })
-            .catch(() => { });
-        } else {
-          tryStartCat();
-        }
+        tryStartCat();
       })();
 
       const _glReadyQueue = [];
@@ -4279,13 +4268,16 @@
       let audioBackgroundLocked = false;
       let audioSyncTimer = 0;
       let audioSyncVersion = 0;
+      const BGM_URL = `${BASE_URL}Evening Traveler - Road Trip.mp3`;
+      const BUTTON_SOUND_URL = `${BASE_URL}button.mp3`;
+      const SCANNING_SOUND_URL = `${BASE_URL}scanning.mp3`;
 
       // === BGM setup ===
       const BGM_CAP = 0.10;
       let userBgmSetting = 1;
       const bgmTargetVolume = () => BGM_CAP * userBgmSetting;
 
-      const bgm = new Audio('Evening Traveler - Road Trip.mp3');
+      const bgm = new Audio(BGM_URL);
       bgm.volume = Math.min(bgmTargetVolume(), 1);
       bgm.loop = true;
       bgm.preload = 'auto';
@@ -4314,7 +4306,14 @@
         stopAllSfx();
       }
 
-      function ensureAudioCtxResumed() { try { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); } catch { } }
+      function ensureAudioCtxResumed() {
+        try {
+          if (!audioCtx && (window.AudioContext || window.webkitAudioContext)) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          }
+          if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        } catch { }
+      }
 
       async function syncAudioState({ immediatePause = false } = {}) {
         const syncVersion = ++audioSyncVersion;
@@ -4373,6 +4372,7 @@
         audioUnlockedByGesture = true;
         audioBackgroundLocked = false;
         ensureAudioCtxResumed();
+        void primeButtonAudio();
         scheduleAudioSync();
       };
 
@@ -4395,27 +4395,44 @@
 
 
       let audioCtx = null, buttonBuffer = null;
-      const btnFallbackAudio = new Audio('button.mp3'); btnFallbackAudio.preload = 'auto';
+      let buttonAudioLoadPromise = null;
+      const btnFallbackAudio = new Audio(BUTTON_SOUND_URL); btnFallbackAudio.preload = 'auto'; btnFallbackAudio.playsInline = true;
 
-      (async () => {
-        try {
-          const res = await fetch('button.mp3', { cache: 'force-cache' });
-          const ab = await res.arrayBuffer();
-          audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const primeButtonAudio = async () => {
+        if (buttonBuffer || buttonAudioLoadPromise) return buttonAudioLoadPromise;
+        buttonAudioLoadPromise = (async () => {
+          ensureAudioCtxResumed();
+          if (!audioCtx) return null;
           try {
-            buttonBuffer = await new Promise((resolve, reject) => {
-              const p = audioCtx.decodeAudioData(ab.slice(0), resolve, reject);
-              if (p && typeof p.then === 'function') p.then(resolve).catch(reject);
+            const res = await fetch(BUTTON_SOUND_URL, { cache: 'force-cache' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const ab = await res.arrayBuffer();
+            const decoded = await new Promise((resolve, reject) => {
+              try {
+                const maybePromise = audioCtx.decodeAudioData(ab.slice(0), resolve, reject);
+                if (maybePromise && typeof maybePromise.then === 'function') {
+                  maybePromise.then(resolve).catch(reject);
+                }
+              } catch (e) {
+                reject(e);
+              }
             });
+            buttonBuffer = decoded;
+            return decoded;
           } catch {
-            audioCtx.decodeAudioData(ab.slice(0), buf => buttonBuffer = buf, () => { });
+            return null;
+          } finally {
+            buttonAudioLoadPromise = null;
           }
-        } catch (e) { console.warn('button.mp3 preload failed', e); }
-      })();
+        })();
+        return buttonAudioLoadPromise;
+      };
 
       function playClick() {
         try {
+          if (!audioUnlockedByGesture) return;
           ensureAudioCtxResumed();
+          if (!buttonBuffer) void primeButtonAudio();
           if (buttonBuffer && audioCtx) {
             const src = audioCtx.createBufferSource(); src.buffer = buttonBuffer; src.connect(audioCtx.destination); src.start(0);
           } else {
@@ -4442,7 +4459,7 @@
       });
       document.addEventListener('click', (ev) => { if (ev.target.closest('button')) playClick(); }, { capture: true });
 
-      const sonarSfx = new Audio('scanning.mp3');
+      const sonarSfx = new Audio(SCANNING_SOUND_URL);
 
 
       /* ====================== GPS CONTROLS ====================== */
@@ -7587,10 +7604,11 @@
         if (lottieEl) {
           const obs = new IntersectionObserver(function (entries) {
             entries.forEach(function (e) {
+              const lottieAnimation = lottieEl._lottieAnimation;
               if (e.isIntersecting) {
-                if (typeof lottieEl.play === 'function') lottieEl.play();
+                lottieAnimation?.play?.();
               } else {
-                if (typeof lottieEl.pause === 'function') lottieEl.pause();
+                lottieAnimation?.pause?.();
               }
             });
           }, { threshold: 0.1 });

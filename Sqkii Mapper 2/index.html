@@ -10,6 +10,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#0b0d11">
+  <link rel="icon" type="image/png" href="edit-mode-icon.png" />
   <title>Sqkii Mapper</title>
 
   <!-- OPTIMIZED: Resource hints for faster CDN connections -->
@@ -47,11 +48,8 @@
   <!-- SheetJS (xlsx) for Excel export -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <!-- Preload button click sound for instant play -->
-  <link rel="preload" href="button.mp3" as="audio" />
-
-  <!-- Lottie Player - Can load async -->
-  <script type="module" src="https://unpkg.com/@dotlottie/player-component@2.7.12/dist/dotlottie-player.mjs"></script>
+  <!-- Lottie Web -->
+  <script src="https://unpkg.com/lottie-web@5.12.2/build/player/lottie.min.js"></script>
 
 </head>
 
@@ -83,10 +81,7 @@
           <div id="brand-stack">
             <div id="brand-title">Sqkii Mapper</div>
 
-            <!-- OPTIMIZED: Reduced speed, canvas renderer for better performance -->
-            <dotlottie-player id="cat-lottie" src="cat-fishing-on-moon.lottie" background="transparent" speed="0.5"
-              renderer="canvas" loop autoplay style="will-change: auto;">
-            </dotlottie-player>
+            <div id="cat-lottie" aria-hidden="true"></div>
           </div>
 
           <!-- Audio toggle -->
