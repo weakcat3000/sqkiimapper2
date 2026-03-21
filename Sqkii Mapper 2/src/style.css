@@ -225,7 +225,7 @@
 
     .sidebar {
       position: relative;
-      background: linear-gradient(180deg, rgba(15, 17, 21, 0.7), rgba(11, 12, 17, 0.8));
+      background: linear-gradient(180deg, rgba(15, 17, 21, 0.82), rgba(11, 12, 17, 0.9));
       border-right: 1px solid var(--border);
       overflow: auto;
       width: var(--side);
@@ -236,17 +236,14 @@
     .sidebar::before {
       content: "";
       position: absolute;
-      inset: -10%;
+      inset: 0;
       z-index: 0;
       pointer-events: none;
       background:
-        radial-gradient(circle at 18% 16%, rgba(182, 104, 255, 0.22), transparent 28%),
-        radial-gradient(circle at 82% 28%, rgba(136, 64, 255, 0.18), transparent 22%),
-        radial-gradient(circle at 46% 72%, rgba(96, 40, 196, 0.16), transparent 30%),
-        linear-gradient(180deg, rgba(86, 40, 145, 0.12), rgba(15, 17, 21, 0.02) 42%, rgba(129, 64, 228, 0.08));
-      opacity: .9;
-      transform-origin: 50% 50%;
-      animation: sidebar-veil-drift 12s ease-in-out infinite alternate;
+        radial-gradient(circle at 18% 16%, rgba(150, 80, 255, 0.12), transparent 32%),
+        radial-gradient(circle at 82% 28%, rgba(118, 52, 218, 0.10), transparent 24%),
+        linear-gradient(180deg, rgba(86, 40, 145, 0.08), rgba(15, 17, 21, 0.02) 42%, rgba(129, 64, 228, 0.06));
+      opacity: .7;
     }
 
     /* Purple “dark veil” overlay */
@@ -255,29 +252,14 @@
       inset: 0;
       z-index: 1;
       pointer-events: none;
-      opacity: .9;
-      mix-blend-mode: screen;
-      filter: saturate(1.45) contrast(1.18) brightness(1.12)
+      opacity: .58;
+      mix-blend-mode: overlay;
+      filter: saturate(1.16) contrast(1.08) brightness(1.02)
     }
 
     .sidebar > *:not(.darkveil-canvas) {
       position: relative;
       z-index: 2;
-    }
-
-    @keyframes sidebar-veil-drift {
-      0% {
-        transform: translate3d(-2%, -1%, 0) scale(1.02) rotate(-1.4deg);
-        opacity: .72;
-      }
-      50% {
-        transform: translate3d(3%, 2%, 0) scale(1.08) rotate(1.8deg);
-        opacity: .96;
-      }
-      100% {
-        transform: translate3d(-1%, 4%, 0) scale(1.04) rotate(-1deg);
-        opacity: .8;
-      }
     }
 
     .header {
