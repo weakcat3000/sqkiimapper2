@@ -1004,7 +1004,7 @@
         })();
 
         // Optional: prefill example (only if no saved data and both textareas are empty)
-        document.addEventListener('DOMContentLoaded', () => {
+        const maybePrefillGeohashExamples = () => {
           const hasSaved =
             typeof getOrCreateLayerByName === 'function' &&
             Array.isArray(getOrCreateLayerByName('Eliminated Geohash')?.data?.features) &&
@@ -1017,7 +1017,12 @@
             taPlayable.value = ['w21zw4_1', 'w238pc_0', 'w21xq6_1', 'w21z4p_0'].join('\n');
             taEliminated.value = ['w21xqp_0', 'w21zkw_1', 'w21zv5_1', 'w21z90_1'].join('\n');
           }
-        });
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', maybePrefillGeohashExamples, { once: true });
+        } else {
+          maybePrefillGeohashExamples();
+        }
 
       })();
 
@@ -1407,6 +1412,7 @@
       const UA = navigator.userAgent || '';
       const IS_IOS_DEVICE = /iPad|iPhone|iPod/.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       const IS_TOUCH_DEVICE = (navigator.maxTouchPoints || 0) > 0 || !!window.matchMedia?.('(pointer: coarse)')?.matches;
+      const IS_LOCALHOST = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
       if (IS_IOS_DEVICE) document.documentElement.classList.add('ios-device');
       if (IS_TOUCH_DEVICE) document.documentElement.classList.add('touch-device');
       maptilersdk.config.apiKey = 'f9B8Wv0ythtbvpcK0QEw';
@@ -1423,6 +1429,8 @@
         zoom: 12,
         pixelRatio: MAPGL_PIXEL_RATIO
       });
+      let mapglStyleLoaded = false;
+      mapgl.on('load', () => { mapglStyleLoaded = true; });
 
       const pauseVeil = () => window.__pauseVeil?.();
       const resumeVeil = () => window.__resumeVeil?.();
@@ -1582,6 +1590,15 @@
       let engine = 'gl';
       function showGL() { const c = mapleaf.getCenter(), z = mapleaf.getZoom(); document.getElementById('mapleaf').style.display = 'none'; document.getElementById('mapgl').style.display = 'block'; mapgl.resize(); mapgl.jumpTo({ center: [c.lng, c.lat], zoom: z }); engine = 'gl'; }
       function showLeaf() { const c = mapgl.getCenter(), z = mapgl.getZoom(); document.getElementById('mapgl').style.display = 'none'; document.getElementById('mapleaf').style.display = 'block'; mapleaf.invalidateSize(true); mapleaf.setView([c.lat, c.lng], Math.round(z)); engine = 'leaf'; }
+      if (IS_LOCALHOST) {
+        setTimeout(() => {
+          if (mapglStyleLoaded) return;
+          console.warn('MapTiler style did not load on localhost. Falling back to OSM.');
+          const basemapSelect = document.getElementById('basemap');
+          if (basemapSelect) basemapSelect.value = 'osm';
+          showLeaf();
+        }, 2500);
+      }
 
       /* ================= Icon registry ================= */
       const DOLLAR_ICON_NAME = 'dollar-pin'; let iconSeq = 1;
@@ -6276,7 +6293,7 @@
       }
 
       /* ================= Startup ================= */
-      window.addEventListener('DOMContentLoaded', () => {
+      const runStartup = () => {
         try {
           const urlParams = new URLSearchParams(location.search);
           const preCode = (urlParams.get('server') || '').trim();
@@ -6290,7 +6307,12 @@
           console.error('Startup guard:', e);
         }
         updateSonarEnabled();
-      });
+      };
+      if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', runStartup, { once: true });
+      } else {
+        runStartup();
+      }
 
 
       /* ================= Export KML / KMZ ================= */
