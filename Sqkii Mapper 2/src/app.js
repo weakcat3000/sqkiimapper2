@@ -3611,53 +3611,137 @@
       // Call on page load
       fetchUserInfo();
 
+      const ROOM_PRESENCE_TABLE = 'room_presence';
+      const ROOM_PRESENCE_HEARTBEAT_MS = 15000;
+      const ROOM_PRESENCE_REFRESH_MS = 10000;
+      const ROOM_PRESENCE_STALE_MS = 45000;
       let currentRoomCode = null;
       const clientId = (() => crypto.getRandomValues(new Uint32Array(4)).join('-'))();
       const presenceSessionId = `${clientId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      let roomPresenceAvailable = true;
+      let roomPresenceHeartbeatTimer = 0;
+      let roomPresenceRefreshTimer = 0;
       let connectedUsers = 1; // Start with self
 
-      function getPresenceUsers(state) {
-        const rawUsers = [];
+      function clearRoomPresenceTimers() {
+        clearInterval(roomPresenceHeartbeatTimer);
+        clearInterval(roomPresenceRefreshTimer);
+        roomPresenceHeartbeatTimer = 0;
+        roomPresenceRefreshTimer = 0;
+      }
 
-        for (const value of Object.values(state || {})) {
-          if (!value) continue;
-          if (Array.isArray(value)) {
-            rawUsers.push(...value.filter(Boolean));
-            continue;
-          }
-          if (Array.isArray(value.metas)) {
-            rawUsers.push(...value.metas.filter(Boolean));
-            continue;
-          }
-          rawUsers.push(value);
+      function setConnectedUsersList(users = []) {
+        window.connectedUsersList = users;
+        connectedUsers = currentRoomCode ? Math.max(1, users.length) : 0;
+        updateConnectionIndicator();
+      }
+
+      function roomPresencePayload() {
+        return {
+          room_code: currentRoomCode,
+          session_id: presenceSessionId,
+          client_id: clientId,
+          device: userInfo.device,
+          browser: userInfo.browser,
+          city: userInfo.city,
+          country: userInfo.countryCode,
+          ip: userInfo.ip,
+          online_at: new Date().toISOString(),
+          last_seen: new Date().toISOString()
+        };
+      }
+
+      async function upsertRoomPresence() {
+        if (!currentRoomCode || !roomPresenceAvailable) return false;
+        const payload = roomPresencePayload();
+        const { error } = await supabase
+          .from(ROOM_PRESENCE_TABLE)
+          .upsert(payload, { onConflict: 'room_code,session_id' });
+        if (error) {
+          if (error.code === 'PGRST205') roomPresenceAvailable = false;
+          throw error;
+        }
+        return true;
+      }
+
+      async function refreshRoomPresence() {
+        if (!currentRoomCode) {
+          setConnectedUsersList([]);
+          return;
+        }
+        if (!roomPresenceAvailable) {
+          setConnectedUsersList([{ client_id: clientId, device: userInfo.device, browser: userInfo.browser, city: userInfo.city, country: userInfo.countryCode, ip: userInfo.ip }]);
+          return;
+        }
+
+        const cutoff = new Date(Date.now() - ROOM_PRESENCE_STALE_MS).toISOString();
+        const { data, error } = await supabase
+          .from(ROOM_PRESENCE_TABLE)
+          .select('session_id, client_id, device, browser, city, country, ip, online_at, last_seen')
+          .eq('room_code', currentRoomCode)
+          .gte('last_seen', cutoff)
+          .order('last_seen', { ascending: false });
+
+        if (error) {
+          if (error.code === 'PGRST205') roomPresenceAvailable = false;
+          console.warn('Room presence refresh failed:', error);
+          setConnectedUsersList([{ client_id: clientId, device: userInfo.device, browser: userInfo.browser, city: userInfo.city, country: userInfo.countryCode, ip: userInfo.ip }]);
+          return;
         }
 
         const seen = new Set();
-        return rawUsers.filter((user) => {
-          const key =
-            user.presence_session_id ||
-            user.phx_ref ||
-            `${user.client_id || 'unknown'}-${user.online_at || ''}-${user.device || ''}`;
+        const users = (data || []).filter((user) => {
+          const key = user.session_id || `${user.client_id || 'unknown'}-${user.last_seen || ''}`;
           if (seen.has(key)) return false;
           seen.add(key);
           return true;
         });
+
+        setConnectedUsersList(users);
       }
 
-      function refreshPresenceIndicator() {
-        if (!presenceChannel) {
-          connectedUsers = currentRoomCode ? 1 : 0;
-          window.connectedUsersList = currentRoomCode ? [] : [];
-          updateConnectionIndicator();
+      async function startRoomPresence(roomCode) {
+        clearRoomPresenceTimers();
+        if (!roomCode) {
+          setConnectedUsersList([]);
           return;
         }
+        try {
+          await upsertRoomPresence();
+          await refreshRoomPresence();
+        } catch (e) {
+          console.warn('Room presence start failed:', e);
+          await refreshRoomPresence();
+        }
 
-        const state = presenceChannel.presenceState?.() || {};
-        const users = getPresenceUsers(state);
-        connectedUsers = Math.max(1, users.length);
-        window.connectedUsersList = users;
-        updateConnectionIndicator();
+        roomPresenceHeartbeatTimer = setInterval(() => {
+          upsertRoomPresence()
+            .then(() => refreshRoomPresence())
+            .catch((e) => console.warn('Room presence heartbeat failed:', e));
+        }, ROOM_PRESENCE_HEARTBEAT_MS);
+
+        roomPresenceRefreshTimer = setInterval(() => {
+          refreshRoomPresence().catch((e) => console.warn('Room presence poll failed:', e));
+        }, ROOM_PRESENCE_REFRESH_MS);
       }
+
+      async function stopRoomPresence(roomCode = currentRoomCode) {
+        clearRoomPresenceTimers();
+        if (!roomCode || !roomPresenceAvailable) return;
+        try {
+          await supabase
+            .from(ROOM_PRESENCE_TABLE)
+            .delete()
+            .eq('room_code', roomCode)
+            .eq('session_id', presenceSessionId);
+        } catch (e) {
+          console.warn('Room presence cleanup failed:', e);
+        }
+      }
+
+      window.addEventListener('pagehide', () => {
+        stopRoomPresence(currentRoomCode).catch(() => { });
+      });
 
       // Update connection indicator
       function updateConnectionIndicator() {
@@ -3844,12 +3928,10 @@
       function saveState() { syncToServerDebounced(); }
 
       let roomChannel = null;
-      let presenceChannel = null;
 
       function subscribeRoom(code) {
         try {
           if (roomChannel) { roomChannel.unsubscribe(); roomChannel = null; }
-          if (presenceChannel) { presenceChannel.unsubscribe(); presenceChannel = null; }
 
           roomChannel = supabase.channel('rooms-' + code)
             .on(
@@ -3890,42 +3972,6 @@
             )
             .subscribe(() => { });
 
-          // Presence tracking channel
-          presenceChannel = supabase.channel('presence-' + code, {
-            config: {
-              presence: {
-                key: presenceSessionId
-              }
-            }
-          });
-
-          presenceChannel
-            .on('presence', { event: 'sync' }, () => {
-              refreshPresenceIndicator();
-            })
-            .on('presence', { event: 'join' }, ({ newPresences }) => {
-              console.log('User joined:', newPresences);
-              setTimeout(refreshPresenceIndicator, 0);
-            })
-            .on('presence', { event: 'leave' }, ({ leftPresences }) => {
-              console.log('User left:', leftPresences);
-              setTimeout(refreshPresenceIndicator, 0);
-            })
-            .subscribe(async (status) => {
-              if (status === 'SUBSCRIBED') {
-                await presenceChannel.track({
-                  client_id: clientId,
-                  presence_session_id: presenceSessionId,
-                  device: userInfo.device,
-                  browser: userInfo.browser,
-                  city: userInfo.city,
-                  country: userInfo.countryCode,
-                  online_at: new Date().toISOString()
-                });
-                setTimeout(refreshPresenceIndicator, 0);
-              }
-            });
-
         } catch (e) {
           console.error('subscribeRoom guard:', e);
         }
@@ -3933,7 +3979,11 @@
 
 
       async function joinRoom(code) {
+        const previousRoomCode = currentRoomCode;
         currentRoomCode = code;
+        if (previousRoomCode && previousRoomCode !== code) {
+          stopRoomPresence(previousRoomCode).catch(() => { });
+        }
         reconOverlayPoints = [];
         clearReconOverlay({ clearCache: false });
         try {
@@ -4036,6 +4086,7 @@
 
           // Start realtime for this room
           subscribeRoom(code);
+          await startRoomPresence(code);
           updateConnectionIndicator();
 
           // Bind Pixel Grid
@@ -4122,9 +4173,11 @@
       document.getElementById('server-continue').addEventListener('click', async () => {
         hideServerModal();
         nudgeAudioAfterJoin();
+        await stopRoomPresence(currentRoomCode);
         currentRoomCode = null;
         reconOverlayPoints = [];
         clearReconOverlay({ clearCache: false });
+        setConnectedUsersList([]);
 
         // Load local state if available
         try {
