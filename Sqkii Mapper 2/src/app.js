@@ -4653,10 +4653,10 @@
       const LAMP_POST_SEARCH_SOURCE_ID = 'lamp-post-search-src';
       const LAMP_POST_SEARCH_HALO_LAYER_ID = 'lamp-post-search-halo';
       const LAMP_POST_SEARCH_CORE_LAYER_ID = 'lamp-post-search-core';
-      const LAMP_POST_SEARCH_TEXT_LAYER_ID = 'lamp-post-search-text';
       let leafletReconLayer = null;
       let lampPostSearchLeafletLayer = null;
       let lampPostSearchLeafletHalos = [];
+      let lampPostSearchGlMarkers = [];
       const RECON_PASSWORD = '6482';
       const RECON_ACCESS_KEY = 'sqkii-recon-access';
       const RECON_ACCESS_MS = 4 * 60 * 60 * 1000;
@@ -5049,7 +5049,7 @@
 
       function updateLampPostSearchHelper() {
         if (!lampSearchHelper || !lampSearchInput) return;
-        const sample = normalizeLampPostNumber(lampSearchInput.value) || '483';
+        const sample = normalizeLampPostNumber(lampSearchInput.value) || '1';
         lampSearchHelper.innerHTML = lampPostSearchMode === 'suffix'
           ? `Ends-with mode: lamp posts like <strong>${sample}</strong>, <strong>1${sample}</strong>, <strong>2${sample}</strong> will match if they are inside this circle.`
           : `Exact mode: only lamp post <strong>${sample}</strong> will match inside this circle.`;
@@ -5096,13 +5096,19 @@
 
         if (mapgl && mapgl.getStyle?.()) {
           try {
-            if (mapgl.getLayer(LAMP_POST_SEARCH_TEXT_LAYER_ID)) mapgl.removeLayer(LAMP_POST_SEARCH_TEXT_LAYER_ID);
             if (mapgl.getLayer(LAMP_POST_SEARCH_CORE_LAYER_ID)) mapgl.removeLayer(LAMP_POST_SEARCH_CORE_LAYER_ID);
             if (mapgl.getLayer(LAMP_POST_SEARCH_HALO_LAYER_ID)) mapgl.removeLayer(LAMP_POST_SEARCH_HALO_LAYER_ID);
             if (mapgl.getSource(LAMP_POST_SEARCH_SOURCE_ID)) mapgl.removeSource(LAMP_POST_SEARCH_SOURCE_ID);
           } catch (error) {
             console.warn('[Lamp Search] Failed to clear GL highlight:', error);
           }
+        }
+
+        if (lampPostSearchGlMarkers.length) {
+          for (const marker of lampPostSearchGlMarkers) {
+            try { marker.remove(); } catch { }
+          }
+          lampPostSearchGlMarkers = [];
         }
 
         if (mapleaf && lampPostSearchLeafletLayer) {
@@ -5203,24 +5209,19 @@
                 'circle-stroke-width': 2
               }
             });
-            mapgl.addLayer({
-              id: LAMP_POST_SEARCH_TEXT_LAYER_ID,
-              type: 'symbol',
-              source: LAMP_POST_SEARCH_SOURCE_ID,
-              filter: ['==', ['get', 'showLabel'], 1],
-              layout: {
-                'text-field': ['get', 'lampPostNumber'],
-                'text-size': 12,
-                'text-anchor': 'top',
-                'text-offset': [0, 1.6],
-                'text-allow-overlap': true
-              },
-              paint: {
-                'text-color': '#fde68a',
-                'text-halo-color': 'rgba(25,16,8,0.95)',
-                'text-halo-width': 1.5
-              }
-            });
+
+            lampPostSearchGlMarkers = [];
+            for (const feature of lampPostSearchFeatures) {
+              if (!feature.properties.showLabel) continue;
+              const labelEl = document.createElement('div');
+              labelEl.className = 'lamp-post-search-marker-label';
+              labelEl.textContent = feature.properties.lampPostNumber;
+              lampPostSearchGlMarkers.push(
+                new maptilersdk.Marker({ element: labelEl, anchor: 'top' })
+                  .setLngLat(feature.geometry.coordinates)
+                  .addTo(mapgl)
+              );
+            }
           } catch (error) {
             console.error('[Lamp Search] Failed to render on MapLibre:', error);
           }

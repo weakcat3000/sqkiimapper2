@@ -952,6 +952,18 @@
       border-color: rgba(255, 255, 255, 0.12);
     }
 
+    .lamp-post-search-marker-label {
+      transform: translate(-50%, 12px);
+      color: #fde68a;
+      font-weight: 800;
+      font-size: 26px;
+      line-height: 1;
+      text-shadow: 0 0 8px rgba(0,0,0,0.9), 0 0 16px rgba(120, 52, 8, 0.45);
+      white-space: nowrap;
+      pointer-events: none;
+      user-select: none;
+    }
+
     @keyframes lamp-search-card-enter {
       from {
         opacity: 0;
