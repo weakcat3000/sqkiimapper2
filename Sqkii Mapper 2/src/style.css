@@ -956,7 +956,7 @@
       transform: translate(-50%, 12px);
       color: #fde68a;
       font-weight: 800;
-      font-size: 26px;
+      font-size: 16px;
       line-height: 1;
       text-shadow: 0 0 8px rgba(0,0,0,0.9), 0 0 16px rgba(120, 52, 8, 0.45);
       white-space: nowrap;
@@ -1323,7 +1323,7 @@
       align-items: center;
       justify-content: center;
       position: fixed;
-      top: 50%;
+      top: calc(50% - var(--stitch-loader-lift, clamp(112px, 17vh, 144px)));
       left: 50%;
       transform: translate(-50%, -50%);
       z-index: 10001;
@@ -2002,9 +2002,8 @@
     /* Loading Progress Bar */
     .stitch-loading-container {
       position: fixed;
-      top: 50%;
+      top: calc(50% - var(--stitch-loader-lift, clamp(112px, 17vh, 144px)));
       left: 50%;
-      margin-top: -56px;
       transform: translate(-50%, -50%);
       z-index: 10001;
       display: flex;
@@ -2094,6 +2093,13 @@
       display: flex;
       flex-direction: column;
       gap: 12px; /* Balanced spacing */
+    }
+
+    @media (max-width: 640px) {
+      #loading-container,
+      .stitch-loading-container {
+        top: calc(50% - clamp(124px, 22vh, 162px));
+      }
     }
 
     .stitch-title {
