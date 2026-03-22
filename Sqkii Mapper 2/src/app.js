@@ -4664,6 +4664,7 @@
       let reconOverlayPoints = [];
       let lampPostSearchFeatures = [];
       let lampPostSearchAnimationFrame = 0;
+      let reconAnalysisInProgress = false;
       let currentLampPostSearchContext = null;
       let lampPostSearchMode = 'exact';
       const lampSearchModal = byId('lamp-search-modal');
@@ -4675,6 +4676,19 @@
       const lampSearchSubmit = byId('lamp-search-submit');
       const lampSearchCancel = byId('lamp-search-cancel');
       const lampSearchCloseTop = byId('lamp-search-close-top');
+
+      function setReconAnalysisPriority(active) {
+        reconAnalysisInProgress = !!active;
+        try {
+          if (reconAnalysisInProgress) {
+            window.__pauseVeil?.();
+          } else if (!document.hidden) {
+            window.__resumeVeil?.();
+          }
+        } catch (error) {
+          console.warn('[Recon] Failed to toggle darkveil priority:', error);
+        }
+      }
 
       function reconOverlayStorageKey(roomCode = currentRoomCode) {
         return `${RECON_OVERLAY_CACHE_PREFIX}:${roomCode || 'local'}`;
@@ -4842,6 +4856,7 @@
         const modal = document.getElementById('recon-modal');
         modal.classList.remove('visible');
         document.getElementById('app').classList.remove('blocked-by-modal');
+        setReconAnalysisPriority(false);
 
         reconConstraints = [];
         currentReconCircle = null;
@@ -5449,6 +5464,7 @@
         const revealBtn = document.getElementById('recon-reveal');
 
         const setLoading = (on, text) => {
+          setReconAnalysisPriority(on);
           status.classList.toggle('loading', on);
           status.textContent = text || status.textContent;
           revealBtn.disabled = on;
