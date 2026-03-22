@@ -2002,14 +2002,14 @@
     /* Loading Progress Bar */
     .stitch-loading-container {
       position: fixed;
-      top: calc(50% - var(--stitch-loader-lift, clamp(112px, 17vh, 144px)));
+      top: calc(50% - var(--stitch-loader-lift, clamp(138px, 20vh, 182px)));
       left: 50%;
       transform: translate(-50%, -50%);
       z-index: 10001;
       display: flex;
       flex-direction: column; /* Stack text above the bar */
       align-items: center;
-      gap: 12px;
+      gap: 8px;
       pointer-events: none;
     }
     
@@ -2098,7 +2098,7 @@
     @media (max-width: 640px) {
       #loading-container,
       .stitch-loading-container {
-        top: calc(50% - clamp(124px, 22vh, 162px));
+        top: calc(50% - clamp(156px, 25vh, 208px));
       }
     }
 

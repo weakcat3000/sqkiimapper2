@@ -4650,6 +4650,8 @@
       let reconPrecision = 30; // Default: 30m spacing
       const RECON_OVERLAY_SOURCE = 'recon-overlay-src';
       const RECON_OVERLAY_LAYER = 'recon-overlay-layer';
+      const RECON_OVERLAY_HALO_SOURCE = 'recon-overlay-halo-src';
+      const RECON_OVERLAY_HALO_LAYER = 'recon-overlay-halo-layer';
       const LAMP_POST_SEARCH_SOURCE_ID = 'lamp-post-search-src';
       const LAMP_POST_SEARCH_HALO_LAYER_ID = 'lamp-post-search-halo';
       const LAMP_POST_SEARCH_CORE_LAYER_ID = 'lamp-post-search-core';
@@ -4662,6 +4664,9 @@
       const RECON_ACCESS_MS = 4 * 60 * 60 * 1000;
       const RECON_OVERLAY_CACHE_PREFIX = 'sqkii-recon-overlay-v1';
       let reconOverlayPoints = [];
+      let reconOverlaySpacingMeters = 20;
+      let reconOverlayHaloAnimationFrame = 0;
+      let leafletReconHalos = [];
       let lampPostSearchFeatures = [];
       let lampPostSearchAnimationFrame = 0;
       let reconAnalysisInProgress = false;
@@ -4716,6 +4721,68 @@
         return normalized;
       }
 
+      function stopReconHaloPulse() {
+        if (reconOverlayHaloAnimationFrame) {
+          cancelAnimationFrame(reconOverlayHaloAnimationFrame);
+          reconOverlayHaloAnimationFrame = 0;
+        }
+      }
+
+      function reconHaloRadiusMeters(phase = 0.5) {
+        const spacing = Math.max(8, Number(reconOverlaySpacingMeters) || 20);
+        const minRadius = Math.max(7.5, spacing * 0.28);
+        const maxRadius = Math.max(10.5, spacing * 0.58);
+        return minRadius + (maxRadius - minRadius) * phase;
+      }
+
+      function reconMetersToPixels(meters, lat) {
+        const zoom = engine === 'gl'
+          ? (mapgl?.getZoom?.() || 17)
+          : (mapleaf?.getZoom?.() || 17);
+        const latitude = Number.isFinite(lat)
+          ? lat
+          : (engine === 'gl' ? mapgl?.getCenter?.().lat : mapleaf?.getCenter?.().lat) || 1.3;
+        const metersPerPixel = 156543.03392 * Math.cos((latitude * Math.PI) / 180) / Math.pow(2, zoom);
+        return Math.max(1, meters / Math.max(0.000001, metersPerPixel));
+      }
+
+      function startReconHaloPulse() {
+        stopReconHaloPulse();
+        if (!reconOverlayPoints.length) return;
+
+        const tick = (ts) => {
+          if (!reconOverlayPoints.length) return;
+
+          const phase = (Math.sin(ts / 720) + 1) / 2;
+          const haloOpacity = 0.06 + phase * 0.08;
+          const fallbackLat = reconOverlayPoints[0]?.[1];
+          const haloRadiusPx = reconMetersToPixels(reconHaloRadiusMeters(phase), fallbackLat);
+
+          if (engine === 'gl' && mapgl?.getLayer?.(RECON_OVERLAY_HALO_LAYER)) {
+            try {
+              mapgl.setPaintProperty(RECON_OVERLAY_HALO_LAYER, 'circle-radius', haloRadiusPx);
+              mapgl.setPaintProperty(RECON_OVERLAY_HALO_LAYER, 'circle-opacity', haloOpacity);
+            } catch { }
+          }
+
+          if (engine === 'leaf' && leafletReconHalos.length) {
+            for (const halo of leafletReconHalos) {
+              try {
+                halo.setRadius(haloRadiusPx);
+                halo.setStyle({
+                  fillOpacity: haloOpacity,
+                  opacity: haloOpacity * 0.7
+                });
+              } catch { }
+            }
+          }
+
+          reconOverlayHaloAnimationFrame = requestAnimationFrame(tick);
+        };
+
+        reconOverlayHaloAnimationFrame = requestAnimationFrame(tick);
+      }
+
       function persistReconOverlayCache(roomCode = currentRoomCode) {
         try {
           const key = reconOverlayStorageKey(roomCode);
@@ -4727,6 +4794,7 @@
           localStorage.setItem(key, JSON.stringify({
             roomCode: roomCode || null,
             points: reconOverlayPoints,
+            spacingMeters: reconOverlaySpacingMeters,
             updatedAt: Date.now()
           }));
         } catch (error) {
@@ -4751,7 +4819,8 @@
             return;
           }
 
-          renderReconOverlay(cachedPoints, { persist: false });
+          reconOverlaySpacingMeters = Math.max(8, Number(parsed?.spacingMeters) || reconOverlaySpacingMeters || 20);
+          renderReconOverlay(cachedPoints, { persist: false, spacingMeters: reconOverlaySpacingMeters });
         } catch (error) {
           console.warn('[Recon] Failed to restore overlay cache:', error);
           reconOverlayPoints = [];
@@ -4763,7 +4832,7 @@
         clearTimeout(reconOverlayRestoreTimer);
         reconOverlayRestoreTimer = setTimeout(() => {
           if (reconOverlayPoints.length) {
-            renderReconOverlay(reconOverlayPoints, { persist: false });
+            renderReconOverlay(reconOverlayPoints, { persist: false, spacingMeters: reconOverlaySpacingMeters });
           } else {
             restoreReconOverlayFromCache(roomCode);
           }
@@ -5604,7 +5673,7 @@
             clearReconOverlay();
             alert('No locations found matching all constraints.');
           } else {
-            renderReconOverlay(matchingPoints);
+            renderReconOverlay(matchingPoints, { spacingMeters: adaptivePrecision });
           }
         } catch (err) {
           console.error('Recon analysis failed:', err);
@@ -5803,13 +5872,14 @@
       }
 
 
-      function renderReconOverlay(points, { persist = true } = {}) {
+      function renderReconOverlay(points, { persist = true, spacingMeters = reconOverlaySpacingMeters } = {}) {
         console.log('[Recon] Rendering overlay with', points.length, 'points');
 
         // Clear old overlay first, but keep cached data unless explicitly replaced.
         clearReconOverlay({ clearCache: false });
 
         reconOverlayPoints = normalizeReconOverlayPoints(points);
+        reconOverlaySpacingMeters = Math.max(8, Number(spacingMeters) || reconOverlaySpacingMeters || 20);
         if (persist) persistReconOverlayCache();
 
         if (!reconOverlayPoints.length) {
@@ -5826,11 +5896,44 @@
           type: 'FeatureCollection',
           features: polygons
         };
+        const haloPointsFc = {
+          type: 'FeatureCollection',
+          features: reconOverlayPoints.map(([lng, lat]) => ({
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [lng, lat] },
+            properties: {}
+          }))
+        };
+        const initialHaloRadiusPx = reconMetersToPixels(reconHaloRadiusMeters(0.5), reconOverlayPoints[0]?.[1]);
 
         // ------------ MapLibre GL ------------
         if (typeof mapgl !== 'undefined' && mapgl && mapgl.addSource && mapgl.getStyle?.()) {
           try {
             console.log('[Recon] Rendering on MapLibre GL');
+
+            if (!mapgl.getSource(RECON_OVERLAY_HALO_SOURCE)) {
+              mapgl.addSource(RECON_OVERLAY_HALO_SOURCE, {
+                type: 'geojson',
+                data: haloPointsFc
+              });
+            } else {
+              mapgl.getSource(RECON_OVERLAY_HALO_SOURCE).setData(haloPointsFc);
+            }
+
+            if (!mapgl.getLayer(RECON_OVERLAY_HALO_LAYER)) {
+              mapgl.addLayer({
+                id: RECON_OVERLAY_HALO_LAYER,
+                type: 'circle',
+                source: RECON_OVERLAY_HALO_SOURCE,
+                paint: {
+                  'circle-radius': initialHaloRadiusPx,
+                  'circle-color': '#22c55e',
+                  'circle-opacity': 0.1,
+                  'circle-blur': 0.6,
+                  'circle-stroke-width': 0
+                }
+              });
+            }
 
             if (!mapgl.getSource(RECON_OVERLAY_SOURCE)) {
               mapgl.addSource(RECON_OVERLAY_SOURCE, {
@@ -5862,7 +5965,18 @@
           console.log('[Recon] Rendering on Leaflet');
 
           try {
-            const layers = polygons.map(poly => {
+            leafletReconHalos = reconOverlayPoints.map(([lng, lat]) =>
+              L.circleMarker([lat, lng], {
+                radius: initialHaloRadiusPx,
+                color: '#22c55e',
+                fillColor: '#22c55e',
+                fillOpacity: 0.1,
+                opacity: 0.07,
+                weight: 0
+              })
+            );
+
+            const dotLayers = polygons.map(poly => {
               const coords = poly.geometry.coordinates[0].map(c => [c[1], c[0]]); // flip to lat,lng
               return L.polygon(coords, {
                 color: '#22c55e',
@@ -5872,15 +5986,18 @@
               });
             });
 
-            leafletReconLayer = L.layerGroup(layers).addTo(mapleaf);
+            leafletReconLayer = L.layerGroup([...leafletReconHalos, ...dotLayers]).addTo(mapleaf);
           } catch (e) {
             console.error('[Recon] Failed to render on Leaflet:', e);
           }
         }
+
+        startReconHaloPulse();
       }
 
       function clearReconOverlay({ clearCache = true } = {}) {
         console.log('[Recon] Clearing existing overlay');
+        stopReconHaloPulse();
 
         // MapLibre GL
         if (mapgl && mapgl.getSource) {
@@ -5888,8 +6005,14 @@
             if (mapgl.getLayer(RECON_OVERLAY_LAYER)) {
               mapgl.removeLayer(RECON_OVERLAY_LAYER);
             }
+            if (mapgl.getLayer(RECON_OVERLAY_HALO_LAYER)) {
+              mapgl.removeLayer(RECON_OVERLAY_HALO_LAYER);
+            }
             if (mapgl.getSource(RECON_OVERLAY_SOURCE)) {
               mapgl.removeSource(RECON_OVERLAY_SOURCE);
+            }
+            if (mapgl.getSource(RECON_OVERLAY_HALO_SOURCE)) {
+              mapgl.removeSource(RECON_OVERLAY_HALO_SOURCE);
             }
           } catch (e) {
             console.warn('[Recon] Failed to clear GL overlay:', e);
@@ -5904,10 +6027,12 @@
             console.warn('[Recon] Failed to clear Leaflet overlay:', e);
           }
           leafletReconLayer = null;
+          leafletReconHalos = [];
         }
 
         if (clearCache) {
           reconOverlayPoints = [];
+          reconOverlaySpacingMeters = 20;
           persistReconOverlayCache();
         }
       }
