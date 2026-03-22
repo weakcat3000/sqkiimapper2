@@ -240,10 +240,10 @@
       z-index: 0;
       pointer-events: none;
       background:
-        radial-gradient(circle at 18% 16%, rgba(150, 80, 255, 0.12), transparent 32%),
-        radial-gradient(circle at 82% 28%, rgba(118, 52, 218, 0.10), transparent 24%),
-        linear-gradient(180deg, rgba(86, 40, 145, 0.08), rgba(15, 17, 21, 0.02) 42%, rgba(129, 64, 228, 0.06));
-      opacity: .7;
+        radial-gradient(circle at 18% 16%, rgba(150, 80, 255, 0.09), transparent 34%),
+        radial-gradient(circle at 82% 28%, rgba(118, 52, 218, 0.07), transparent 26%),
+        linear-gradient(180deg, rgba(86, 40, 145, 0.06), rgba(15, 17, 21, 0.02) 42%, rgba(129, 64, 228, 0.045));
+      opacity: .55;
     }
 
     /* Purple “dark veil” overlay */
@@ -252,9 +252,9 @@
       inset: 0;
       z-index: 1;
       pointer-events: none;
-      opacity: .58;
+      opacity: .48;
       mix-blend-mode: overlay;
-      filter: saturate(1.16) contrast(1.08) brightness(1.02)
+      filter: saturate(1.1) contrast(1.05) brightness(1.01)
     }
 
     .sidebar > *:not(.darkveil-canvas) {

@@ -4973,47 +4973,22 @@
         setLoading(true, 'Loading data and analyzing...');
 
         try {
-          const w = window;
-          const requiredDatasets = getRequiredReconDatasets(reconConstraints);
+          // Match the original mapper exactly: same worker-only cache path, same
+          // dataset preload order, same preprocessing sequence.
+          let [lampData, hdbData, aedData, busData, trafficData] = await Promise.all([
+            getExactAnalysisCached(DATASET_IDS.LAMP_POST, 'Lamp Post'),
+            getExactAnalysisCached(DATASET_IDS.HDB, 'HDB'),
+            getExactAnalysisCached(DATASET_IDS.AED, 'AED'),
+            getExactAnalysisCached(DATASET_IDS.BUS_STOP, 'Bus Stop'),
+            getExactAnalysisCached(DATASET_IDS.TRAFFIC_SIGN, 'Traffic Sign')
+          ]);
 
-          if (requiredDatasets.has('LAMP_POST')) {
-            w.__LAMPPOST_CACHE_PROMISE ??= fetchDataGovGeoJson(DATASET_IDS.LAMP_POST, 'Lamp Post');
-          }
-          if (requiredDatasets.has('HDB')) {
-            w.__HDB_CACHE_PROMISE ??= fetchDataGovGeoJson(DATASET_IDS.HDB, 'HDB');
-          }
-          if (requiredDatasets.has('AED')) {
-            w.__AED_CACHE_PROMISE ??= fetchDataGovGeoJson(DATASET_IDS.AED, 'AED');
-          }
-          if (requiredDatasets.has('BUS_STOP')) {
-            w.__BUS_CACHE_PROMISE ??= fetchDataGovGeoJson(DATASET_IDS.BUS_STOP, 'Bus Stop');
-          }
-          if (requiredDatasets.has('TRAFFIC_SIGN')) {
-            w.__TRAFFIC_SIGN_CACHE_PROMISE ??= fetchDataGovGeoJson(DATASET_IDS.TRAFFIC_SIGN, 'Traffic Sign');
-          }
-
-          let lampData = null;
-          let hdbData = null;
-          let aedData = null;
-          let busData = null;
-          let trafficData = null;
-
-          if (requiredDatasets.has('LAMP_POST')) {
-            lampData = prepDataset(await w.__LAMPPOST_CACHE_PROMISE);
-          }
-          if (requiredDatasets.has('HDB')) {
-            hdbData = prepDataset(await w.__HDB_CACHE_PROMISE);
-            ensureHdbIndex(hdbData);
-          }
-          if (requiredDatasets.has('AED')) {
-            aedData = prepDataset(await w.__AED_CACHE_PROMISE);
-          }
-          if (requiredDatasets.has('BUS_STOP')) {
-            busData = prepDataset(await w.__BUS_CACHE_PROMISE);
-          }
-          if (requiredDatasets.has('TRAFFIC_SIGN')) {
-            trafficData = prepDataset(await w.__TRAFFIC_SIGN_CACHE_PROMISE);
-          }
+          lampData = prepDataset(lampData);
+          hdbData = prepDataset(hdbData);
+          ensureHdbIndex(hdbData);
+          aedData = prepDataset(aedData);
+          busData = prepDataset(busData);
+          trafficData = prepDataset(trafficData);
 
           // Build recon search circle + adaptive precision
           const searchCircle = turf.circle(
@@ -6494,6 +6469,67 @@
         TRAFFIC_SIGN: "d_bbf0132c7290d6838f82003972d933d5",
       };
 
+      // Keep recon/statistics/glimpse on the original worker-only data path so counts
+      // match the old mapper exactly.
+      function getExactAnalysisCached(datasetId, label) {
+        window.__DG_EXACT_CACHE = window.__DG_EXACT_CACHE || {};
+        if (!window.__DG_EXACT_CACHE[datasetId]) {
+          window.__DG_EXACT_CACHE[datasetId] = fetchDataGovGeoJsonExact(datasetId, label);
+        }
+        return window.__DG_EXACT_CACHE[datasetId];
+      }
+
+      async function fetchDataGovGeoJsonExact(datasetId, label = '') {
+        const pollUrl = `https://api-open.data.gov.sg/v1/public/api/datasets/${datasetId}/poll-download`;
+
+        try {
+          console.log(`🌐 [${label || datasetId}] poll-download via Worker:`, pollUrl);
+
+          const pollResp = await fetch(workerProxy(pollUrl));
+          console.log(`📥 [${label || datasetId}] poll status:`, pollResp.status);
+
+          if (!pollResp.ok) {
+            console.warn(`⚠️ [${label || datasetId}] poll HTTP error`, pollResp.status);
+            return null;
+          }
+
+          const pollJson = await pollResp.json();
+          console.log(`📊 [${label || datasetId}] poll payload:`, pollJson);
+
+          if (pollJson && pollJson.type === 'FeatureCollection' && Array.isArray(pollJson.features)) {
+            console.log(`✅ [${label || datasetId}] poll returned FeatureCollection directly`);
+            return pollJson;
+          }
+
+          const downloadUrl = pollJson?.data?.url;
+          if (!downloadUrl) {
+            console.warn(`⚠️ [${label || datasetId}] missing data.url`, pollJson);
+            return null;
+          }
+
+          console.log(`⬇️ [${label || datasetId}] downloading via Worker:`, downloadUrl);
+
+          const dataResp = await fetch(workerProxy(downloadUrl));
+          console.log(`📥 [${label || datasetId}] data status:`, dataResp.status);
+
+          if (!dataResp.ok) {
+            console.warn(`⚠️ [${label || datasetId}] data HTTP error`, dataResp.status);
+            return null;
+          }
+
+          const dataJson = await dataResp.json();
+          if (!dataJson || dataJson.type !== 'FeatureCollection' || !Array.isArray(dataJson.features)) {
+            console.warn(`⚠️ [${label || datasetId}] not a FeatureCollection`, dataJson);
+            return null;
+          }
+
+          return dataJson;
+        } catch (e) {
+          console.error(`❌ [${label || datasetId}] fetchDataGovGeoJsonExact failed`, e);
+          return null;
+        }
+      }
+
       let reconWorker = null;
 
       function getReconWorker() {
@@ -6573,10 +6609,24 @@
     }
 
     function extractTrafficSignCategory(feature) {
-      // keep your existing logic if you want; this is a simple placeholder
-      const desc = (feature.properties?.description || feature.properties?.type || '').toString().toLowerCase();
-      if (!desc) return null;
-      return desc;
+      const props = feature && feature.properties ? feature.properties : {};
+      let typ = '';
+
+      if (props.TYP_CD != null) typ = String(props.TYP_CD).toUpperCase();
+      else if (props.typ_cd != null) typ = String(props.typ_cd).toUpperCase();
+      else if (props.TYP != null) typ = String(props.TYP).toUpperCase();
+      else if (props.Description) {
+        const desc = String(props.Description);
+        const match = desc.match(/<th>\\s*TYP_CD\\s*<\\/th>\\s*<td>(.*?)<\\/td>/i);
+        const typCdRaw = match ? match[1] : '';
+        typ = typCdRaw.replace(/<[^>]+>/g, '').toUpperCase().trim();
+      }
+
+      if (!typ) return null;
+      if (typ.includes('NO ENTRY')) return 'NO_ENTRY';
+      if (typ.includes('SLOW')) return 'SLOW';
+      if (typ.includes('STOP')) return 'STOP';
+      return null;
     }
 
     function countTrafficSigns(dataset, circle, category) {
@@ -7122,23 +7172,12 @@
           let slowSignCount = 0;
           let stopSignCount = 0;
 
-          // Cache promises globally so subsequent calls reuse downloads
-          const w = (typeof window !== 'undefined') ? window : globalThis;
-          w.__DG_CACHE_PROMISES = w.__DG_CACHE_PROMISES || {};
-
-          function getCached(datasetId, label) {
-            if (!w.__DG_CACHE_PROMISES[datasetId]) {
-              w.__DG_CACHE_PROMISES[datasetId] = fetchDataGovGeoJson(datasetId, label);
-            }
-            return w.__DG_CACHE_PROMISES[datasetId];
-          }
-
           const [hdbData, aedData, busData, lampPostData, trafficData] = await Promise.all([
-            getCached(DATASET_IDS.HDB, 'HDB'),
-            getCached(DATASET_IDS.AED, 'AED'),
-            getCached(DATASET_IDS.BUS_STOP, 'Bus Stop'),
-            getCached(DATASET_IDS.LAMP_POST, 'Lamp Post'),
-            getCached(DATASET_IDS.TRAFFIC_SIGN, 'Traffic Sign'),
+            getExactAnalysisCached(DATASET_IDS.HDB, 'HDB'),
+            getExactAnalysisCached(DATASET_IDS.AED, 'AED'),
+            getExactAnalysisCached(DATASET_IDS.BUS_STOP, 'Bus Stop'),
+            getExactAnalysisCached(DATASET_IDS.LAMP_POST, 'Lamp Post'),
+            getExactAnalysisCached(DATASET_IDS.TRAFFIC_SIGN, 'Traffic Sign'),
           ]);
 
           // ---- HDB Blocks ----
@@ -7354,18 +7393,8 @@
        * with a simple cache so we only fetch once.
        */
       async function getTrafficSignDataForGlimpse() {
-        const TRAFFIC_DATASET_ID = 'd_bbf0132c7290d6838f82003972d933d5';
-        const w = (typeof window !== 'undefined') ? window : globalThis;
-
-        if (!w.__TRAFFIC_SIGN_CACHE_PROMISE) {
-          console.log('[Glimpse] No cache yet, calling fetchDataGovGeoJson');
-          w.__TRAFFIC_SIGN_CACHE_PROMISE = fetchDataGovGeoJson(TRAFFIC_DATASET_ID);
-        } else {
-          console.log('[Glimpse] Using cached traffic-sign data');
-        }
-
         try {
-          const data = await w.__TRAFFIC_SIGN_CACHE_PROMISE;
+          const data = await getExactAnalysisCached(DATASET_IDS.TRAFFIC_SIGN, 'Traffic Sign');
           console.log(
             '[Glimpse] Traffic-sign data loaded:',
             data && Array.isArray(data.features) ? data.features.length : 0,
@@ -7592,7 +7621,7 @@
       const RESEED_EVERY_SEC = 0;            // e.g., 60 to reseed each minute
 
       /* ===== DO NOT EDIT BELOW (minified) ===== */
-      (function () { const c = document.getElementById('darkveil'); if (!c || IS_LOCALHOST) { if (c && IS_LOCALHOST) c.style.display = 'none'; return; } c.style.opacity = ".58"; const gl = c.getContext('webgl', { alpha: !0, premultipliedAlpha: !1 }) || c.getContext('experimental-webgl'); if (!gl) { console.warn('DarkVeil fallback'); return } const VS = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}'; const FS = 'precision mediump float;uniform vec2 r;uniform float t,B,n,s,f,W,ang,seed;uniform float rw;uniform vec3 Cb,Lp,Dp;uniform vec4 A1,A2,A3;uniform vec3 J;uniform float jdir;float rnd(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233))+seed)*43758.5453);}float n1(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.0-2.0*f);float a=rnd(i),b=rnd(i+vec2(1.,0.)),c=rnd(i+vec2(0.,1.)),d=rnd(i+vec2(1.,1.));return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);}vec2 warpN(vec2 p){vec2 g=vec2(n1(p*1.1+seed),n1(p*1.3-seed));return p+rw*(g-0.5);}vec2 warpS(vec2 p){return p+W*vec2(sin(2.1*p.y+0.9*t),cos(2.0*p.x-0.7*t));}float tri(float x){return 1.0-abs(fract(x)-0.5)*2.0;}float band(vec2 p,vec2 d,float freq,float width,float off,float k){p=warpS(warpN(p));float tf=t*mix(1.0,1.6,k);float jf=n1(p*1.2+tf*0.37+seed)-0.5;float jw=n1(p*1.5-tf*0.29-seed)-0.5;float jo=n1(p*0.9+tf*0.41+seed*0.5)-0.5;float F=freq*(1.0+J.x*jf),W=clamp(width*(1.0+J.y*jw),0.05,0.95),O=off+J.z*jo;float x=dot(p,d)*F - tf + O;float v=tri(x);return smoothstep(1.0-W,1.0,v);}void main(){vec2 uv=(gl_FragCoord.xy/r)*2.-1.;uv.y*=-1.;float asp=r.x/r.y;vec2 p=vec2(uv.x*asp,uv.y);float a=ang + jdir*(n1(vec2(ang*0.17,ang*0.23)+seed)-0.5);vec2 d=normalize(vec2(cos(a),sin(a)));vec3 col=Cb;float m1=band(p,d,A1.z,A1.y,A1.w,0.25);float m2=band(p,d,A2.z,A2.y,A2.w,0.55);float m3=band(p,d,A3.z,A3.y,A3.w,0.85);col=mix(col,Lp,clamp(m1*A1.x,0.,1.));col=mix(col,Dp,clamp(m2*A2.x,0.,1.));col=mix(col,vec3(0.),clamp(m3*A3.x,0.,1.));col*=B;col=pow(col,vec3(0.92));float sl=sin(gl_FragCoord.y*f)*.5+.5;col*=1.-(sl*sl)*s;col+=(rnd(gl_FragCoord.xy+t)-.5)*n*.8;gl_FragColor=vec4(clamp(col,0.,1.),1.);}'; function S(t, s) { const x = gl.createShader(t); gl.shaderSource(x, s); gl.compileShader(x); return x } const pr = gl.createProgram(); gl.attachShader(pr, S(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, S(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(pr); gl.useProgram(pr); const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW); const a = gl.getAttribLocation(pr, 'p'); gl.enableVertexAttribArray(a); gl.vertexAttribPointer(a, 2, gl.FLOAT, !1, 0, 0); const uR = gl.getUniformLocation(pr, 'r'), uT = gl.getUniformLocation(pr, 't'), uA = gl.getUniformLocation(pr, 'ang'); const uSeed = gl.getUniformLocation(pr, 'seed'); gl.uniform1f(gl.getUniformLocation(pr, 'B'), BRIGHTNESS); gl.uniform1f(gl.getUniformLocation(pr, 'n'), NOISE); gl.uniform1f(gl.getUniformLocation(pr, 's'), SCAN_S); gl.uniform1f(gl.getUniformLocation(pr, 'f'), SCAN_F); gl.uniform1f(gl.getUniformLocation(pr, 'W'), WARP); gl.uniform1f(gl.getUniformLocation(pr, 'rw'), RAND_WARP); gl.uniform3f(gl.getUniformLocation(pr, 'Cb'), BASE_PURPLE[0], BASE_PURPLE[1], BASE_PURPLE[2]); gl.uniform3f(gl.getUniformLocation(pr, 'Lp'), ACC_LIGHT[0], ACC_LIGHT[1], ACC_LIGHT[2]); gl.uniform3f(gl.getUniformLocation(pr, 'Dp'), ACC_DARK[0], ACC_DARK[1], ACC_DARK[2]); gl.uniform4f(gl.getUniformLocation(pr, 'A1'), STR1, WIDTH1, FREQ1, OFF1); gl.uniform4f(gl.getUniformLocation(pr, 'A2'), STR2, WIDTH2, FREQ2, OFF2); gl.uniform4f(gl.getUniformLocation(pr, 'A3'), STR3, WIDTH3, FREQ3, OFF3); gl.uniform3f(gl.getUniformLocation(pr, 'J'), JIT_FREQ, JIT_WIDTH, JIT_OFFSET); gl.uniform1f(gl.getUniformLocation(pr, 'jdir'), JIT_DIR); const rs = () => { const w = (c.parentElement?.clientWidth || c.width) | 0, h = (c.parentElement?.clientHeight || c.height) | 0, W = (w * RES_SCALE) | 0, H = (h * RES_SCALE) | 0; if (c.width !== W || c.height !== H) { c.width = Math.max(1, W); c.height = Math.max(1, H); gl.viewport(0, 0, c.width, c.height) } gl.uniform2f(uR, c.width, c.height) }; addEventListener('resize', rs, { passive: !0 }); rs(); let st = performance.now(), raf = 0, seed = RAND_SEED, seedAt = 0, running = !0; function loop() { if (!running) return; const now = (performance.now() - st) / 1e3; gl.uniform1f(uT, now * SPEED); gl.uniform1f(uA, now * ANGLE_SPEED); if (RESEED_EVERY_SEC > 0 && (now - seedAt) > RESEED_EVERY_SEC) { seedAt = now; seed = Math.random() * 1000 } gl.uniform1f(uSeed, seed); gl.drawArrays(gl.TRIANGLES, 0, 3); raf = requestAnimationFrame(loop) } function pauseVeil() { running = !1; raf && (cancelAnimationFrame(raf), raf = 0) } function resumeVeil() { running || (running = !0, st = performance.now(), seedAt = 0, raf = requestAnimationFrame(loop)) } window.__pauseVeil = pauseVeil; window.__resumeVeil = resumeVeil; raf = requestAnimationFrame(loop); document.addEventListener('visibilitychange', () => { document.hidden ? pauseVeil() : resumeVeil() }) })();
+      (function () { const c = document.getElementById('darkveil'); if (!c || IS_LOCALHOST) { if (c && IS_LOCALHOST) c.style.display = 'none'; return; } c.style.opacity = ".48"; const gl = c.getContext('webgl', { alpha: !0, premultipliedAlpha: !1 }) || c.getContext('experimental-webgl'); if (!gl) { console.warn('DarkVeil fallback'); return } const VS = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}'; const FS = 'precision mediump float;uniform vec2 r;uniform float t,B,n,s,f,W,ang,seed;uniform float rw;uniform vec3 Cb,Lp,Dp;uniform vec4 A1,A2,A3;uniform vec3 J;uniform float jdir;float rnd(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233))+seed)*43758.5453);}float n1(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.0-2.0*f);float a=rnd(i),b=rnd(i+vec2(1.,0.)),c=rnd(i+vec2(0.,1.)),d=rnd(i+vec2(1.,1.));return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);}vec2 warpN(vec2 p){vec2 g=vec2(n1(p*1.1+seed),n1(p*1.3-seed));return p+rw*(g-0.5);}vec2 warpS(vec2 p){return p+W*vec2(sin(2.1*p.y+0.9*t),cos(2.0*p.x-0.7*t));}float tri(float x){return 1.0-abs(fract(x)-0.5)*2.0;}float band(vec2 p,vec2 d,float freq,float width,float off,float k){p=warpS(warpN(p));float tf=t*mix(1.0,1.6,k);float jf=n1(p*1.2+tf*0.37+seed)-0.5;float jw=n1(p*1.5-tf*0.29-seed)-0.5;float jo=n1(p*0.9+tf*0.41+seed*0.5)-0.5;float F=freq*(1.0+J.x*jf),W=clamp(width*(1.0+J.y*jw),0.05,0.95),O=off+J.z*jo;float x=dot(p,d)*F - tf + O;float v=tri(x);return smoothstep(1.0-W,1.0,v);}void main(){vec2 uv=(gl_FragCoord.xy/r)*2.-1.;uv.y*=-1.;float asp=r.x/r.y;vec2 p=vec2(uv.x*asp,uv.y);float a=ang + jdir*(n1(vec2(ang*0.17,ang*0.23)+seed)-0.5);vec2 d=normalize(vec2(cos(a),sin(a)));vec3 col=Cb;float m1=band(p,d,A1.z,A1.y,A1.w,0.25);float m2=band(p,d,A2.z,A2.y,A2.w,0.55);float m3=band(p,d,A3.z,A3.y,A3.w,0.85);col=mix(col,Lp,clamp(m1*A1.x,0.,1.));col=mix(col,Dp,clamp(m2*A2.x,0.,1.));col=mix(col,vec3(0.),clamp(m3*A3.x,0.,1.));col*=B;col=pow(col,vec3(0.92));float sl=sin(gl_FragCoord.y*f)*.5+.5;col*=1.-(sl*sl)*s;col+=(rnd(gl_FragCoord.xy+t)-.5)*n*.8;gl_FragColor=vec4(clamp(col,0.,1.),1.);}'; function S(t, s) { const x = gl.createShader(t); gl.shaderSource(x, s); gl.compileShader(x); return x } const pr = gl.createProgram(); gl.attachShader(pr, S(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, S(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(pr); gl.useProgram(pr); const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW); const a = gl.getAttribLocation(pr, 'p'); gl.enableVertexAttribArray(a); gl.vertexAttribPointer(a, 2, gl.FLOAT, !1, 0, 0); const uR = gl.getUniformLocation(pr, 'r'), uT = gl.getUniformLocation(pr, 't'), uA = gl.getUniformLocation(pr, 'ang'); const uSeed = gl.getUniformLocation(pr, 'seed'); gl.uniform1f(gl.getUniformLocation(pr, 'B'), BRIGHTNESS); gl.uniform1f(gl.getUniformLocation(pr, 'n'), NOISE); gl.uniform1f(gl.getUniformLocation(pr, 's'), SCAN_S); gl.uniform1f(gl.getUniformLocation(pr, 'f'), SCAN_F); gl.uniform1f(gl.getUniformLocation(pr, 'W'), WARP); gl.uniform1f(gl.getUniformLocation(pr, 'rw'), RAND_WARP); gl.uniform3f(gl.getUniformLocation(pr, 'Cb'), BASE_PURPLE[0], BASE_PURPLE[1], BASE_PURPLE[2]); gl.uniform3f(gl.getUniformLocation(pr, 'Lp'), ACC_LIGHT[0], ACC_LIGHT[1], ACC_LIGHT[2]); gl.uniform3f(gl.getUniformLocation(pr, 'Dp'), ACC_DARK[0], ACC_DARK[1], ACC_DARK[2]); gl.uniform4f(gl.getUniformLocation(pr, 'A1'), STR1, WIDTH1, FREQ1, OFF1); gl.uniform4f(gl.getUniformLocation(pr, 'A2'), STR2, WIDTH2, FREQ2, OFF2); gl.uniform4f(gl.getUniformLocation(pr, 'A3'), STR3, WIDTH3, FREQ3, OFF3); gl.uniform3f(gl.getUniformLocation(pr, 'J'), JIT_FREQ, JIT_WIDTH, JIT_OFFSET); gl.uniform1f(gl.getUniformLocation(pr, 'jdir'), JIT_DIR); const rs = () => { const w = (c.parentElement?.clientWidth || c.width) | 0, h = (c.parentElement?.clientHeight || c.height) | 0, W = (w * RES_SCALE) | 0, H = (h * RES_SCALE) | 0; if (c.width !== W || c.height !== H) { c.width = Math.max(1, W); c.height = Math.max(1, H); gl.viewport(0, 0, c.width, c.height) } gl.uniform2f(uR, c.width, c.height) }; addEventListener('resize', rs, { passive: !0 }); rs(); let st = performance.now(), raf = 0, seed = RAND_SEED, seedAt = 0, running = !0; function loop() { if (!running) return; const now = (performance.now() - st) / 1e3; gl.uniform1f(uT, now * SPEED); gl.uniform1f(uA, now * ANGLE_SPEED); if (RESEED_EVERY_SEC > 0 && (now - seedAt) > RESEED_EVERY_SEC) { seedAt = now; seed = Math.random() * 1000 } gl.uniform1f(uSeed, seed); gl.drawArrays(gl.TRIANGLES, 0, 3); raf = requestAnimationFrame(loop) } function pauseVeil() { running = !1; raf && (cancelAnimationFrame(raf), raf = 0) } function resumeVeil() { running || (running = !0, st = performance.now(), seedAt = 0, raf = requestAnimationFrame(loop)) } window.__pauseVeil = pauseVeil; window.__resumeVeil = resumeVeil; raf = requestAnimationFrame(loop); document.addEventListener('visibilitychange', () => { document.hidden ? pauseVeil() : resumeVeil() }) })();
 
 
       /* ===================== FPS OPTIMIZATIONS ===================== */
