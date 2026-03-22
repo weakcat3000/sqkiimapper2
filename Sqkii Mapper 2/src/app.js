@@ -4730,8 +4730,9 @@
 
       function reconHaloRadiusMeters(phase = 0.5) {
         const spacing = Math.max(8, Number(reconOverlaySpacingMeters) || 20);
-        const minRadius = Math.max(8.5, spacing * 0.36);
-        const maxRadius = Math.max(minRadius + 3.5, spacing * 0.7);
+        const dotRadiusMeters = 7;
+        const minRadius = Math.max(dotRadiusMeters + 2.5, spacing * 0.46);
+        const maxRadius = Math.max(minRadius + 4.5, dotRadiusMeters + spacing * 0.9);
         return minRadius + (maxRadius - minRadius) * phase;
       }
 
@@ -4754,16 +4755,18 @@
           if (!reconOverlayPoints.length) return;
 
           const phase = (Math.sin(ts / 720) + 1) / 2;
-          const haloOpacity = 0.08 + phase * 0.1;
+          const haloOpacity = 0.05 + phase * 0.07;
           const fallbackLat = reconOverlayPoints[0]?.[1];
-          const haloRadiusPx = reconMetersToPixels(reconHaloRadiusMeters(phase), fallbackLat);
-          const haloStrokePx = 1.5 + phase * 2.4;
+          const dotRadiusPx = reconMetersToPixels(7, fallbackLat);
+          const haloRadiusPx = Math.max(dotRadiusPx + 3, reconMetersToPixels(reconHaloRadiusMeters(phase), fallbackLat));
+          const haloStrokePx = 3.2 + phase * 3.2;
 
           if (engine === 'gl' && mapgl?.getLayer?.(RECON_OVERLAY_HALO_LAYER)) {
             try {
               mapgl.setPaintProperty(RECON_OVERLAY_HALO_LAYER, 'circle-radius', haloRadiusPx);
               mapgl.setPaintProperty(RECON_OVERLAY_HALO_LAYER, 'circle-stroke-opacity', haloOpacity);
               mapgl.setPaintProperty(RECON_OVERLAY_HALO_LAYER, 'circle-stroke-width', haloStrokePx);
+              mapgl.setPaintProperty(RECON_OVERLAY_HALO_LAYER, 'circle-blur', 0.35 + phase * 0.18);
             } catch { }
           }
 
@@ -5907,8 +5910,9 @@
             properties: {}
           }))
         };
-        const initialHaloRadiusPx = reconMetersToPixels(reconHaloRadiusMeters(0.5), reconOverlayPoints[0]?.[1]);
-        const initialHaloStrokePx = 2.2;
+        const initialDotRadiusPx = reconMetersToPixels(7, reconOverlayPoints[0]?.[1]);
+        const initialHaloRadiusPx = Math.max(initialDotRadiusPx + 3, reconMetersToPixels(reconHaloRadiusMeters(0.5), reconOverlayPoints[0]?.[1]));
+        const initialHaloStrokePx = 4;
 
         // ------------ MapLibre GL ------------
         if (typeof mapgl !== 'undefined' && mapgl && mapgl.addSource && mapgl.getStyle?.()) {
@@ -5934,9 +5938,9 @@
                   'circle-color': '#22c55e',
                   'circle-opacity': 0,
                   'circle-stroke-color': '#22c55e',
-                  'circle-stroke-opacity': 0.12,
+                  'circle-stroke-opacity': 0.09,
                   'circle-stroke-width': initialHaloStrokePx,
-                  'circle-blur': 0
+                  'circle-blur': 0.42
                 }
               });
             }
