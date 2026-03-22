@@ -244,12 +244,17 @@
         radial-gradient(circle at 82% 28%, rgba(118, 52, 218, 0.07), transparent 26%),
         linear-gradient(180deg, rgba(86, 40, 145, 0.06), rgba(15, 17, 21, 0.02) 42%, rgba(129, 64, 228, 0.045));
       opacity: .55;
+      min-height: 100%;
     }
 
     /* Purple “dark veil” overlay */
     .darkveil-canvas {
       position: absolute;
       inset: 0;
+      width: 100%;
+      height: 100%;
+      min-height: 100%;
+      display: block;
       z-index: 1;
       pointer-events: none;
       opacity: .48;
@@ -1071,11 +1076,13 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      position: absolute;
-      top: 30%;
+      position: fixed;
+      top: 50%;
       left: 50%;
-      transform: translateX(-50%);
-      z-index: 1000;
+      transform: translate(-50%, -50%);
+      z-index: 10001;
+      width: min(80vw, 320px);
+      pointer-events: none;
       font-size: 18px;
       font-weight: bold;
       color: white !important;
@@ -1753,7 +1760,7 @@
       left: 50%;
       margin-top: -56px;
       transform: translate(-50%, -50%);
-      z-index: 9999;
+      z-index: 10001;
       display: flex;
       flex-direction: column; /* Stack text above the bar */
       align-items: center;
