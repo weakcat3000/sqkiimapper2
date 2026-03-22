@@ -6486,52 +6486,64 @@
 
       async function fetchDataGovGeoJsonExact(datasetId, label = '') {
         const pollUrl = `https://api-open.data.gov.sg/v1/public/api/datasets/${datasetId}/poll-download`;
+        const name = label || datasetId;
+        const loaderToken = beginDataGovLoader(name);
+        let hasFailure = false;
 
         try {
-          console.log(`🌐 [${label || datasetId}] poll-download via Worker:`, pollUrl);
+          console.log(`🌐 [${name}] poll-download via Worker:`, pollUrl);
 
           const pollResp = await fetch(workerProxy(pollUrl));
-          console.log(`📥 [${label || datasetId}] poll status:`, pollResp.status);
+          console.log(`📥 [${name}] poll status:`, pollResp.status);
 
           if (!pollResp.ok) {
-            console.warn(`⚠️ [${label || datasetId}] poll HTTP error`, pollResp.status);
+            hasFailure = true;
+            console.warn(`⚠️ [${name}] poll HTTP error`, pollResp.status);
             return null;
           }
 
           const pollJson = await pollResp.json();
-          console.log(`📊 [${label || datasetId}] poll payload:`, pollJson);
+          markDataGovLoaderStep(loaderToken, `Loaded poll metadata for ${name}`);
+          console.log(`📊 [${name}] poll payload:`, pollJson);
 
           if (pollJson && pollJson.type === 'FeatureCollection' && Array.isArray(pollJson.features)) {
-            console.log(`✅ [${label || datasetId}] poll returned FeatureCollection directly`);
+            console.log(`✅ [${name}] poll returned FeatureCollection directly`);
             return pollJson;
           }
 
           const downloadUrl = pollJson?.data?.url;
           if (!downloadUrl) {
-            console.warn(`⚠️ [${label || datasetId}] missing data.url`, pollJson);
+            hasFailure = true;
+            console.warn(`⚠️ [${name}] missing data.url`, pollJson);
             return null;
           }
 
-          console.log(`⬇️ [${label || datasetId}] downloading via Worker:`, downloadUrl);
+          console.log(`⬇️ [${name}] downloading via Worker:`, downloadUrl);
 
           const dataResp = await fetch(workerProxy(downloadUrl));
-          console.log(`📥 [${label || datasetId}] data status:`, dataResp.status);
+          console.log(`📥 [${name}] data status:`, dataResp.status);
 
           if (!dataResp.ok) {
-            console.warn(`⚠️ [${label || datasetId}] data HTTP error`, dataResp.status);
+            hasFailure = true;
+            console.warn(`⚠️ [${name}] data HTTP error`, dataResp.status);
             return null;
           }
 
           const dataJson = await dataResp.json();
+          markDataGovLoaderStep(loaderToken, `Downloaded ${name}`);
           if (!dataJson || dataJson.type !== 'FeatureCollection' || !Array.isArray(dataJson.features)) {
-            console.warn(`⚠️ [${label || datasetId}] not a FeatureCollection`, dataJson);
+            hasFailure = true;
+            console.warn(`⚠️ [${name}] not a FeatureCollection`, dataJson);
             return null;
           }
 
           return dataJson;
         } catch (e) {
-          console.error(`❌ [${label || datasetId}] fetchDataGovGeoJsonExact failed`, e);
+          hasFailure = true;
+          console.error(`❌ [${name}] fetchDataGovGeoJsonExact failed`, e);
           return null;
+        } finally {
+          finishDataGovLoader(loaderToken, hasFailure);
         }
       }
 
