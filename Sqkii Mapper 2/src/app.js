@@ -4731,7 +4731,7 @@
       function reconHaloRadiusMeters(phase = 0.5) {
         const spacing = Math.max(8, Number(reconOverlaySpacingMeters) || 20);
         const dotRadiusMeters = 7;
-        const minRadius = Math.max(dotRadiusMeters + 10.5, spacing * 0.46);
+        const minRadius = Math.max(dotRadiusMeters + 9.0, spacing * 0.46);
         const maxRadius = Math.max(minRadius + 4.5, dotRadiusMeters + spacing * 0.9);
         return minRadius + (maxRadius - minRadius) * phase;
       }
@@ -4769,8 +4769,8 @@
           const fallbackLat = reconOverlayPoints[0]?.[1];
           const dotRadiusPx = reconMetersToPixels(7, fallbackLat);
           const haloRadiusPx = Math.max(
-            dotRadiusPx + 11,
-            dotRadiusPx + 11 * zoomAttenuation,
+            dotRadiusPx + 9.5,
+            dotRadiusPx + 9.5 * zoomAttenuation,
             reconMetersToPixels(reconHaloRadiusMeters(phase), fallbackLat)
           );
           const haloStrokePx = (4.4 + phase * 4.18) * Math.max(0.25, zoomAttenuation);
@@ -5927,8 +5927,8 @@
         const initialDotRadiusPx = reconMetersToPixels(7, reconOverlayPoints[0]?.[1]);
         const initialZoomAttenuation = reconHaloZoomAttenuation();
         const initialHaloRadiusPx = Math.max(
-          initialDotRadiusPx + 11,
-          initialDotRadiusPx + 11 * initialZoomAttenuation,
+          initialDotRadiusPx + 9.5,
+          initialDotRadiusPx + 9.5 * initialZoomAttenuation,
           reconMetersToPixels(reconHaloRadiusMeters(0.5), reconOverlayPoints[0]?.[1])
         );
         const initialHaloStrokePx = 5.28 * Math.max(0.25, initialZoomAttenuation);
