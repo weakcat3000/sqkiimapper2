@@ -4730,8 +4730,8 @@
 
       function reconHaloRadiusMeters(phase = 0.5) {
         const spacing = Math.max(8, Number(reconOverlaySpacingMeters) || 20);
-        const minRadius = Math.max(7.5, spacing * 0.28);
-        const maxRadius = Math.max(10.5, spacing * 0.58);
+        const minRadius = Math.max(8.5, spacing * 0.36);
+        const maxRadius = Math.max(minRadius + 3.5, spacing * 0.7);
         return minRadius + (maxRadius - minRadius) * phase;
       }
 
@@ -4754,14 +4754,16 @@
           if (!reconOverlayPoints.length) return;
 
           const phase = (Math.sin(ts / 720) + 1) / 2;
-          const haloOpacity = 0.06 + phase * 0.08;
+          const haloOpacity = 0.08 + phase * 0.1;
           const fallbackLat = reconOverlayPoints[0]?.[1];
           const haloRadiusPx = reconMetersToPixels(reconHaloRadiusMeters(phase), fallbackLat);
+          const haloStrokePx = 1.5 + phase * 2.4;
 
           if (engine === 'gl' && mapgl?.getLayer?.(RECON_OVERLAY_HALO_LAYER)) {
             try {
               mapgl.setPaintProperty(RECON_OVERLAY_HALO_LAYER, 'circle-radius', haloRadiusPx);
-              mapgl.setPaintProperty(RECON_OVERLAY_HALO_LAYER, 'circle-opacity', haloOpacity);
+              mapgl.setPaintProperty(RECON_OVERLAY_HALO_LAYER, 'circle-stroke-opacity', haloOpacity);
+              mapgl.setPaintProperty(RECON_OVERLAY_HALO_LAYER, 'circle-stroke-width', haloStrokePx);
             } catch { }
           }
 
@@ -4770,8 +4772,9 @@
               try {
                 halo.setRadius(haloRadiusPx);
                 halo.setStyle({
-                  fillOpacity: haloOpacity,
-                  opacity: haloOpacity * 0.7
+                  fillOpacity: 0,
+                  opacity: haloOpacity,
+                  weight: haloStrokePx
                 });
               } catch { }
             }
@@ -5905,6 +5908,7 @@
           }))
         };
         const initialHaloRadiusPx = reconMetersToPixels(reconHaloRadiusMeters(0.5), reconOverlayPoints[0]?.[1]);
+        const initialHaloStrokePx = 2.2;
 
         // ------------ MapLibre GL ------------
         if (typeof mapgl !== 'undefined' && mapgl && mapgl.addSource && mapgl.getStyle?.()) {
@@ -5928,9 +5932,11 @@
                 paint: {
                   'circle-radius': initialHaloRadiusPx,
                   'circle-color': '#22c55e',
-                  'circle-opacity': 0.1,
-                  'circle-blur': 0.6,
-                  'circle-stroke-width': 0
+                  'circle-opacity': 0,
+                  'circle-stroke-color': '#22c55e',
+                  'circle-stroke-opacity': 0.12,
+                  'circle-stroke-width': initialHaloStrokePx,
+                  'circle-blur': 0
                 }
               });
             }
@@ -5970,9 +5976,9 @@
                 radius: initialHaloRadiusPx,
                 color: '#22c55e',
                 fillColor: '#22c55e',
-                fillOpacity: 0.1,
-                opacity: 0.07,
-                weight: 0
+                fillOpacity: 0,
+                opacity: 0.12,
+                weight: initialHaloStrokePx
               })
             );
 
