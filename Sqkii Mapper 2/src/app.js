@@ -2840,6 +2840,7 @@
           leafletCircleTheme = 'on-osm';
           showLeaf();
           restyleAllLeafletPolys();   // repaint existing polygons for OSM theme
+          if (lampPostSearchFeature) renderLampPostSearchHighlight(lampPostSearchFeature);
         } else {
           // Switch back to GL styles
           leafletCircleTheme = 'on-gl';
@@ -2852,6 +2853,7 @@
 
           readdAllGroupsAfterGLStyleChange();
           if (reconOverlayPoints.length) mapgl.once('idle', () => scheduleReconOverlayRestore());
+          if (lampPostSearchFeature) mapgl.once('idle', () => renderLampPostSearchHighlight(lampPostSearchFeature));
           showGL();
         }
 
@@ -2896,6 +2898,7 @@
       let seCalcStats = null;
       let seGlimpseSigns = null;
       let seReconCoin = null;
+      let seSearchLampPost = null;
 
 
       seDrag.addEventListener('click', () => {
@@ -3119,6 +3122,10 @@
             try { seGlimpseSigns.remove(); } catch { }
             seGlimpseSigns = null;
           }
+          if (seSearchLampPost) {
+            try { seSearchLampPost.remove(); } catch { }
+            seSearchLampPost = null;
+          }
 
           // Create new Calculate Statistics button
           seCalcStats = document.createElement('button');
@@ -3211,6 +3218,32 @@
             await glimpseTrafficSigns(fid, center, radius);
           };
 
+          seSearchLampPost = document.createElement('button');
+          seSearchLampPost.className = 'btn small';
+          seSearchLampPost.style.cssText = 'width:100%;margin-top:4px;background:rgba(249,115,22,0.14);border-color:#fb923c;color:#fde68a;';
+          seSearchLampPost.textContent = '🔎 Search';
+
+          seSearchLampPost.onclick = async () => {
+            let center = p._circleCenter;
+            let radius = p._circleRadius;
+
+            if (!center || !radius) {
+              try {
+                const centroid = turf.centroid(f);
+                center = centroid.geometry.coordinates;
+                const bbox = turf.bbox(f);
+                const dx = bbox[2] - bbox[0];
+                const dy = bbox[3] - bbox[1];
+                radius = Math.max(dx, dy) * 111320 / 2;
+              } catch {
+                center = null;
+                radius = null;
+              }
+            }
+
+            await searchLampPostByNumber(center, radius);
+          };
+
           // Insert all buttons before the actions row
           const actionsRow = editorEl.querySelector('.style-actions');
           if (actionsRow) {
@@ -3219,6 +3252,7 @@
             parent.insertBefore(seCalcStats, actionsRow);
             parent.insertBefore(seReconCoin, actionsRow);
             parent.insertBefore(seGlimpseSigns, actionsRow);
+            parent.insertBefore(seSearchLampPost, actionsRow);
           }
 
           // Show cached stats if available
@@ -3262,6 +3296,10 @@
           if (seGlimpseSigns) {
             try { seGlimpseSigns.remove(); } catch { }
             seGlimpseSigns = null;
+          }
+          if (seSearchLampPost) {
+            try { seSearchLampPost.remove(); } catch { }
+            seSearchLampPost = null;
           }
 
 
@@ -4612,12 +4650,20 @@
       let reconPrecision = 30; // Default: 30m spacing
       const RECON_OVERLAY_SOURCE = 'recon-overlay-src';
       const RECON_OVERLAY_LAYER = 'recon-overlay-layer';
+      const LAMP_POST_SEARCH_SOURCE_ID = 'lamp-post-search-src';
+      const LAMP_POST_SEARCH_HALO_LAYER_ID = 'lamp-post-search-halo';
+      const LAMP_POST_SEARCH_CORE_LAYER_ID = 'lamp-post-search-core';
+      const LAMP_POST_SEARCH_TEXT_LAYER_ID = 'lamp-post-search-text';
       let leafletReconLayer = null;
+      let lampPostSearchLeafletLayer = null;
+      let lampPostSearchLeafletHalo = null;
       const RECON_PASSWORD = '6482';
       const RECON_ACCESS_KEY = 'sqkii-recon-access';
       const RECON_ACCESS_MS = 4 * 60 * 60 * 1000;
       const RECON_OVERLAY_CACHE_PREFIX = 'sqkii-recon-overlay-v1';
       let reconOverlayPoints = [];
+      let lampPostSearchFeature = null;
+      let lampPostSearchAnimationFrame = 0;
 
       function reconOverlayStorageKey(roomCode = currentRoomCode) {
         return `${RECON_OVERLAY_CACHE_PREFIX}:${roomCode || 'local'}`;
@@ -4919,6 +4965,288 @@
         }
 
         return fc;
+      }
+
+      function normalizeLampPostNumber(value) {
+        return String(value || '')
+          .trim()
+          .toUpperCase()
+          .replace(/\s+/g, '')
+          .replace(/[^A-Z0-9-]/g, '');
+      }
+
+      function decodeLampPostDescription(value) {
+        return String(value || '')
+          .replace(/&lt;/gi, '<')
+          .replace(/&gt;/gi, '>')
+          .replace(/&quot;/gi, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&amp;/gi, '&');
+      }
+
+      function extractLampPostNumberFromDescription(description) {
+        const text = decodeLampPostDescription(description);
+        if (!text) return '';
+
+        const tableMatch =
+          text.match(/LAMPPOST_NUM[\s\S]{0,160}?<TD>\s*([^<\s]+)/i) ||
+          text.match(/LAMPPOST[_\s-]*NUM[\s:=]{0,20}([A-Z0-9-]+)/i);
+
+        if (tableMatch?.[1]) return normalizeLampPostNumber(tableMatch[1]);
+
+        const stripped = text.replace(/<[^>]+>/g, ' ');
+        const flatMatch = stripped.match(/LAMPPOST[_\s-]*NUM\s*([A-Z0-9-]+)/i);
+        return normalizeLampPostNumber(flatMatch?.[1] || '');
+      }
+
+      function extractLampPostNumber(feature) {
+        const props = feature?.properties || {};
+        const directKeys = [
+          'LAMPPOST_NUM',
+          'lamppost_num',
+          'lampPostNum',
+          'lamp_post_num',
+          'LampPostNum',
+          'LAMP_POST_NUM',
+          'lamp_post',
+          'lampPost',
+          'LP_NUM'
+        ];
+
+        for (const key of directKeys) {
+          const normalized = normalizeLampPostNumber(props[key]);
+          if (normalized) return normalized;
+        }
+
+        const descriptionKeys = ['Description', 'description', 'DESCRIPTION', 'Html', 'html', 'popupContent'];
+        for (const key of descriptionKeys) {
+          const normalized = extractLampPostNumberFromDescription(props[key]);
+          if (normalized) return normalized;
+        }
+
+        return '';
+      }
+
+      function cancelLampPostSearchPulse() {
+        if (lampPostSearchAnimationFrame) {
+          cancelAnimationFrame(lampPostSearchAnimationFrame);
+          lampPostSearchAnimationFrame = 0;
+        }
+      }
+
+      function clearLampPostSearchHighlight({ clearFeature = true } = {}) {
+        cancelLampPostSearchPulse();
+
+        if (mapgl && mapgl.getStyle?.()) {
+          try {
+            if (mapgl.getLayer(LAMP_POST_SEARCH_TEXT_LAYER_ID)) mapgl.removeLayer(LAMP_POST_SEARCH_TEXT_LAYER_ID);
+            if (mapgl.getLayer(LAMP_POST_SEARCH_CORE_LAYER_ID)) mapgl.removeLayer(LAMP_POST_SEARCH_CORE_LAYER_ID);
+            if (mapgl.getLayer(LAMP_POST_SEARCH_HALO_LAYER_ID)) mapgl.removeLayer(LAMP_POST_SEARCH_HALO_LAYER_ID);
+            if (mapgl.getSource(LAMP_POST_SEARCH_SOURCE_ID)) mapgl.removeSource(LAMP_POST_SEARCH_SOURCE_ID);
+          } catch (error) {
+            console.warn('[Lamp Search] Failed to clear GL highlight:', error);
+          }
+        }
+
+        if (mapleaf && lampPostSearchLeafletLayer) {
+          try { mapleaf.removeLayer(lampPostSearchLeafletLayer); } catch { }
+          lampPostSearchLeafletLayer = null;
+          lampPostSearchLeafletHalo = null;
+        }
+
+        if (clearFeature) lampPostSearchFeature = null;
+      }
+
+      function animateLampPostSearchPulse() {
+        cancelLampPostSearchPulse();
+
+        const tick = (ts) => {
+          if (!lampPostSearchFeature) return;
+
+          const phase = ts / 650;
+          const pulse = (Math.sin(phase) + 1) / 2;
+          const haloRadius = 18 + pulse * 12;
+          const haloOpacity = 0.12 + pulse * 0.14;
+
+          if (engine === 'gl' && mapgl?.getLayer?.(LAMP_POST_SEARCH_HALO_LAYER_ID)) {
+            try {
+              mapgl.setPaintProperty(LAMP_POST_SEARCH_HALO_LAYER_ID, 'circle-radius', haloRadius);
+              mapgl.setPaintProperty(LAMP_POST_SEARCH_HALO_LAYER_ID, 'circle-opacity', haloOpacity);
+            } catch { }
+          }
+
+          if (engine === 'leaf' && lampPostSearchLeafletHalo) {
+            try {
+              lampPostSearchLeafletHalo.setRadius(16 + pulse * 12);
+              lampPostSearchLeafletHalo.setStyle({
+                fillOpacity: haloOpacity,
+                opacity: 0.18 + pulse * 0.18
+              });
+            } catch { }
+          }
+
+          lampPostSearchAnimationFrame = requestAnimationFrame(tick);
+        };
+
+        lampPostSearchAnimationFrame = requestAnimationFrame(tick);
+      }
+
+      function renderLampPostSearchHighlight(feature) {
+        if (!feature?.geometry?.coordinates || feature.geometry.type !== 'Point') return;
+
+        lampPostSearchFeature = {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [Number(feature.geometry.coordinates[0]), Number(feature.geometry.coordinates[1])]
+          },
+          properties: {
+            lampPostNumber: extractLampPostNumber(feature) || ''
+          }
+        };
+
+        clearLampPostSearchHighlight({ clearFeature: false });
+
+        const fc = { type: 'FeatureCollection', features: [lampPostSearchFeature] };
+        const [lng, lat] = lampPostSearchFeature.geometry.coordinates;
+
+        if (engine === 'gl' && mapgl?.addSource && mapgl.getStyle?.()) {
+          try {
+            mapgl.addSource(LAMP_POST_SEARCH_SOURCE_ID, { type: 'geojson', data: fc });
+            mapgl.addLayer({
+              id: LAMP_POST_SEARCH_HALO_LAYER_ID,
+              type: 'circle',
+              source: LAMP_POST_SEARCH_SOURCE_ID,
+              paint: {
+                'circle-radius': 22,
+                'circle-color': '#f59e0b',
+                'circle-opacity': 0.18,
+                'circle-blur': 0.7,
+                'circle-stroke-width': 0
+              }
+            });
+            mapgl.addLayer({
+              id: LAMP_POST_SEARCH_CORE_LAYER_ID,
+              type: 'circle',
+              source: LAMP_POST_SEARCH_SOURCE_ID,
+              paint: {
+                'circle-radius': 6,
+                'circle-color': '#fcd34d',
+                'circle-opacity': 0.95,
+                'circle-stroke-color': '#fb923c',
+                'circle-stroke-width': 2
+              }
+            });
+            mapgl.addLayer({
+              id: LAMP_POST_SEARCH_TEXT_LAYER_ID,
+              type: 'symbol',
+              source: LAMP_POST_SEARCH_SOURCE_ID,
+              layout: {
+                'text-field': ['get', 'lampPostNumber'],
+                'text-size': 12,
+                'text-anchor': 'top',
+                'text-offset': [0, 1.6],
+                'text-allow-overlap': true
+              },
+              paint: {
+                'text-color': '#fde68a',
+                'text-halo-color': 'rgba(25,16,8,0.95)',
+                'text-halo-width': 1.5
+              }
+            });
+          } catch (error) {
+            console.error('[Lamp Search] Failed to render on MapLibre:', error);
+          }
+        }
+
+        if (engine === 'leaf' && mapleaf && typeof L !== 'undefined' && L) {
+          try {
+            lampPostSearchLeafletHalo = L.circleMarker([lat, lng], {
+              radius: 22,
+              color: '#f59e0b',
+              weight: 1.5,
+              opacity: 0.24,
+              fillColor: '#f59e0b',
+              fillOpacity: 0.16
+            });
+
+            const core = L.circleMarker([lat, lng], {
+              radius: 6,
+              color: '#fb923c',
+              weight: 2,
+              fillColor: '#fcd34d',
+              fillOpacity: 0.95
+            });
+
+            const label = L.marker([lat, lng], {
+              icon: L.divIcon({
+                className: 'lamp-post-search-label',
+                html: `<div style="transform:translate(-50%, 12px);color:#fde68a;font-weight:800;text-shadow:0 0 8px rgba(0,0,0,0.9);white-space:nowrap;">${lampPostSearchFeature.properties.lampPostNumber}</div>`
+              })
+            });
+
+            lampPostSearchLeafletLayer = L.layerGroup([lampPostSearchLeafletHalo, core, label]).addTo(mapleaf);
+          } catch (error) {
+            console.error('[Lamp Search] Failed to render on Leaflet:', error);
+          }
+        }
+
+        animateLampPostSearchPulse();
+      }
+
+      async function searchLampPostByNumber(center, radiusMeters) {
+        const enteredNumber = prompt('Search lamp post number:', lampPostSearchFeature?.properties?.lampPostNumber || '');
+        if (enteredNumber == null) return;
+
+        const query = normalizeLampPostNumber(enteredNumber);
+        if (!query) {
+          alert('Please enter a lamp post number.');
+          return;
+        }
+
+        if (!Array.isArray(center) || center.length < 2 || !Number.isFinite(Number(radiusMeters)) || Number(radiusMeters) <= 0) {
+          alert('Could not determine the selected circle.');
+          return;
+        }
+
+        let lampData;
+        try {
+          lampData = prepDataset(await getExactAnalysisCached(DATASET_IDS.LAMP_POST, 'Lamp Post'));
+        } catch (error) {
+          console.error('[Lamp Search] Failed to load lamp post data:', error);
+          alert('Could not load the lamp post dataset.');
+          return;
+        }
+
+        let match = null;
+        for (const feature of lampData?.features || []) {
+          if (feature?.geometry?.type !== 'Point') continue;
+          const lng = Number(feature.__lng ?? feature.geometry?.coordinates?.[0]);
+          const lat = Number(feature.__lat ?? feature.geometry?.coordinates?.[1]);
+          if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+          if (turf.distance(center, [lng, lat], { units: 'meters' }) > radiusMeters) continue;
+          if (extractLampPostNumber(feature) !== query) continue;
+          match = feature;
+          break;
+        }
+
+        if (!match) {
+          alert(`Lamp post ${query} was not found inside this circle.`);
+          return;
+        }
+
+        renderLampPostSearchHighlight(match);
+
+        const lng = Number(match.__lng ?? match.geometry?.coordinates?.[0]);
+        const lat = Number(match.__lat ?? match.geometry?.coordinates?.[1]);
+        if (Number.isFinite(lng) && Number.isFinite(lat)) {
+          if (engine === 'gl' && mapgl?.flyTo) {
+            mapgl.flyTo({ center: [lng, lat], zoom: Math.max(mapgl.getZoom?.() || 17, 18), speed: 1.1, essential: true });
+          } else if (engine === 'leaf' && mapleaf?.flyTo) {
+            mapleaf.flyTo([lat, lng], Math.max(mapleaf.getZoom?.() || 17, 18), { duration: 0.9 });
+          }
+
+        }
       }
 
       function getRequiredReconDatasets(constraints) {
