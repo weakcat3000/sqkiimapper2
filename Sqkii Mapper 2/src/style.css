@@ -749,6 +749,240 @@
       font-size: 16px
     }
 
+    .lamp-search-card {
+      position: relative;
+      max-width: 460px;
+      width: min(92vw, 460px);
+      overflow: hidden;
+      border-radius: 22px;
+      padding: 22px 20px 18px;
+      background:
+        radial-gradient(circle at top right, rgba(251, 146, 60, 0.22), transparent 34%),
+        radial-gradient(circle at bottom left, rgba(245, 158, 11, 0.12), transparent 28%),
+        linear-gradient(180deg, rgba(28, 20, 35, 0.96), rgba(17, 14, 24, 0.98));
+      border-color: rgba(251, 146, 60, 0.3);
+      box-shadow:
+        0 30px 80px rgba(0, 0, 0, 0.58),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 0 0 1px rgba(245, 158, 11, 0.06);
+      animation: lamp-search-card-enter .28s ease-out;
+    }
+
+    .lamp-search-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 18%, rgba(255, 214, 120, 0.08) 44%, transparent 70%);
+      transform: translateX(-70%);
+      animation: lamp-search-sheen 3.2s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    .lamp-search-close-top {
+      top: 10px;
+      right: 10px;
+      z-index: 1;
+    }
+
+    .lamp-search-kicker {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      color: #fcd34d;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .lamp-search-kicker::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #fb923c;
+      box-shadow: 0 0 12px rgba(251, 146, 60, 0.9);
+      animation: lamp-search-dot 1.8s ease-in-out infinite;
+    }
+
+    .lamp-search-subtitle {
+      color: rgba(255, 245, 230, 0.74);
+      font-size: 13px;
+      line-height: 1.5;
+      margin-bottom: 16px;
+      max-width: 34ch;
+    }
+
+    .lamp-search-input-wrap {
+      display: grid;
+      gap: 8px;
+    }
+
+    .lamp-search-input-wrap label,
+    .lamp-search-mode-label {
+      color: #f8d8a3;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+
+    .lamp-search-input {
+      width: 100%;
+      border-radius: 16px;
+      border: 1px solid rgba(251, 146, 60, 0.28);
+      background: rgba(14, 12, 20, 0.8);
+      color: #fff7e6;
+      padding: 14px 16px;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      outline: none;
+      transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+
+    .lamp-search-input::placeholder {
+      color: rgba(255, 245, 230, 0.34);
+      letter-spacing: normal;
+      font-weight: 600;
+    }
+
+    .lamp-search-input:focus {
+      border-color: rgba(253, 186, 116, 0.72);
+      box-shadow: 0 0 0 4px rgba(251, 146, 60, 0.16), 0 8px 24px rgba(245, 158, 11, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .lamp-search-mode {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .lamp-search-chip {
+      position: relative;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: linear-gradient(180deg, rgba(36, 28, 47, 0.96), rgba(19, 15, 27, 0.96));
+      color: rgba(255, 241, 214, 0.82);
+      border-radius: 999px;
+      padding: 11px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, color .18s ease;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    .lamp-search-chip:hover {
+      transform: translateY(-1px);
+      border-color: rgba(251, 146, 60, 0.36);
+    }
+
+    .lamp-search-chip.active {
+      color: #fff9ea;
+      border-color: rgba(251, 146, 60, 0.56);
+      background: linear-gradient(180deg, rgba(86, 42, 19, 0.98), rgba(51, 26, 12, 0.98));
+      box-shadow: 0 10px 24px rgba(245, 158, 11, 0.16), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    .lamp-search-helper {
+      margin-top: 12px;
+      min-height: 40px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      color: rgba(255, 242, 214, 0.8);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .lamp-search-helper strong {
+      color: #fde68a;
+    }
+
+    .lamp-search-status {
+      min-height: 20px;
+      margin-top: 10px;
+      color: #fbbf24;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .lamp-search-status.success {
+      color: #86efac;
+    }
+
+    .lamp-search-status.error {
+      color: #fca5a5;
+    }
+
+    .lamp-search-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .lamp-search-submit,
+    .lamp-search-cancel {
+      flex: 1;
+      min-height: 42px;
+      border-radius: 999px;
+      font-weight: 800;
+      transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+    }
+
+    .lamp-search-submit {
+      background: linear-gradient(180deg, rgba(251, 146, 60, 0.32), rgba(194, 65, 12, 0.28));
+      border-color: rgba(251, 146, 60, 0.72);
+      color: #fff6dd;
+      box-shadow: 0 12px 26px rgba(194, 65, 12, 0.22);
+    }
+
+    .lamp-search-submit:hover,
+    .lamp-search-cancel:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.04);
+    }
+
+    .lamp-search-cancel {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    @keyframes lamp-search-card-enter {
+      from {
+        opacity: 0;
+        transform: translateY(14px) scale(0.98);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes lamp-search-sheen {
+      0%, 12% {
+        transform: translateX(-70%);
+      }
+      32%, 100% {
+        transform: translateX(140%);
+      }
+    }
+
+    @keyframes lamp-search-dot {
+      0%, 100% {
+        transform: scale(0.9);
+        opacity: 0.72;
+      }
+      50% {
+        transform: scale(1.18);
+        opacity: 1;
+      }
+    }
+
     .coin-db-card {
       max-width: 1100px;
       width: 96%;

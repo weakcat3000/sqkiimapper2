@@ -2840,7 +2840,7 @@
           leafletCircleTheme = 'on-osm';
           showLeaf();
           restyleAllLeafletPolys();   // repaint existing polygons for OSM theme
-          if (lampPostSearchFeature) renderLampPostSearchHighlight(lampPostSearchFeature);
+          if (lampPostSearchFeatures.length) renderLampPostSearchHighlight(lampPostSearchFeatures);
         } else {
           // Switch back to GL styles
           leafletCircleTheme = 'on-gl';
@@ -2853,7 +2853,7 @@
 
           readdAllGroupsAfterGLStyleChange();
           if (reconOverlayPoints.length) mapgl.once('idle', () => scheduleReconOverlayRestore());
-          if (lampPostSearchFeature) mapgl.once('idle', () => renderLampPostSearchHighlight(lampPostSearchFeature));
+          if (lampPostSearchFeatures.length) mapgl.once('idle', () => renderLampPostSearchHighlight(lampPostSearchFeatures));
           showGL();
         }
 
@@ -3223,7 +3223,7 @@
           seSearchLampPost.style.cssText = 'width:100%;margin-top:4px;background:rgba(249,115,22,0.14);border-color:#fb923c;color:#fde68a;';
           seSearchLampPost.textContent = '🔎 Search';
 
-          seSearchLampPost.onclick = async () => {
+          seSearchLampPost.onclick = () => {
             let center = p._circleCenter;
             let radius = p._circleRadius;
 
@@ -3241,7 +3241,7 @@
               }
             }
 
-            await searchLampPostByNumber(center, radius);
+            openLampPostSearchModal(center, radius);
           };
 
           // Insert all buttons before the actions row
@@ -4656,14 +4656,25 @@
       const LAMP_POST_SEARCH_TEXT_LAYER_ID = 'lamp-post-search-text';
       let leafletReconLayer = null;
       let lampPostSearchLeafletLayer = null;
-      let lampPostSearchLeafletHalo = null;
+      let lampPostSearchLeafletHalos = [];
       const RECON_PASSWORD = '6482';
       const RECON_ACCESS_KEY = 'sqkii-recon-access';
       const RECON_ACCESS_MS = 4 * 60 * 60 * 1000;
       const RECON_OVERLAY_CACHE_PREFIX = 'sqkii-recon-overlay-v1';
       let reconOverlayPoints = [];
-      let lampPostSearchFeature = null;
+      let lampPostSearchFeatures = [];
       let lampPostSearchAnimationFrame = 0;
+      let currentLampPostSearchContext = null;
+      let lampPostSearchMode = 'exact';
+      const lampSearchModal = byId('lamp-search-modal');
+      const lampSearchInput = byId('lamp-search-input');
+      const lampSearchModeExact = byId('lamp-search-mode-exact');
+      const lampSearchModeSuffix = byId('lamp-search-mode-suffix');
+      const lampSearchHelper = byId('lamp-search-helper');
+      const lampSearchStatus = byId('lamp-search-status');
+      const lampSearchSubmit = byId('lamp-search-submit');
+      const lampSearchCancel = byId('lamp-search-cancel');
+      const lampSearchCloseTop = byId('lamp-search-close-top');
 
       function reconOverlayStorageKey(roomCode = currentRoomCode) {
         return `${RECON_OVERLAY_CACHE_PREFIX}:${roomCode || 'local'}`;
@@ -5002,6 +5013,8 @@
       function extractLampPostNumber(feature) {
         const props = feature?.properties || {};
         const directKeys = [
+          'lampPostNumber',
+          'lamp_post_number',
           'LAMPPOST_NUM',
           'lamppost_num',
           'lampPostNum',
@@ -5027,6 +5040,50 @@
         return '';
       }
 
+      function setLampPostSearchStatus(message = '', tone = '') {
+        if (!lampSearchStatus) return;
+        lampSearchStatus.textContent = message;
+        lampSearchStatus.classList.remove('success', 'error');
+        if (tone) lampSearchStatus.classList.add(tone);
+      }
+
+      function updateLampPostSearchHelper() {
+        if (!lampSearchHelper || !lampSearchInput) return;
+        const sample = normalizeLampPostNumber(lampSearchInput.value) || '483';
+        lampSearchHelper.innerHTML = lampPostSearchMode === 'suffix'
+          ? `Ends-with mode: lamp posts like <strong>${sample}</strong>, <strong>1${sample}</strong>, <strong>2${sample}</strong> will match if they are inside this circle.`
+          : `Exact mode: only lamp post <strong>${sample}</strong> will match inside this circle.`;
+      }
+
+      function setLampPostSearchMode(mode) {
+        lampPostSearchMode = mode === 'suffix' ? 'suffix' : 'exact';
+        lampSearchModeExact?.classList.toggle('active', lampPostSearchMode === 'exact');
+        lampSearchModeSuffix?.classList.toggle('active', lampPostSearchMode === 'suffix');
+        updateLampPostSearchHelper();
+      }
+
+      function openLampPostSearchModal(center, radiusMeters) {
+        if (!lampSearchModal) return;
+        currentLampPostSearchContext = { center, radiusMeters };
+        setLampPostSearchStatus('');
+        lampSearchModal.classList.add('visible');
+        appEl?.classList.add('blocked-by-modal');
+        updateLampPostSearchHelper();
+        requestAnimationFrame(() => {
+          lampSearchInput?.focus();
+          lampSearchInput?.select();
+        });
+      }
+
+      function closeLampPostSearchModal() {
+        if (!lampSearchModal) return;
+        lampSearchModal.classList.remove('visible');
+        appEl?.classList.remove('blocked-by-modal');
+        currentLampPostSearchContext = null;
+        if (lampSearchSubmit) lampSearchSubmit.disabled = false;
+        setLampPostSearchStatus('');
+      }
+
       function cancelLampPostSearchPulse() {
         if (lampPostSearchAnimationFrame) {
           cancelAnimationFrame(lampPostSearchAnimationFrame);
@@ -5034,7 +5091,7 @@
         }
       }
 
-      function clearLampPostSearchHighlight({ clearFeature = true } = {}) {
+      function clearLampPostSearchHighlight({ clearFeatures = true } = {}) {
         cancelLampPostSearchPulse();
 
         if (mapgl && mapgl.getStyle?.()) {
@@ -5051,17 +5108,17 @@
         if (mapleaf && lampPostSearchLeafletLayer) {
           try { mapleaf.removeLayer(lampPostSearchLeafletLayer); } catch { }
           lampPostSearchLeafletLayer = null;
-          lampPostSearchLeafletHalo = null;
+          lampPostSearchLeafletHalos = [];
         }
 
-        if (clearFeature) lampPostSearchFeature = null;
+        if (clearFeatures) lampPostSearchFeatures = [];
       }
 
       function animateLampPostSearchPulse() {
         cancelLampPostSearchPulse();
 
         const tick = (ts) => {
-          if (!lampPostSearchFeature) return;
+          if (!lampPostSearchFeatures.length) return;
 
           const phase = ts / 650;
           const pulse = (Math.sin(phase) + 1) / 2;
@@ -5075,14 +5132,16 @@
             } catch { }
           }
 
-          if (engine === 'leaf' && lampPostSearchLeafletHalo) {
-            try {
-              lampPostSearchLeafletHalo.setRadius(16 + pulse * 12);
-              lampPostSearchLeafletHalo.setStyle({
-                fillOpacity: haloOpacity,
-                opacity: 0.18 + pulse * 0.18
-              });
-            } catch { }
+          if (engine === 'leaf' && lampPostSearchLeafletHalos.length) {
+            for (const halo of lampPostSearchLeafletHalos) {
+              try {
+                halo.setRadius(16 + pulse * 12);
+                halo.setStyle({
+                  fillOpacity: haloOpacity,
+                  opacity: 0.18 + pulse * 0.18
+                });
+              } catch { }
+            }
           }
 
           lampPostSearchAnimationFrame = requestAnimationFrame(tick);
@@ -5091,24 +5150,31 @@
         lampPostSearchAnimationFrame = requestAnimationFrame(tick);
       }
 
-      function renderLampPostSearchHighlight(feature) {
-        if (!feature?.geometry?.coordinates || feature.geometry.type !== 'Point') return;
+      function renderLampPostSearchHighlight(features) {
+        const inputFeatures = Array.isArray(features) ? features : [features];
+        const normalized = [];
 
-        lampPostSearchFeature = {
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            coordinates: [Number(feature.geometry.coordinates[0]), Number(feature.geometry.coordinates[1])]
-          },
-          properties: {
-            lampPostNumber: extractLampPostNumber(feature) || ''
-          }
-        };
+        for (const feature of inputFeatures) {
+          if (!feature?.geometry?.coordinates || feature.geometry.type !== 'Point') continue;
+          const lng = Number(feature.__lng ?? feature.geometry.coordinates[0]);
+          const lat = Number(feature.__lat ?? feature.geometry.coordinates[1]);
+          if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+          normalized.push({
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [lng, lat] },
+            properties: {
+              lampPostNumber: extractLampPostNumber(feature) || '',
+              showLabel: inputFeatures.length <= 24 ? 1 : 0
+            }
+          });
+        }
 
-        clearLampPostSearchHighlight({ clearFeature: false });
+        if (!normalized.length) return;
 
-        const fc = { type: 'FeatureCollection', features: [lampPostSearchFeature] };
-        const [lng, lat] = lampPostSearchFeature.geometry.coordinates;
+        lampPostSearchFeatures = normalized;
+        clearLampPostSearchHighlight({ clearFeatures: false });
+
+        const fc = { type: 'FeatureCollection', features: lampPostSearchFeatures };
 
         if (engine === 'gl' && mapgl?.addSource && mapgl.getStyle?.()) {
           try {
@@ -5141,6 +5207,7 @@
               id: LAMP_POST_SEARCH_TEXT_LAYER_ID,
               type: 'symbol',
               source: LAMP_POST_SEARCH_SOURCE_ID,
+              filter: ['==', ['get', 'showLabel'], 1],
               layout: {
                 'text-field': ['get', 'lampPostNumber'],
                 'text-size': 12,
@@ -5161,31 +5228,41 @@
 
         if (engine === 'leaf' && mapleaf && typeof L !== 'undefined' && L) {
           try {
-            lampPostSearchLeafletHalo = L.circleMarker([lat, lng], {
-              radius: 22,
-              color: '#f59e0b',
-              weight: 1.5,
-              opacity: 0.24,
-              fillColor: '#f59e0b',
-              fillOpacity: 0.16
-            });
+            const leafletLayers = [];
+            lampPostSearchLeafletHalos = [];
 
-            const core = L.circleMarker([lat, lng], {
-              radius: 6,
-              color: '#fb923c',
-              weight: 2,
-              fillColor: '#fcd34d',
-              fillOpacity: 0.95
-            });
+            for (const feature of lampPostSearchFeatures) {
+              const [lng, lat] = feature.geometry.coordinates;
+              const halo = L.circleMarker([lat, lng], {
+                radius: 22,
+                color: '#f59e0b',
+                weight: 1.5,
+                opacity: 0.24,
+                fillColor: '#f59e0b',
+                fillOpacity: 0.16
+              });
+              lampPostSearchLeafletHalos.push(halo);
+              leafletLayers.push(halo);
 
-            const label = L.marker([lat, lng], {
-              icon: L.divIcon({
-                className: 'lamp-post-search-label',
-                html: `<div style="transform:translate(-50%, 12px);color:#fde68a;font-weight:800;text-shadow:0 0 8px rgba(0,0,0,0.9);white-space:nowrap;">${lampPostSearchFeature.properties.lampPostNumber}</div>`
-              })
-            });
+              leafletLayers.push(L.circleMarker([lat, lng], {
+                radius: 6,
+                color: '#fb923c',
+                weight: 2,
+                fillColor: '#fcd34d',
+                fillOpacity: 0.95
+              }));
 
-            lampPostSearchLeafletLayer = L.layerGroup([lampPostSearchLeafletHalo, core, label]).addTo(mapleaf);
+              if (feature.properties.showLabel) {
+                leafletLayers.push(L.marker([lat, lng], {
+                  icon: L.divIcon({
+                    className: 'lamp-post-search-label',
+                    html: `<div style="transform:translate(-50%, 12px);color:#fde68a;font-weight:800;text-shadow:0 0 8px rgba(0,0,0,0.9);white-space:nowrap;">${feature.properties.lampPostNumber}</div>`
+                  })
+                }));
+              }
+            }
+
+            lampPostSearchLeafletLayer = L.layerGroup(leafletLayers).addTo(mapleaf);
           } catch (error) {
             console.error('[Lamp Search] Failed to render on Leaflet:', error);
           }
@@ -5194,19 +5271,9 @@
         animateLampPostSearchPulse();
       }
 
-      async function searchLampPostByNumber(center, radiusMeters) {
-        const enteredNumber = prompt('Search lamp post number:', lampPostSearchFeature?.properties?.lampPostNumber || '');
-        if (enteredNumber == null) return;
-
-        const query = normalizeLampPostNumber(enteredNumber);
-        if (!query) {
-          alert('Please enter a lamp post number.');
-          return;
-        }
-
+      async function searchLampPostByNumber(center, radiusMeters, query, mode = 'exact') {
         if (!Array.isArray(center) || center.length < 2 || !Number.isFinite(Number(radiusMeters)) || Number(radiusMeters) <= 0) {
-          alert('Could not determine the selected circle.');
-          return;
+          throw new Error('Could not determine the selected circle.');
         }
 
         let lampData;
@@ -5214,40 +5281,129 @@
           lampData = prepDataset(await getExactAnalysisCached(DATASET_IDS.LAMP_POST, 'Lamp Post'));
         } catch (error) {
           console.error('[Lamp Search] Failed to load lamp post data:', error);
-          alert('Could not load the lamp post dataset.');
-          return;
+          throw new Error('Could not load the lamp post dataset.');
         }
 
-        let match = null;
+        const matches = [];
         for (const feature of lampData?.features || []) {
           if (feature?.geometry?.type !== 'Point') continue;
           const lng = Number(feature.__lng ?? feature.geometry?.coordinates?.[0]);
           const lat = Number(feature.__lat ?? feature.geometry?.coordinates?.[1]);
           if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
           if (turf.distance(center, [lng, lat], { units: 'meters' }) > radiusMeters) continue;
-          if (extractLampPostNumber(feature) !== query) continue;
-          match = feature;
-          break;
+          const lampNumber = extractLampPostNumber(feature);
+          if (!lampNumber) continue;
+          const matched = mode === 'suffix' ? lampNumber.endsWith(query) : lampNumber === query;
+          if (!matched) continue;
+          matches.push(feature);
         }
 
-        if (!match) {
-          alert(`Lamp post ${query} was not found inside this circle.`);
-          return;
-        }
+        return matches;
+      }
 
-        renderLampPostSearchHighlight(match);
+      function focusLampPostSearchResults(features) {
+        const normalized = (features || [])
+          .map((feature) => {
+            const coords = feature?.geometry?.coordinates;
+            if (!Array.isArray(coords) || coords.length < 2) return null;
+            const lng = Number(coords[0]);
+            const lat = Number(coords[1]);
+            return Number.isFinite(lng) && Number.isFinite(lat) ? [lng, lat] : null;
+          })
+          .filter(Boolean);
 
-        const lng = Number(match.__lng ?? match.geometry?.coordinates?.[0]);
-        const lat = Number(match.__lat ?? match.geometry?.coordinates?.[1]);
-        if (Number.isFinite(lng) && Number.isFinite(lat)) {
+        if (!normalized.length) return;
+
+        if (normalized.length === 1) {
+          const [lng, lat] = normalized[0];
           if (engine === 'gl' && mapgl?.flyTo) {
             mapgl.flyTo({ center: [lng, lat], zoom: Math.max(mapgl.getZoom?.() || 17, 18), speed: 1.1, essential: true });
           } else if (engine === 'leaf' && mapleaf?.flyTo) {
             mapleaf.flyTo([lat, lng], Math.max(mapleaf.getZoom?.() || 17, 18), { duration: 0.9 });
           }
+          return;
+        }
 
+        const bounds = normalized.reduce((acc, [lng, lat]) => {
+          if (!acc) return [lng, lat, lng, lat];
+          acc[0] = Math.min(acc[0], lng);
+          acc[1] = Math.min(acc[1], lat);
+          acc[2] = Math.max(acc[2], lng);
+          acc[3] = Math.max(acc[3], lat);
+          return acc;
+        }, null);
+
+        if (!bounds) return;
+
+        if (engine === 'gl' && mapgl?.fitBounds) {
+          mapgl.fitBounds([[bounds[0], bounds[1]], [bounds[2], bounds[3]]], { padding: 72, duration: 850 });
+        } else if (engine === 'leaf' && mapleaf?.fitBounds) {
+          mapleaf.fitBounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]], { padding: [72, 72] });
         }
       }
+
+      async function submitLampPostSearch() {
+        const query = normalizeLampPostNumber(lampSearchInput?.value || '');
+        if (!query) {
+          setLampPostSearchStatus('Enter a lamp post number to search.', 'error');
+          lampSearchInput?.focus();
+          return;
+        }
+
+        const center = currentLampPostSearchContext?.center;
+        const radiusMeters = currentLampPostSearchContext?.radiusMeters;
+
+        setLampPostSearchStatus('Searching lamp posts inside this circle...');
+        clearLampPostSearchHighlight();
+        if (lampSearchSubmit) lampSearchSubmit.disabled = true;
+
+        try {
+          const matches = await searchLampPostByNumber(center, radiusMeters, query, lampPostSearchMode);
+          if (!matches.length) {
+            setLampPostSearchStatus(
+              lampPostSearchMode === 'suffix'
+                ? `No lamp posts ending with ${query} were found inside this circle.`
+                : `Lamp post ${query} was not found inside this circle.`,
+              'error'
+            );
+            return;
+          }
+
+          renderLampPostSearchHighlight(matches);
+          focusLampPostSearchResults(matches);
+          setLampPostSearchStatus(
+            lampPostSearchMode === 'suffix'
+              ? `Highlighted ${matches.length} lamp post${matches.length === 1 ? '' : 's'} ending with ${query}.`
+              : `Highlighted lamp post ${query}.`,
+            'success'
+          );
+          setTimeout(() => closeLampPostSearchModal(), 160);
+        } catch (error) {
+          setLampPostSearchStatus(error?.message || 'Search failed.', 'error');
+        } finally {
+          if (lampSearchSubmit) lampSearchSubmit.disabled = false;
+        }
+      }
+
+      lampSearchModeExact?.addEventListener('click', () => setLampPostSearchMode('exact'));
+      lampSearchModeSuffix?.addEventListener('click', () => setLampPostSearchMode('suffix'));
+      lampSearchSubmit?.addEventListener('click', submitLampPostSearch);
+      lampSearchCancel?.addEventListener('click', closeLampPostSearchModal);
+      lampSearchCloseTop?.addEventListener('click', closeLampPostSearchModal);
+      lampSearchInput?.addEventListener('input', () => {
+        setLampPostSearchStatus('');
+        updateLampPostSearchHelper();
+      });
+      lampSearchInput?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          submitLampPostSearch();
+        }
+      });
+      lampSearchModal?.addEventListener('click', (event) => {
+        if (event.target === lampSearchModal) closeLampPostSearchModal();
+      });
+      setLampPostSearchMode('exact');
 
       function getRequiredReconDatasets(constraints) {
         const required = new Set();

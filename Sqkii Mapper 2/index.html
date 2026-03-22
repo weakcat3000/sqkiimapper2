@@ -376,6 +376,36 @@
 
 
 
+    <div id="lamp-search-modal" class="modal">
+      <div class="modal-card lamp-search-card">
+        <button id="lamp-search-close-top" class="style-editor-x lamp-search-close-top" aria-label="Close lamp post search">×</button>
+        <div class="lamp-search-kicker">Lamp Post Search</div>
+        <h3>Search Within Circle</h3>
+        <div class="lamp-search-subtitle">Find one exact lamp post number, or highlight every lamp post whose number ends with the digits you enter.</div>
+
+        <div class="lamp-search-input-wrap">
+          <label for="lamp-search-input">Lamp post number</label>
+          <input id="lamp-search-input" class="lamp-search-input" type="text" inputmode="text" placeholder="e.g. 483 or 6" autocomplete="off">
+        </div>
+
+        <div class="lamp-search-mode-label">Search mode</div>
+        <div class="lamp-search-mode" role="tablist" aria-label="Lamp post search mode">
+          <button id="lamp-search-mode-exact" class="lamp-search-chip active" type="button">Full Number</button>
+          <button id="lamp-search-mode-suffix" class="lamp-search-chip" type="button">Ends With</button>
+        </div>
+
+        <div id="lamp-search-helper" class="lamp-search-helper">Exact mode: only lamp post <strong>483</strong> will match.</div>
+        <div id="lamp-search-status" class="lamp-search-status" aria-live="polite"></div>
+
+        <div class="lamp-search-actions">
+          <button id="lamp-search-submit" class="btn small lamp-search-submit">Search</button>
+          <button id="lamp-search-cancel" class="btn small lamp-search-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+
+
 
     <!-- ===== Geohashes Editor (no upload; edits existing layer) ===== -->
     <div id="geohash-modal" class="modal">
