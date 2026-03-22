@@ -4731,7 +4731,7 @@
       function reconHaloRadiusMeters(phase = 0.5) {
         const spacing = Math.max(8, Number(reconOverlaySpacingMeters) || 20);
         const dotRadiusMeters = 7;
-        const minRadius = Math.max(dotRadiusMeters + 2.5, spacing * 0.46);
+        const minRadius = Math.max(dotRadiusMeters + 5.5, spacing * 0.46);
         const maxRadius = Math.max(minRadius + 4.5, dotRadiusMeters + spacing * 0.9);
         return minRadius + (maxRadius - minRadius) * phase;
       }
@@ -4758,7 +4758,7 @@
           const haloOpacity = 0.05 + phase * 0.07;
           const fallbackLat = reconOverlayPoints[0]?.[1];
           const dotRadiusPx = reconMetersToPixels(7, fallbackLat);
-          const haloRadiusPx = Math.max(dotRadiusPx + 3, reconMetersToPixels(reconHaloRadiusMeters(phase), fallbackLat));
+          const haloRadiusPx = Math.max(dotRadiusPx + 6, reconMetersToPixels(reconHaloRadiusMeters(phase), fallbackLat));
           const haloStrokePx = 3.2 + phase * 3.2;
 
           if (engine === 'gl' && mapgl?.getLayer?.(RECON_OVERLAY_HALO_LAYER)) {
@@ -5911,7 +5911,7 @@
           }))
         };
         const initialDotRadiusPx = reconMetersToPixels(7, reconOverlayPoints[0]?.[1]);
-        const initialHaloRadiusPx = Math.max(initialDotRadiusPx + 3, reconMetersToPixels(reconHaloRadiusMeters(0.5), reconOverlayPoints[0]?.[1]));
+        const initialHaloRadiusPx = Math.max(initialDotRadiusPx + 6, reconMetersToPixels(reconHaloRadiusMeters(0.5), reconOverlayPoints[0]?.[1]));
         const initialHaloStrokePx = 4;
 
         // ------------ MapLibre GL ------------
