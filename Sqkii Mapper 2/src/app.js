@@ -4747,6 +4747,15 @@
         return Math.max(1, meters / Math.max(0.000001, metersPerPixel));
       }
 
+      function reconHaloZoomAttenuation() {
+        const zoom = engine === 'gl'
+          ? (mapgl?.getZoom?.() || 17)
+          : (mapleaf?.getZoom?.() || 17);
+        if (zoom <= 14.6) return 0;
+        if (zoom >= 16.4) return 1;
+        return (zoom - 14.6) / (16.4 - 14.6);
+      }
+
       function startReconHaloPulse() {
         stopReconHaloPulse();
         if (!reconOverlayPoints.length) return;
@@ -4755,11 +4764,16 @@
           if (!reconOverlayPoints.length) return;
 
           const phase = (Math.sin(ts / 648) + 1) / 2;
-          const haloOpacity = 0.084 + phase * 0.1045;
+          const zoomAttenuation = reconHaloZoomAttenuation();
+          const haloOpacity = (0.084 + phase * 0.1045) * zoomAttenuation;
           const fallbackLat = reconOverlayPoints[0]?.[1];
           const dotRadiusPx = reconMetersToPixels(7, fallbackLat);
-          const haloRadiusPx = Math.max(dotRadiusPx + 11, reconMetersToPixels(reconHaloRadiusMeters(phase), fallbackLat));
-          const haloStrokePx = 4.4 + phase * 4.18;
+          const haloRadiusPx = Math.max(
+            dotRadiusPx + 11,
+            dotRadiusPx + 11 * zoomAttenuation,
+            reconMetersToPixels(reconHaloRadiusMeters(phase), fallbackLat)
+          );
+          const haloStrokePx = (4.4 + phase * 4.18) * Math.max(0.25, zoomAttenuation);
 
           if (engine === 'gl' && mapgl?.getLayer?.(RECON_OVERLAY_HALO_LAYER)) {
             try {
@@ -5911,8 +5925,13 @@
           }))
         };
         const initialDotRadiusPx = reconMetersToPixels(7, reconOverlayPoints[0]?.[1]);
-        const initialHaloRadiusPx = Math.max(initialDotRadiusPx + 11, reconMetersToPixels(reconHaloRadiusMeters(0.5), reconOverlayPoints[0]?.[1]));
-        const initialHaloStrokePx = 5.28;
+        const initialZoomAttenuation = reconHaloZoomAttenuation();
+        const initialHaloRadiusPx = Math.max(
+          initialDotRadiusPx + 11,
+          initialDotRadiusPx + 11 * initialZoomAttenuation,
+          reconMetersToPixels(reconHaloRadiusMeters(0.5), reconOverlayPoints[0]?.[1])
+        );
+        const initialHaloStrokePx = 5.28 * Math.max(0.25, initialZoomAttenuation);
 
         // ------------ MapLibre GL ------------
         if (typeof mapgl !== 'undefined' && mapgl && mapgl.addSource && mapgl.getStyle?.()) {
@@ -5938,7 +5957,7 @@
                   'circle-color': '#22c55e',
                   'circle-opacity': 0,
                   'circle-stroke-color': '#22c55e',
-                  'circle-stroke-opacity': 0.1254,
+                  'circle-stroke-opacity': 0.1254 * initialZoomAttenuation,
                   'circle-stroke-width': initialHaloStrokePx,
                   'circle-blur': 0.42
                 }

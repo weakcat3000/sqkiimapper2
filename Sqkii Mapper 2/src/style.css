@@ -1323,7 +1323,7 @@
       align-items: center;
       justify-content: center;
       position: fixed;
-      top: calc(50% - var(--stitch-loader-lift, clamp(112px, 17vh, 144px)));
+      top: calc(50% - var(--stitch-loader-lift, clamp(228px, 31vh, 292px)));
       left: 50%;
       transform: translate(-50%, -50%);
       z-index: 10001;
@@ -1347,7 +1347,7 @@
       font-weight: bold;
       color: white !important;
       /* Reaffirm white color for the text */
-      margin-top: 10px;
+      margin-top: 4px;
       /* Adds spacing between the loading bar and text */
       font-family: 'Arial', sans-serif;
       /* Or your preferred font */
