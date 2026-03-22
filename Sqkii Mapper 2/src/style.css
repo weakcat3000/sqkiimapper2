@@ -2002,7 +2002,7 @@
     /* Loading Progress Bar */
     .stitch-loading-container {
       position: fixed;
-      top: calc(50% - var(--stitch-loader-lift, clamp(158px, 23vh, 208px)));
+      top: calc(50% - var(--stitch-loader-lift, clamp(182px, 25vh, 232px)));
       left: 50%;
       transform: translate(-50%, -50%);
       z-index: 10001;

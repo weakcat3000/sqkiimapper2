@@ -4731,7 +4731,7 @@
       function reconHaloRadiusMeters(phase = 0.5) {
         const spacing = Math.max(8, Number(reconOverlaySpacingMeters) || 20);
         const dotRadiusMeters = 7;
-        const minRadius = Math.max(dotRadiusMeters + 5.5, spacing * 0.46);
+        const minRadius = Math.max(dotRadiusMeters + 10.5, spacing * 0.46);
         const maxRadius = Math.max(minRadius + 4.5, dotRadiusMeters + spacing * 0.9);
         return minRadius + (maxRadius - minRadius) * phase;
       }
@@ -4754,12 +4754,12 @@
         const tick = (ts) => {
           if (!reconOverlayPoints.length) return;
 
-          const phase = (Math.sin(ts / 720) + 1) / 2;
-          const haloOpacity = 0.05 + phase * 0.07;
+          const phase = (Math.sin(ts / 648) + 1) / 2;
+          const haloOpacity = 0.088 + phase * 0.11;
           const fallbackLat = reconOverlayPoints[0]?.[1];
           const dotRadiusPx = reconMetersToPixels(7, fallbackLat);
-          const haloRadiusPx = Math.max(dotRadiusPx + 6, reconMetersToPixels(reconHaloRadiusMeters(phase), fallbackLat));
-          const haloStrokePx = 3.2 + phase * 3.2;
+          const haloRadiusPx = Math.max(dotRadiusPx + 11, reconMetersToPixels(reconHaloRadiusMeters(phase), fallbackLat));
+          const haloStrokePx = 4.4 + phase * 4.18;
 
           if (engine === 'gl' && mapgl?.getLayer?.(RECON_OVERLAY_HALO_LAYER)) {
             try {
@@ -5911,8 +5911,8 @@
           }))
         };
         const initialDotRadiusPx = reconMetersToPixels(7, reconOverlayPoints[0]?.[1]);
-        const initialHaloRadiusPx = Math.max(initialDotRadiusPx + 6, reconMetersToPixels(reconHaloRadiusMeters(0.5), reconOverlayPoints[0]?.[1]));
-        const initialHaloStrokePx = 4;
+        const initialHaloRadiusPx = Math.max(initialDotRadiusPx + 11, reconMetersToPixels(reconHaloRadiusMeters(0.5), reconOverlayPoints[0]?.[1]));
+        const initialHaloStrokePx = 5.28;
 
         // ------------ MapLibre GL ------------
         if (typeof mapgl !== 'undefined' && mapgl && mapgl.addSource && mapgl.getStyle?.()) {
@@ -5938,7 +5938,7 @@
                   'circle-color': '#22c55e',
                   'circle-opacity': 0,
                   'circle-stroke-color': '#22c55e',
-                  'circle-stroke-opacity': 0.09,
+                  'circle-stroke-opacity': 0.132,
                   'circle-stroke-width': initialHaloStrokePx,
                   'circle-blur': 0.42
                 }
