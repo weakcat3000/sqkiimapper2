@@ -4755,7 +4755,7 @@
           if (!reconOverlayPoints.length) return;
 
           const phase = (Math.sin(ts / 648) + 1) / 2;
-          const haloOpacity = 0.088 + phase * 0.11;
+          const haloOpacity = 0.084 + phase * 0.1045;
           const fallbackLat = reconOverlayPoints[0]?.[1];
           const dotRadiusPx = reconMetersToPixels(7, fallbackLat);
           const haloRadiusPx = Math.max(dotRadiusPx + 11, reconMetersToPixels(reconHaloRadiusMeters(phase), fallbackLat));
@@ -5938,7 +5938,7 @@
                   'circle-color': '#22c55e',
                   'circle-opacity': 0,
                   'circle-stroke-color': '#22c55e',
-                  'circle-stroke-opacity': 0.132,
+                  'circle-stroke-opacity': 0.1254,
                   'circle-stroke-width': initialHaloStrokePx,
                   'circle-blur': 0.42
                 }
