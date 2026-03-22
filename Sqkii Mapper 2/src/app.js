@@ -4856,6 +4856,11 @@
         }
       }
 
+      // Recon rows use inline onchange/onclick handlers in generated HTML, so these
+      // functions must be reachable on window in the bundled app.
+      window.removeReconConstraint = removeReconConstraint;
+      window.updateReconConstraint = updateReconConstraint;
+
       function renderReconConstraints() {
         const container = document.getElementById('recon-constraints');
         container.innerHTML = '';
