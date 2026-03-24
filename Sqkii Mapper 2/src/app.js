@@ -7157,7 +7157,7 @@
           source: 'coin-preview-circles',
           paint: {
             'fill-color': '#f59e0b',
-            'fill-opacity': 0.08
+            'fill-opacity': 0
           }
         });
         map.addLayer({
@@ -7165,9 +7165,9 @@
           type: 'line',
           source: 'coin-preview-circles',
           paint: {
-            'line-color': '#fde68a',
+            'line-color': '#f59e0b',
             'line-width': 2,
-            'line-opacity': 0.75
+            'line-opacity': 0.9
           }
         });
         map.addLayer({
