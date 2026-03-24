@@ -6633,6 +6633,21 @@
                   ${exactSpot ? `<span class="coin-db-chip">Exact: ${escapeHtml(exactSpot)}</span>` : ''}
                 </div>
 
+                <div class="coin-db-note-form">
+                  <input type="number" step="any" class="coin-db-exact-lat" data-entry-id="${escapeHtml(entry.id)}" placeholder="Exact latitude" value="${entry.exact_lat ?? ''}">
+                  <input type="number" step="any" class="coin-db-exact-lng" data-entry-id="${escapeHtml(entry.id)}" placeholder="Exact longitude" value="${entry.exact_lng ?? ''}">
+                  <textarea class="coin-db-exact-note" data-entry-id="${escapeHtml(entry.id)}" placeholder="Notes about the revealed exact spot">${escapeHtml(entry.exact_note || '')}</textarea>
+                  <div class="coin-db-note-footer">
+                    <div class="coin-db-inline-status" id="coin-db-inline-status-${escapeHtml(entry.id)}"></div>
+                    <div class="coin-db-footer-btns">
+                      <button class="btn small coin-db-delete-entry danger" data-entry-id="${escapeHtml(entry.id)}" title="Delete this archived coin">Delete</button>
+                      <button class="btn small coin-db-preview-entry" data-entry-id="${escapeHtml(entry.id)}">Preview</button>
+                      <button class="btn small coin-db-load-snapshot" data-entry-id="${escapeHtml(entry.id)}">Load Snapshot</button>
+                      <button class="btn small coin-db-save-note" data-entry-id="${escapeHtml(entry.id)}">Save Exact Spot</button>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="coin-db-steps">
                   ${steps.length === 0 ? '<div class="coin-db-empty" style="padding:10px">No shrink steps recorded yet.</div>' : ''}
                   ${steps.map((step) => `
@@ -6655,21 +6670,6 @@
                       </div>
                     </div>
                   `).join('')}
-                </div>
-
-                <div class="coin-db-note-form">
-                  <input type="number" step="any" class="coin-db-exact-lat" data-entry-id="${escapeHtml(entry.id)}" placeholder="Exact latitude" value="${entry.exact_lat ?? ''}">
-                  <input type="number" step="any" class="coin-db-exact-lng" data-entry-id="${escapeHtml(entry.id)}" placeholder="Exact longitude" value="${entry.exact_lng ?? ''}">
-                  <textarea class="coin-db-exact-note" data-entry-id="${escapeHtml(entry.id)}" placeholder="Notes about the revealed exact spot">${escapeHtml(entry.exact_note || '')}</textarea>
-                  <div class="coin-db-note-footer">
-                    <div class="coin-db-inline-status" id="coin-db-inline-status-${escapeHtml(entry.id)}"></div>
-                    <div class="coin-db-footer-btns">
-                      <button class="btn small coin-db-delete-entry danger" data-entry-id="${escapeHtml(entry.id)}" title="Delete this archived coin">Delete</button>
-                      <button class="btn small coin-db-preview-entry" data-entry-id="${escapeHtml(entry.id)}">Preview</button>
-                      <button class="btn small coin-db-load-snapshot" data-entry-id="${escapeHtml(entry.id)}">Load Snapshot</button>
-                      <button class="btn small coin-db-save-note" data-entry-id="${escapeHtml(entry.id)}">Save Exact Spot</button>
-                    </div>
-                  </div>
                 </div>
               </div>
             </details>
@@ -6950,6 +6950,18 @@
           shrinkCount: steps.length,
           firstCenter: [steps[0].lng, steps[0].lat],
           firstStep: steps[0].stepNumber,
+          screenshotBounds: (() => {
+            const origin = turf.point([steps[0].lng, steps[0].lat]);
+            const maxDistanceMeters = Math.max(...steps.map((step) => {
+              const centerDistanceMeters = turf.distance(origin, turf.point([step.lng, step.lat]), { units: 'kilometers' }) * 1000;
+              return centerDistanceMeters + step.radiusMeters;
+            }));
+            const north = turf.destination(origin, maxDistanceMeters / 1000, 0, { units: 'kilometers' }).geometry.coordinates;
+            const east = turf.destination(origin, maxDistanceMeters / 1000, 90, { units: 'kilometers' }).geometry.coordinates;
+            const south = turf.destination(origin, maxDistanceMeters / 1000, 180, { units: 'kilometers' }).geometry.coordinates;
+            const west = turf.destination(origin, maxDistanceMeters / 1000, 270, { units: 'kilometers' }).geometry.coordinates;
+            return [west[0], south[1], east[0], north[1]];
+          })(),
           exactSpot: exactFeature ? `${coinDbFormatCoord(exactLat)}, ${coinDbFormatCoord(exactLng)}` : '',
           note: String(entry?.exact_note || ''),
           createdAt: coinDbFormatDate(entry?.created_at),
@@ -7146,7 +7158,8 @@
         bearing: 0,
         hash: false,
         geolocate: false,
-        navigationControl: true
+        navigationControl: true,
+        preserveDrawingBuffer: true
       });
 
       function downloadMapScreenshot() {
@@ -7161,13 +7174,20 @@
         };
 
         const targetCenter = Array.isArray(payload.firstCenter) ? payload.firstCenter : null;
-        if (!targetCenter) {
+        const screenshotBounds = Array.isArray(payload.screenshotBounds) && payload.screenshotBounds.length === 4 ? payload.screenshotBounds : null;
+        if (!targetCenter || !screenshotBounds) {
           triggerDownload();
           return;
         }
 
-        map.easeTo({ center: targetCenter, duration: 450, essential: true });
-        map.once('idle', () => requestAnimationFrame(triggerDownload));
+        map.fitBounds([[screenshotBounds[0], screenshotBounds[1]], [screenshotBounds[2], screenshotBounds[3]]], {
+          padding: { top: 64, right: 64, bottom: 64, left: 64 },
+          duration: 500
+        });
+        map.once('idle', () => {
+          map.easeTo({ center: targetCenter, duration: 0, essential: true });
+          map.once('idle', () => setTimeout(triggerDownload, 120));
+        });
       }
 
       function addStepMarkers() {
