@@ -1929,6 +1929,13 @@
     }
 
     @media (max-width: 820px) {
+      .ui-reopen {
+        top: 71.6px;
+        padding: 5.1px 8.5px;
+        font-size: 12px;
+        border-radius: 8.5px;
+      }
+
       .btn {
         padding: 5px 8.5px;
         font-size: 12px;
