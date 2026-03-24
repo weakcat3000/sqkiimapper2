@@ -4547,7 +4547,12 @@
       const COMPASS_OVERLAY_SPREAD_DEG = 42;
       let compassEnabled = false;
       let compassPending = false;
-      let compassSupported = typeof window !== 'undefined' && ('DeviceOrientationEvent' in window || 'ondeviceorientation' in window);
+      let compassSupported = typeof window !== 'undefined' && (
+        'DeviceOrientationEvent' in window ||
+        'ondeviceorientation' in window ||
+        'DeviceMotionEvent' in window ||
+        'ondevicemotion' in window
+      );
       let compassHeadingDeg = null;
       let compassPermissionDenied = false;
       let compassListenersAttached = false;
@@ -4945,13 +4950,23 @@
           return;
         }
 
+        compassPermissionDenied = false;
         compassPending = true;
         updateCompassButtonState();
 
         try {
+          const requestedPermissions = [];
           if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-            const permission = await DeviceOrientationEvent.requestPermission();
-            if (permission !== 'granted') {
+            requestedPermissions.push(DeviceOrientationEvent.requestPermission());
+          }
+          if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+            requestedPermissions.push(DeviceMotionEvent.requestPermission());
+          }
+
+          if (requestedPermissions.length) {
+            const responses = await Promise.allSettled(requestedPermissions);
+            const denied = responses.some((result) => result.status !== 'fulfilled' || result.value !== 'granted');
+            if (denied) {
               compassPermissionDenied = true;
               compassPending = false;
               updateCompassButtonState();
