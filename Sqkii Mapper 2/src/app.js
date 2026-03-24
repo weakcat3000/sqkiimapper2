@@ -6960,6 +6960,8 @@
           shrinkCount: steps.length,
           firstCenter: [steps[0].lng, steps[0].lat],
           firstStep: steps[0].stepNumber,
+          lastCenter: [steps[steps.length - 1].lng, steps[steps.length - 1].lat],
+          lastStep: steps[steps.length - 1].stepNumber,
           screenshotBounds: (() => {
             const origin = turf.point([steps[0].lng, steps[0].lat]);
             const maxDistanceMeters = Math.max(...steps.map((step) => {
@@ -6979,6 +6981,16 @@
           styleUrl: CUSTOM_STYLE,
           circles: { type: 'FeatureCollection', features: circleFeatures },
           centers: { type: 'FeatureCollection', features: centerFeatures },
+          firstHighlight: {
+            type: 'Feature',
+            properties: { step: steps[0].stepNumber },
+            geometry: { type: 'Point', coordinates: [steps[0].lng, steps[0].lat] }
+          },
+          lastHighlight: {
+            type: 'Feature',
+            properties: { step: steps[steps.length - 1].stepNumber },
+            geometry: { type: 'Point', coordinates: [steps[steps.length - 1].lng, steps[steps.length - 1].lat] }
+          },
           path: pathFeature,
           exact: exactFeature,
           bounds: turf.bbox({ type: 'FeatureCollection', features: bboxFeatures })
@@ -7266,6 +7278,45 @@
         }
       }
 
+      let pulseFrame = 0;
+      function stopPulseAnimation() {
+        if (pulseFrame) {
+          cancelAnimationFrame(pulseFrame);
+          pulseFrame = 0;
+        }
+      }
+
+      function startPulseAnimation() {
+        stopPulseAnimation();
+        const tick = (ts) => {
+          const phase = (Math.sin(ts / 520) + 1) / 2;
+          const firstRadius = 14 + phase * 10;
+          const lastRadius = 12 + phase * 8;
+          const exactRadius = 14 + phase * 9;
+          const firstOpacity = 0.18 + phase * 0.16;
+          const lastOpacity = 0.14 + phase * 0.14;
+          const exactOpacity = 0.16 + phase * 0.16;
+
+          try {
+            if (map.getLayer('coin-preview-first-halo')) {
+              map.setPaintProperty('coin-preview-first-halo', 'circle-radius', firstRadius);
+              map.setPaintProperty('coin-preview-first-halo', 'circle-opacity', firstOpacity);
+            }
+            if (map.getLayer('coin-preview-last-halo')) {
+              map.setPaintProperty('coin-preview-last-halo', 'circle-radius', lastRadius);
+              map.setPaintProperty('coin-preview-last-halo', 'circle-opacity', lastOpacity);
+            }
+            if (map.getLayer('coin-preview-exact-halo')) {
+              map.setPaintProperty('coin-preview-exact-halo', 'circle-radius', exactRadius);
+              map.setPaintProperty('coin-preview-exact-halo', 'circle-opacity', exactOpacity);
+            }
+          } catch { }
+
+          pulseFrame = requestAnimationFrame(tick);
+        };
+        pulseFrame = requestAnimationFrame(tick);
+      }
+
       map.on('load', () => {
         const downloadBtn = document.getElementById('preview-download');
         if (downloadBtn) {
@@ -7273,6 +7324,8 @@
         }
         map.addSource('coin-preview-circles', { type: 'geojson', data: payload.circles });
         map.addSource('coin-preview-centers', { type: 'geojson', data: payload.centers });
+        map.addSource('coin-preview-first', { type: 'geojson', data: payload.firstHighlight });
+        map.addSource('coin-preview-last', { type: 'geojson', data: payload.lastHighlight });
         if (payload.path) {
           map.addSource('coin-preview-path', { type: 'geojson', data: payload.path });
           map.addLayer({
@@ -7306,6 +7359,28 @@
           }
         });
         map.addLayer({
+          id: 'coin-preview-first-halo',
+          type: 'circle',
+          source: 'coin-preview-first',
+          paint: {
+            'circle-radius': 16,
+            'circle-color': '#f59e0b',
+            'circle-opacity': 0.22,
+            'circle-blur': 0.65
+          }
+        });
+        map.addLayer({
+          id: 'coin-preview-last-halo',
+          type: 'circle',
+          source: 'coin-preview-last',
+          paint: {
+            'circle-radius': 14,
+            'circle-color': '#fb923c',
+            'circle-opacity': 0.18,
+            'circle-blur': 0.62
+          }
+        });
+        map.addLayer({
           id: 'coin-preview-centers-core',
           type: 'circle',
           source: 'coin-preview-centers',
@@ -7325,11 +7400,13 @@
             paint: {
               'circle-radius': 16,
               'circle-color': '#22c55e',
-              'circle-opacity': 0.16
+              'circle-opacity': 0.18,
+              'circle-blur': 0.7
             }
           });
         }
         addStepMarkers();
+        startPulseAnimation();
         if (Array.isArray(payload.bounds) && payload.bounds.length === 4) {
           map.fitBounds([[payload.bounds[0], payload.bounds[1]], [payload.bounds[2], payload.bounds[3]]], {
             padding: { top: 110, right: 70, bottom: 70, left: 430 },
@@ -7337,6 +7414,7 @@
           });
         }
       });
+      window.addEventListener('beforeunload', stopPulseAnimation);
     })();
   </script>
 </body>
