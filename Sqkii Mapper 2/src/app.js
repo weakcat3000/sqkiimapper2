@@ -1617,8 +1617,24 @@
       mapleaf.on('click', (e) => { if (!e.originalEvent.defaultPrevented) closeActivePopup(); });
 
       let engine = 'gl';
-      function showGL() { const c = mapleaf.getCenter(), z = mapleaf.getZoom(); document.getElementById('mapleaf').style.display = 'none'; document.getElementById('mapgl').style.display = 'block'; mapgl.resize(); mapgl.jumpTo({ center: [c.lng, c.lat], zoom: z }); engine = 'gl'; }
-      function showLeaf() { const c = mapgl.getCenter(), z = mapgl.getZoom(); document.getElementById('mapgl').style.display = 'none'; document.getElementById('mapleaf').style.display = 'block'; mapleaf.invalidateSize(true); mapleaf.setView([c.lat, c.lng], Math.round(z)); engine = 'leaf'; }
+      function showGL() {
+        const c = mapleaf.getCenter(), z = mapleaf.getZoom();
+        document.getElementById('mapleaf').style.display = 'none';
+        document.getElementById('mapgl').style.display = 'block';
+        mapgl.resize();
+        mapgl.jumpTo({ center: [c.lng, c.lat], zoom: z });
+        engine = 'gl';
+        if (typeof scheduleCompassRender === 'function') scheduleCompassRender();
+      }
+      function showLeaf() {
+        const c = mapgl.getCenter(), z = mapgl.getZoom();
+        document.getElementById('mapgl').style.display = 'none';
+        document.getElementById('mapleaf').style.display = 'block';
+        mapleaf.invalidateSize(true);
+        mapleaf.setView([c.lat, c.lng], Math.round(z));
+        engine = 'leaf';
+        if (typeof scheduleCompassRender === 'function') scheduleCompassRender();
+      }
       if (IS_LOCALHOST) {
         setTimeout(() => {
           if (mapglStyleLoaded) return;
@@ -1653,6 +1669,7 @@
             });
             renderLayers();
             renderGroupsVisibility();
+            if (typeof scheduleCompassRender === 'function') scheduleCompassRender();
 
             // DON'T recreate GPS control on style changes
             // The existing control should persist across style changes
@@ -4521,6 +4538,19 @@
 
       /* ====================== GPS CONTROLS ====================== */
       let geolocate = null;
+      const COMPASS_OVERLAY_SOURCE = 'user-heading-src';
+      const COMPASS_OVERLAY_FILL_LAYER = 'user-heading-fill';
+      const COMPASS_OVERLAY_LINE_LAYER = 'user-heading-line';
+      const COMPASS_OVERLAY_CENTER_LAYER = 'user-heading-center';
+      const COMPASS_OVERLAY_CONE_LENGTH_METERS = 42;
+      const COMPASS_OVERLAY_SPREAD_DEG = 42;
+      let compassEnabled = false;
+      let compassPending = false;
+      let compassSupported = typeof window !== 'undefined' && ('DeviceOrientationEvent' in window || 'ondeviceorientation' in window);
+      let compassHeadingDeg = null;
+      let compassPermissionDenied = false;
+      let compassListenersAttached = false;
+      let compassLeafletLayer = null;
 
       function ensureGeolocateControl() {
         if (geolocate) return geolocate; // Don't create if we already have one
@@ -4551,6 +4581,302 @@
 
       let lastUserPos = null; // [lng, lat]
       const sonarBtn = byId('sonar-btn');
+      const compassBtn = byId('compass-btn');
+
+      function normalizeHeadingDeg(value) {
+        const heading = Number(value);
+        if (!Number.isFinite(heading)) return null;
+        return ((heading % 360) + 360) % 360;
+      }
+
+      function headingDelta(a, b) {
+        if (!Number.isFinite(a) || !Number.isFinite(b)) return Infinity;
+        const diff = Math.abs(a - b) % 360;
+        return diff > 180 ? 360 - diff : diff;
+      }
+
+      function updateCompassButtonState() {
+        if (!compassBtn) return;
+        compassBtn.classList.toggle('active', compassEnabled);
+        compassBtn.classList.toggle('pending', compassPending);
+        compassBtn.classList.toggle('unavailable', !compassSupported || compassPermissionDenied);
+        compassBtn.setAttribute('aria-pressed', compassEnabled ? 'true' : 'false');
+
+        let title = 'Enable compass direction';
+        if (!compassSupported) title = 'Compass direction is not supported on this device';
+        else if (compassPermissionDenied) title = 'Compass permission denied';
+        else if (compassPending) title = 'Waiting for compass permission';
+        else if (compassEnabled && lastUserPos && Number.isFinite(compassHeadingDeg)) title = 'Disable compass direction';
+        else if (compassEnabled) title = 'Move phone to calibrate compass direction';
+        else if (!lastUserPos) title = 'Enable compass direction (GPS fix recommended)';
+
+        compassBtn.title = title;
+        compassBtn.setAttribute('aria-label', title);
+      }
+
+      function clearCompassLeafletOverlay() {
+        if (compassLeafletLayer && mapleaf) {
+          try { mapleaf.removeLayer(compassLeafletLayer); } catch { }
+        }
+        compassLeafletLayer = null;
+      }
+
+      function clearCompassGlOverlay() {
+        if (!mapgl?.getStyle?.()) return;
+        [COMPASS_OVERLAY_FILL_LAYER, COMPASS_OVERLAY_LINE_LAYER, COMPASS_OVERLAY_CENTER_LAYER].forEach((layerId) => {
+          if (mapgl.getLayer(layerId)) {
+            try { mapgl.removeLayer(layerId); } catch { }
+          }
+        });
+        if (mapgl.getSource(COMPASS_OVERLAY_SOURCE)) {
+          try { mapgl.removeSource(COMPASS_OVERLAY_SOURCE); } catch { }
+        }
+      }
+
+      function clearCompassOverlay() {
+        clearCompassGlOverlay();
+        clearCompassLeafletOverlay();
+      }
+
+      function buildCompassOverlayData(position, headingDeg) {
+        if (!Array.isArray(position) || position.length < 2 || !Number.isFinite(headingDeg)) {
+          return { type: 'FeatureCollection', features: [] };
+        }
+
+        const [lng, lat] = position;
+        const base = [lng, lat];
+        const halfSpread = COMPASS_OVERLAY_SPREAD_DEG / 2;
+        const arcSteps = 8;
+        const coneCoords = [base];
+        for (let i = 0; i <= arcSteps; i++) {
+          const bearing = headingDeg - halfSpread + (COMPASS_OVERLAY_SPREAD_DEG * i / arcSteps);
+          coneCoords.push(destinationPoint(lng, lat, bearing, COMPASS_OVERLAY_CONE_LENGTH_METERS));
+        }
+        coneCoords.push(base);
+
+        const tip = destinationPoint(lng, lat, headingDeg, COMPASS_OVERLAY_CONE_LENGTH_METERS);
+        const shortTip = destinationPoint(lng, lat, headingDeg, COMPASS_OVERLAY_CONE_LENGTH_METERS * 0.52);
+
+        return {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: { kind: 'cone' },
+              geometry: { type: 'Polygon', coordinates: [coneCoords] }
+            },
+            {
+              type: 'Feature',
+              properties: { kind: 'line' },
+              geometry: { type: 'LineString', coordinates: [base, tip] }
+            },
+            {
+              type: 'Feature',
+              properties: { kind: 'center' },
+              geometry: { type: 'Point', coordinates: base }
+            },
+            {
+              type: 'Feature',
+              properties: { kind: 'tip' },
+              geometry: { type: 'LineString', coordinates: [base, shortTip] }
+            }
+          ]
+        };
+      }
+
+      function renderCompassOverlay() {
+        if (!compassEnabled || !lastUserPos || !Number.isFinite(compassHeadingDeg)) {
+          clearCompassOverlay();
+          updateCompassButtonState();
+          return;
+        }
+
+        const geojson = buildCompassOverlayData(lastUserPos, compassHeadingDeg);
+
+        if (engine === 'gl') {
+          clearCompassLeafletOverlay();
+          glReady(() => {
+            if (!compassEnabled || !lastUserPos || !Number.isFinite(compassHeadingDeg) || !mapgl?.getStyle?.()) return;
+            const source = mapgl.getSource(COMPASS_OVERLAY_SOURCE);
+            if (source) {
+              source.setData(geojson);
+            } else {
+              mapgl.addSource(COMPASS_OVERLAY_SOURCE, { type: 'geojson', data: geojson });
+              mapgl.addLayer({
+                id: COMPASS_OVERLAY_FILL_LAYER,
+                type: 'fill',
+                source: COMPASS_OVERLAY_SOURCE,
+                filter: ['==', ['get', 'kind'], 'cone'],
+                paint: {
+                  'fill-color': '#60a5fa',
+                  'fill-opacity': 0.17
+                }
+              });
+              mapgl.addLayer({
+                id: COMPASS_OVERLAY_LINE_LAYER,
+                type: 'line',
+                source: COMPASS_OVERLAY_SOURCE,
+                filter: ['any', ['==', ['get', 'kind'], 'line'], ['==', ['get', 'kind'], 'tip']],
+                paint: {
+                  'line-color': '#bfdbfe',
+                  'line-width': ['case', ['==', ['get', 'kind'], 'line'], 3, 2],
+                  'line-opacity': ['case', ['==', ['get', 'kind'], 'line'], 0.82, 0.94]
+                }
+              });
+              mapgl.addLayer({
+                id: COMPASS_OVERLAY_CENTER_LAYER,
+                type: 'circle',
+                source: COMPASS_OVERLAY_SOURCE,
+                filter: ['==', ['get', 'kind'], 'center'],
+                paint: {
+                  'circle-radius': 5.5,
+                  'circle-color': '#e0f2fe',
+                  'circle-stroke-color': '#2563eb',
+                  'circle-stroke-width': 2.4
+                }
+              });
+            }
+          });
+        } else {
+          clearCompassGlOverlay();
+          if (!mapleaf || typeof L === 'undefined' || !L) return;
+
+          const features = geojson.features || [];
+          const cone = features.find((feature) => feature.properties?.kind === 'cone');
+          const line = features.find((feature) => feature.properties?.kind === 'line');
+          const center = features.find((feature) => feature.properties?.kind === 'center');
+          if (!cone || !line || !center) return;
+
+          const coneLatLngs = cone.geometry.coordinates[0].map(([lng, lat]) => [lat, lng]);
+          const lineLatLngs = line.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+          const centerLatLng = [center.geometry.coordinates[1], center.geometry.coordinates[0]];
+
+          clearCompassLeafletOverlay();
+          compassLeafletLayer = L.layerGroup([
+            L.polygon(coneLatLngs, {
+              color: '#93c5fd',
+              weight: 1.5,
+              opacity: 0.78,
+              fillColor: '#60a5fa',
+              fillOpacity: 0.17,
+              interactive: false
+            }),
+            L.polyline(lineLatLngs, {
+              color: '#dbeafe',
+              weight: 3,
+              opacity: 0.84,
+              interactive: false
+            }),
+            L.circleMarker(centerLatLng, {
+              radius: 5,
+              color: '#2563eb',
+              weight: 2,
+              fillColor: '#e0f2fe',
+              fillOpacity: 1,
+              interactive: false
+            })
+          ]).addTo(mapleaf);
+        }
+
+        updateCompassButtonState();
+      }
+
+      function scheduleCompassRender() {
+        Utils.raf.schedule('compass-render', renderCompassOverlay);
+      }
+
+      function extractCompassHeading(event) {
+        const webkitHeading = normalizeHeadingDeg(event?.webkitCompassHeading);
+        if (webkitHeading !== null) return webkitHeading;
+
+        const alpha = Number(event?.alpha);
+        if (Number.isFinite(alpha)) {
+          return normalizeHeadingDeg(360 - alpha);
+        }
+
+        return null;
+      }
+
+      function onCompassOrientation(event) {
+        if (!compassEnabled) return;
+        const nextHeading = extractCompassHeading(event);
+        if (nextHeading === null) return;
+        if (headingDelta(nextHeading, compassHeadingDeg) < 0.7) return;
+        compassHeadingDeg = nextHeading;
+        updateCompassButtonState();
+        scheduleCompassRender();
+      }
+
+      function attachCompassListeners() {
+        if (compassListenersAttached) return;
+        window.addEventListener('deviceorientation', onCompassOrientation, true);
+        window.addEventListener('deviceorientationabsolute', onCompassOrientation, true);
+        compassListenersAttached = true;
+      }
+
+      function detachCompassListeners() {
+        if (!compassListenersAttached) return;
+        window.removeEventListener('deviceorientation', onCompassOrientation, true);
+        window.removeEventListener('deviceorientationabsolute', onCompassOrientation, true);
+        compassListenersAttached = false;
+      }
+
+      function nudgeGpsTracking() {
+        const control = ensureGeolocateControl();
+        try {
+          if (control && typeof control.trigger === 'function') control.trigger();
+        } catch (error) {
+          console.warn('Failed to trigger geolocate control for compass:', error);
+        }
+      }
+
+      async function enableCompassDirection() {
+        if (!compassSupported) {
+          compassPermissionDenied = true;
+          updateCompassButtonState();
+          alert('Compass direction is not supported on this device/browser.');
+          return;
+        }
+
+        compassPending = true;
+        updateCompassButtonState();
+
+        try {
+          if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            const permission = await DeviceOrientationEvent.requestPermission();
+            if (permission !== 'granted') {
+              compassPermissionDenied = true;
+              compassPending = false;
+              updateCompassButtonState();
+              alert('Compass permission was not granted. Enable Motion & Orientation Access and try again.');
+              return;
+            }
+          }
+
+          compassPermissionDenied = false;
+          compassEnabled = true;
+          attachCompassListeners();
+          if (!lastUserPos) nudgeGpsTracking();
+          compassPending = false;
+          updateCompassButtonState();
+          scheduleCompassRender();
+        } catch (error) {
+          compassPending = false;
+          compassPermissionDenied = true;
+          updateCompassButtonState();
+          console.warn('Compass permission request failed:', error);
+          alert('Unable to enable compass direction on this device.');
+        }
+      }
+
+      function disableCompassDirection() {
+        compassEnabled = false;
+        compassPending = false;
+        compassHeadingDeg = null;
+        detachCompassListeners();
+        clearCompassOverlay();
+        updateCompassButtonState();
+      }
 
       function updateSonarEnabled() {
         if (lastUserPos) {
@@ -4574,6 +4900,7 @@
         if (typeof lng === 'number' && typeof lat === 'number') {
           lastUserPos = [lng, lat];
           updateSonarEnabled();
+          if (compassEnabled) scheduleCompassRender();
 
           // Auto-enable sonar button when GPS activates
           if (sonarBtn.classList.contains('disabled')) {
@@ -4584,7 +4911,25 @@
         }
       }
 
-      mapgl.on('load', () => { ensureGeolocateControl(); });
+      if (compassBtn) {
+        compassBtn.addEventListener('click', async () => {
+          if (compassPending) return;
+          if (compassEnabled) {
+            disableCompassDirection();
+          } else {
+            await enableCompassDirection();
+          }
+        });
+      }
+
+      mapgl.on('load', () => {
+        ensureGeolocateControl();
+        if (compassEnabled) scheduleCompassRender();
+      });
+      mapgl.on('styledata', () => {
+        if (compassEnabled) scheduleCompassRender();
+      });
+      updateCompassButtonState();
 
       /* ===== Sonar UI ===== */
       const sonarModal = byId('sonar-modal');
