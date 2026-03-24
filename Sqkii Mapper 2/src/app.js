@@ -4955,23 +4955,24 @@
         updateCompassButtonState();
 
         try {
-          const requestedPermissions = [];
+          let orientationGranted = true;
           if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-            requestedPermissions.push(DeviceOrientationEvent.requestPermission());
-          }
-          if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-            requestedPermissions.push(DeviceMotionEvent.requestPermission());
+            orientationGranted = (await DeviceOrientationEvent.requestPermission()) === 'granted';
           }
 
-          if (requestedPermissions.length) {
-            const responses = await Promise.allSettled(requestedPermissions);
-            const denied = responses.some((result) => result.status !== 'fulfilled' || result.value !== 'granted');
-            if (denied) {
-              compassPermissionDenied = true;
-              compassPending = false;
-              updateCompassButtonState();
-              alert('Compass permission was not granted. Enable Motion & Orientation Access and try again.');
-              return;
+          if (!orientationGranted) {
+            compassPermissionDenied = true;
+            compassPending = false;
+            updateCompassButtonState();
+            alert('Compass permission was not granted. Enable Motion & Orientation Access and try again.');
+            return;
+          }
+
+          if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+            try {
+              await DeviceMotionEvent.requestPermission();
+            } catch (motionError) {
+              console.warn('Device motion permission request failed:', motionError);
             }
           }
 
