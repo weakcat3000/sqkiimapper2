@@ -6948,6 +6948,8 @@
           roomCode: String(entry?.room_code || ''),
           status: String(entry?.status || ''),
           shrinkCount: steps.length,
+          firstCenter: [steps[0].lng, steps[0].lat],
+          firstStep: steps[0].stepNumber,
           exactSpot: exactFeature ? `${coinDbFormatCoord(exactLat)}, ${coinDbFormatCoord(exactLng)}` : '',
           note: String(entry?.exact_note || ''),
           createdAt: coinDbFormatDate(entry?.created_at),
@@ -7005,9 +7007,9 @@
       position: absolute;
       top: 18px;
       left: 18px;
-      max-width: min(380px, calc(100vw - 36px));
-      padding: 16px 18px;
-      border-radius: 18px;
+      max-width: min(360px, calc(100vw - 36px));
+      padding: 14px 16px;
+      border-radius: 16px;
       border: 1px solid var(--panel-border);
       background: linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(10, 14, 24, 0.9));
       box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
@@ -7016,54 +7018,81 @@
     }
     .preview-card h1 {
       margin: 0 0 6px;
-      font-size: 24px;
+      font-size: 21px;
       line-height: 1.1;
     }
     .preview-subtitle {
-      margin: 0 0 12px;
+      margin: 0 0 10px;
+      font-size: 12px;
       color: var(--muted);
     }
     .preview-chips {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 12px;
+      gap: 7px;
+      margin-bottom: 10px;
     }
     .preview-chip {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 6px 10px;
+      padding: 5px 9px;
       border-radius: 999px;
       border: 1px solid rgba(245, 158, 11, 0.28);
       background: var(--accent-soft);
       color: #fde68a;
+      font-size: 11px;
       font-weight: 700;
     }
     .preview-card p {
       margin: 0;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .preview-actions {
+      display: flex;
+      gap: 8px;
+      margin: 0 0 10px;
+    }
+    .preview-btn {
+      appearance: none;
+      border: 1px solid rgba(245, 158, 11, 0.32);
+      background: linear-gradient(180deg, rgba(245, 158, 11, 0.24), rgba(180, 83, 9, 0.2));
+      color: #fef3c7;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font: inherit;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+    }
+    .preview-btn:hover {
+      background: linear-gradient(180deg, rgba(245, 158, 11, 0.3), rgba(180, 83, 9, 0.24));
     }
     .preview-note {
-      margin-top: 12px;
-      padding: 10px 12px;
+      margin-top: 10px;
+      padding: 9px 11px;
       border-radius: 12px;
       background: rgba(255, 255, 255, 0.04);
       color: #e5e7eb;
+      font-size: 11px;
+      line-height: 1.4;
       white-space: pre-wrap;
     }
     .preview-step-label {
       display: grid;
       place-items: center;
-      min-width: 24px;
-      height: 24px;
-      padding: 0 6px;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 5px;
       border-radius: 999px;
       background: radial-gradient(circle at 30% 30%, #fde68a, #f59e0b 68%, #b45309);
       color: #1f2937;
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 900;
       border: 1px solid rgba(255, 244, 214, 0.75);
-      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.14), 0 6px 16px rgba(0, 0, 0, 0.32);
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.14), 0 5px 14px rgba(0, 0, 0, 0.32);
     }
     .preview-exact {
       width: 18px;
@@ -7081,7 +7110,7 @@
         max-width: none;
       }
       .preview-card h1 {
-        font-size: 20px;
+        font-size: 18px;
       }
     }
   </style>
@@ -7096,6 +7125,9 @@
         <span class="preview-chip">${escapeHtml(String(payload.shrinkCount))} shrink${payload.shrinkCount === 1 ? '' : 's'}</span>
         <span class="preview-chip">${escapeHtml(payload.status || 'archived')}</span>
         ${payload.exactSpot ? `<span class="preview-chip">Exact: ${escapeHtml(payload.exactSpot)}</span>` : ''}
+      </div>
+      <div class="preview-actions">
+        <button id="preview-download" class="preview-btn" type="button">Download Screenshot</button>
       </div>
       <p>Each ring is one recorded shrink step, connected in order by the center path.</p>
       ${payload.note ? `<div class="preview-note">${escapeHtml(payload.note)}</div>` : ''}
@@ -7117,6 +7149,27 @@
         navigationControl: true
       });
 
+      function downloadMapScreenshot() {
+        const triggerDownload = () => {
+          const canvas = map.getCanvas && map.getCanvas();
+          if (!canvas) return;
+          const link = document.createElement('a');
+          const safeLabel = String(payload.label || 'coin-preview').replace(/[^a-z0-9_-]+/gi, '_').replace(/^_+|_+$/g, '') || 'coin-preview';
+          link.download = safeLabel + '-step-' + String(payload.firstStep || 1) + '.png';
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+        };
+
+        const targetCenter = Array.isArray(payload.firstCenter) ? payload.firstCenter : null;
+        if (!targetCenter) {
+          triggerDownload();
+          return;
+        }
+
+        map.easeTo({ center: targetCenter, duration: 450, essential: true });
+        map.once('idle', () => requestAnimationFrame(triggerDownload));
+      }
+
       function addStepMarkers() {
         (payload.centers.features || []).forEach((feature) => {
           const el = document.createElement('div');
@@ -7136,6 +7189,10 @@
       }
 
       map.on('load', () => {
+        const downloadBtn = document.getElementById('preview-download');
+        if (downloadBtn) {
+          downloadBtn.addEventListener('click', downloadMapScreenshot);
+        }
         map.addSource('coin-preview-circles', { type: 'geojson', data: payload.circles });
         map.addSource('coin-preview-centers', { type: 'geojson', data: payload.centers });
         if (payload.path) {
@@ -7166,8 +7223,8 @@
           source: 'coin-preview-circles',
           paint: {
             'line-color': '#f59e0b',
-            'line-width': 2,
-            'line-opacity': 0.9
+            'line-width': 1.5,
+            'line-opacity': 0.8
           }
         });
         map.addLayer({
