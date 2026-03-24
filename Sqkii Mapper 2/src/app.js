@@ -4540,7 +4540,6 @@
       let geolocate = null;
       const COMPASS_OVERLAY_SOURCE = 'user-heading-src';
       const COMPASS_OVERLAY_FILL_LAYER = 'user-heading-fill';
-      const COMPASS_OVERLAY_INNER_FILL_LAYER = 'user-heading-fill-inner';
       const COMPASS_OVERLAY_LINE_LAYER = 'user-heading-line';
       const COMPASS_OVERLAY_CENTER_LAYER = 'user-heading-center';
       const COMPASS_OVERLAY_AURA_LAYER = 'user-heading-aura';
@@ -4628,7 +4627,7 @@
 
       function clearCompassGlOverlay() {
         if (!mapgl?.getStyle?.()) return;
-        [COMPASS_OVERLAY_FILL_LAYER, COMPASS_OVERLAY_INNER_FILL_LAYER, COMPASS_OVERLAY_LINE_LAYER, COMPASS_OVERLAY_CENTER_LAYER, COMPASS_OVERLAY_AURA_LAYER].forEach((layerId) => {
+        [COMPASS_OVERLAY_FILL_LAYER, COMPASS_OVERLAY_LINE_LAYER, COMPASS_OVERLAY_CENTER_LAYER, COMPASS_OVERLAY_AURA_LAYER].forEach((layerId) => {
           if (mapgl.getLayer(layerId)) {
             try { mapgl.removeLayer(layerId); } catch { }
           }
@@ -4658,18 +4657,13 @@
         const [lng, lat] = position;
         const base = [lng, lat];
         const halfSpread = COMPASS_OVERLAY_SPREAD_DEG / 2;
-        const innerHalfSpread = halfSpread * 0.6;
         const arcSteps = 8;
         const coneCoords = [base];
-        const innerConeCoords = [base];
         for (let i = 0; i <= arcSteps; i++) {
           const bearing = headingDeg - halfSpread + (COMPASS_OVERLAY_SPREAD_DEG * i / arcSteps);
           coneCoords.push(destinationPoint(lng, lat, bearing, COMPASS_OVERLAY_CONE_LENGTH_METERS));
-          const innerBearing = headingDeg - innerHalfSpread + ((innerHalfSpread * 2) * i / arcSteps);
-          innerConeCoords.push(destinationPoint(lng, lat, innerBearing, COMPASS_OVERLAY_CONE_LENGTH_METERS * 0.74));
         }
         coneCoords.push(base);
-        innerConeCoords.push(base);
 
         const tip = destinationPoint(lng, lat, headingDeg, COMPASS_OVERLAY_CONE_LENGTH_METERS);
         const shortTip = destinationPoint(lng, lat, headingDeg, COMPASS_OVERLAY_CONE_LENGTH_METERS * 0.52);
@@ -4681,11 +4675,6 @@
               type: 'Feature',
               properties: { kind: 'cone' },
               geometry: { type: 'Polygon', coordinates: [coneCoords] }
-            },
-            {
-              type: 'Feature',
-              properties: { kind: 'cone-inner' },
-              geometry: { type: 'Polygon', coordinates: [innerConeCoords] }
             },
             {
               type: 'Feature',
@@ -4720,20 +4709,16 @@
           }
 
           const phase = (Math.sin(timestamp / 650) + 1) / 2;
-          const outerOpacity = 0.12 + phase * 0.06;
-          const innerOpacity = 0.18 + phase * 0.09;
-          const lineOpacity = 0.8 + phase * 0.1;
-          const auraRadius = 12 + phase * 8;
-          const auraOpacity = 0.08 + phase * 0.08;
+          const outerOpacity = 0.13 + phase * 0.06;
+          const lineOpacity = 0.82 + phase * 0.08;
+          const auraRadius = 13 + phase * 8;
+          const auraOpacity = 0.1 + phase * 0.08;
           const centerRadius = 5.4 + phase * 0.6;
 
           try {
             if (engine === 'gl' && mapgl?.getStyle?.()) {
               if (mapgl.getLayer(COMPASS_OVERLAY_FILL_LAYER)) {
                 mapgl.setPaintProperty(COMPASS_OVERLAY_FILL_LAYER, 'fill-opacity', outerOpacity);
-              }
-              if (mapgl.getLayer(COMPASS_OVERLAY_INNER_FILL_LAYER)) {
-                mapgl.setPaintProperty(COMPASS_OVERLAY_INNER_FILL_LAYER, 'fill-opacity', innerOpacity);
               }
               if (mapgl.getLayer(COMPASS_OVERLAY_LINE_LAYER)) {
                 mapgl.setPaintProperty(COMPASS_OVERLAY_LINE_LAYER, 'line-opacity', ['case', ['==', ['get', 'kind'], 'line'], lineOpacity, Math.min(0.98, lineOpacity + 0.08)]);
@@ -4748,7 +4733,6 @@
               }
             } else if (compassLeafletParts) {
               compassLeafletParts.outerCone?.setStyle({ fillOpacity: outerOpacity, opacity: Math.min(0.72, outerOpacity + 0.34) });
-              compassLeafletParts.innerCone?.setStyle({ fillOpacity: innerOpacity, opacity: Math.min(0.95, innerOpacity + 0.3) });
               compassLeafletParts.line?.setStyle({ opacity: lineOpacity, weight: 3 + phase * 0.5 });
               compassLeafletParts.tip?.setStyle({ opacity: Math.min(0.98, lineOpacity + 0.08), weight: 2 + phase * 0.3 });
               compassLeafletParts.aura?.setStyle({ fillOpacity: auraOpacity, opacity: auraOpacity * 1.1, radius: auraRadius });
@@ -4781,33 +4765,23 @@
               source.setData(geojson);
             } else {
               mapgl.addSource(COMPASS_OVERLAY_SOURCE, { type: 'geojson', data: geojson });
-              mapgl.addLayer({
-                id: COMPASS_OVERLAY_FILL_LAYER,
-                type: 'fill',
-                source: COMPASS_OVERLAY_SOURCE,
-                filter: ['==', ['get', 'kind'], 'cone'],
-                paint: {
-                  'fill-color': '#60a5fa',
-                  'fill-opacity': 0.13
-                }
-              });
-              mapgl.addLayer({
-                id: COMPASS_OVERLAY_INNER_FILL_LAYER,
-                type: 'fill',
-                source: COMPASS_OVERLAY_SOURCE,
-                filter: ['==', ['get', 'kind'], 'cone-inner'],
-                paint: {
-                  'fill-color': '#dbeafe',
-                  'fill-opacity': 0.2
-                }
-              });
+                mapgl.addLayer({
+                  id: COMPASS_OVERLAY_FILL_LAYER,
+                  type: 'fill',
+                  source: COMPASS_OVERLAY_SOURCE,
+                  filter: ['==', ['get', 'kind'], 'cone'],
+                  paint: {
+                    'fill-color': '#f59e0b',
+                    'fill-opacity': 0.15
+                  }
+                });
               mapgl.addLayer({
                 id: COMPASS_OVERLAY_LINE_LAYER,
                 type: 'line',
                 source: COMPASS_OVERLAY_SOURCE,
                 filter: ['any', ['==', ['get', 'kind'], 'line'], ['==', ['get', 'kind'], 'tip']],
                 paint: {
-                  'line-color': '#bfdbfe',
+                  'line-color': '#fde68a',
                   'line-width': ['case', ['==', ['get', 'kind'], 'line'], 3, 2],
                   'line-opacity': ['case', ['==', ['get', 'kind'], 'line'], 0.82, 0.94]
                 }
@@ -4819,7 +4793,7 @@
                 filter: ['==', ['get', 'kind'], 'aura'],
                 paint: {
                   'circle-radius': 14,
-                  'circle-color': '#60a5fa',
+                  'circle-color': '#f59e0b',
                   'circle-opacity': 0.12,
                   'circle-blur': 0.78
                 }
@@ -4831,8 +4805,8 @@
                 filter: ['==', ['get', 'kind'], 'center'],
                 paint: {
                   'circle-radius': 5.5,
-                  'circle-color': '#e0f2fe',
-                  'circle-stroke-color': '#2563eb',
+                  'circle-color': '#fff7ed',
+                  'circle-stroke-color': '#f59e0b',
                   'circle-stroke-width': 2.4
                 }
               });
@@ -4845,15 +4819,13 @@
 
           const features = geojson.features || [];
           const cone = features.find((feature) => feature.properties?.kind === 'cone');
-          const innerCone = features.find((feature) => feature.properties?.kind === 'cone-inner');
           const line = features.find((feature) => feature.properties?.kind === 'line');
           const center = features.find((feature) => feature.properties?.kind === 'center');
           const tip = features.find((feature) => feature.properties?.kind === 'tip');
           const aura = features.find((feature) => feature.properties?.kind === 'aura');
-          if (!cone || !innerCone || !line || !center || !tip || !aura) return;
+          if (!cone || !line || !center || !tip || !aura) return;
 
           const coneLatLngs = cone.geometry.coordinates[0].map(([lng, lat]) => [lat, lng]);
-          const innerConeLatLngs = innerCone.geometry.coordinates[0].map(([lng, lat]) => [lat, lng]);
           const lineLatLngs = line.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
           const tipLatLngs = tip.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
           const centerLatLng = [center.geometry.coordinates[1], center.geometry.coordinates[0]];
@@ -4861,52 +4833,43 @@
 
           clearCompassLeafletOverlay();
           const outerConeLayer = L.polygon(coneLatLngs, {
-            color: '#93c5fd',
+            color: '#fcd34d',
             weight: 1.35,
-            opacity: 0.48,
-            fillColor: '#60a5fa',
-            fillOpacity: 0.13,
-            interactive: false
-          });
-          const innerConeLayer = L.polygon(innerConeLatLngs, {
-            color: '#dbeafe',
-            weight: 1.1,
-            opacity: 0.74,
-            fillColor: '#dbeafe',
-            fillOpacity: 0.2,
+            opacity: 0.52,
+            fillColor: '#f59e0b',
+            fillOpacity: 0.15,
             interactive: false
           });
           const lineLayer = L.polyline(lineLatLngs, {
-            color: '#dbeafe',
+            color: '#fde68a',
             weight: 3,
             opacity: 0.84,
             interactive: false
           });
           const tipLayer = L.polyline(tipLatLngs, {
-            color: '#eff6ff',
+            color: '#fef3c7',
             weight: 2,
             opacity: 0.92,
             interactive: false
           });
           const auraLayer = L.circleMarker(auraLatLng, {
             radius: 14,
-            color: '#60a5fa',
+            color: '#f59e0b',
             weight: 0,
-            fillColor: '#60a5fa',
+            fillColor: '#f59e0b',
             fillOpacity: 0.12,
             interactive: false
           });
           const centerLayer = L.circleMarker(centerLatLng, {
             radius: 5.5,
-            color: '#2563eb',
+            color: '#f59e0b',
             weight: 2,
-            fillColor: '#e0f2fe',
+            fillColor: '#fff7ed',
             fillOpacity: 1,
             interactive: false
           });
           compassLeafletParts = {
             outerCone: outerConeLayer,
-            innerCone: innerConeLayer,
             line: lineLayer,
             tip: tipLayer,
             aura: auraLayer,
@@ -4914,7 +4877,6 @@
           };
           compassLeafletLayer = L.layerGroup([
             outerConeLayer,
-            innerConeLayer,
             lineLayer,
             tipLayer,
             auraLayer,
