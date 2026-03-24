@@ -6665,6 +6665,7 @@
                     <div class="coin-db-inline-status" id="coin-db-inline-status-${escapeHtml(entry.id)}"></div>
                     <div class="coin-db-footer-btns">
                       <button class="btn small coin-db-delete-entry danger" data-entry-id="${escapeHtml(entry.id)}" title="Delete this archived coin">Delete</button>
+                      <button class="btn small coin-db-preview-entry" data-entry-id="${escapeHtml(entry.id)}">Preview</button>
                       <button class="btn small coin-db-load-snapshot" data-entry-id="${escapeHtml(entry.id)}">Load Snapshot</button>
                       <button class="btn small coin-db-save-note" data-entry-id="${escapeHtml(entry.id)}">Save Exact Spot</button>
                     </div>
@@ -6866,6 +6867,367 @@
         }
       }
 
+      function buildCoinDbPreviewPayload(entry) {
+        const steps = (Array.isArray(entry?.lifecycle) ? entry.lifecycle : [])
+          .map((step, index) => {
+            const lat = Number(step?.lat);
+            const lng = Number(step?.lng);
+            const radiusMeters = Number(step?.radiusMeters);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(radiusMeters) || radiusMeters <= 0) {
+              return null;
+            }
+            return {
+              stepNumber: Number.isFinite(Number(step?.step)) ? Number(step.step) : index + 1,
+              lat,
+              lng,
+              radiusMeters,
+              timestampIso: step?.timestampIso || null
+            };
+          })
+          .filter(Boolean)
+          .sort((a, b) => a.stepNumber - b.stepNumber);
+
+        if (!steps.length) return null;
+
+        const circleFeatures = steps.map((step, index) => ({
+          type: 'Feature',
+          properties: {
+            step: step.stepNumber,
+            radiusMeters: step.radiusMeters,
+            timestampIso: step.timestampIso,
+            sequenceIndex: index
+          },
+          geometry: turf.circle([step.lng, step.lat], step.radiusMeters, { steps: 128, units: 'meters' }).geometry
+        }));
+
+        const centerFeatures = steps.map((step, index) => ({
+          type: 'Feature',
+          properties: {
+            step: step.stepNumber,
+            radiusMeters: step.radiusMeters,
+            timestampIso: step.timestampIso,
+            sequenceIndex: index
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: [step.lng, step.lat]
+          }
+        }));
+
+        const pathFeature = steps.length > 1 ? {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: steps.map((step) => [step.lng, step.lat])
+          }
+        } : null;
+
+        const exactLat = Number(entry?.exact_lat);
+        const exactLng = Number(entry?.exact_lng);
+        const exactFeature = Number.isFinite(exactLat) && Number.isFinite(exactLng) ? {
+          type: 'Feature',
+          properties: {
+            note: entry?.exact_note || ''
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: [exactLng, exactLat]
+          }
+        } : null;
+
+        const bboxFeatures = [
+          ...circleFeatures,
+          ...centerFeatures,
+          ...(pathFeature ? [pathFeature] : []),
+          ...(exactFeature ? [exactFeature] : [])
+        ];
+
+        return {
+          label: coinDbCanonicalLabel(entry?.coin_label || 'Unnamed coin') || 'Unnamed coin',
+          roomCode: String(entry?.room_code || ''),
+          status: String(entry?.status || ''),
+          shrinkCount: steps.length,
+          exactSpot: exactFeature ? `${coinDbFormatCoord(exactLat)}, ${coinDbFormatCoord(exactLng)}` : '',
+          note: String(entry?.exact_note || ''),
+          createdAt: coinDbFormatDate(entry?.created_at),
+          apiKey: String(maptilersdk?.config?.apiKey || ''),
+          styleUrl: CUSTOM_STYLE,
+          circles: { type: 'FeatureCollection', features: circleFeatures },
+          centers: { type: 'FeatureCollection', features: centerFeatures },
+          path: pathFeature,
+          exact: exactFeature,
+          bounds: turf.bbox({ type: 'FeatureCollection', features: bboxFeatures })
+        };
+      }
+
+      function buildCoinDbPreviewDocument(payload) {
+        const serializedPayload = JSON.stringify(payload).replace(/</g, '\\u003c');
+        const title = escapeHtml(`${payload.label} Preview`);
+        return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${title}</title>
+  <script src="https://cdn.maptiler.com/maptiler-sdk-js/v3.6.1/maptiler-sdk.umd.min.js"></script>
+  <link href="https://cdn.maptiler.com/maptiler-sdk-js/v3.6.1/maptiler-sdk.css" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0a0d14;
+      --panel: rgba(12, 16, 24, 0.88);
+      --panel-border: rgba(148, 163, 184, 0.18);
+      --text: #f8fafc;
+      --muted: #a7b3c5;
+      --accent: #f59e0b;
+      --accent-soft: rgba(245, 158, 11, 0.16);
+    }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      overflow: hidden;
+    }
+    #preview-map {
+      position: absolute;
+      inset: 0;
+    }
+    .preview-shell {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .preview-card {
+      position: absolute;
+      top: 18px;
+      left: 18px;
+      max-width: min(380px, calc(100vw - 36px));
+      padding: 16px 18px;
+      border-radius: 18px;
+      border: 1px solid var(--panel-border);
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(10, 14, 24, 0.9));
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+      backdrop-filter: blur(18px);
+      pointer-events: auto;
+    }
+    .preview-card h1 {
+      margin: 0 0 6px;
+      font-size: 24px;
+      line-height: 1.1;
+    }
+    .preview-subtitle {
+      margin: 0 0 12px;
+      color: var(--muted);
+    }
+    .preview-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .preview-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(245, 158, 11, 0.28);
+      background: var(--accent-soft);
+      color: #fde68a;
+      font-weight: 700;
+    }
+    .preview-card p {
+      margin: 0;
+    }
+    .preview-note {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      color: #e5e7eb;
+      white-space: pre-wrap;
+    }
+    .preview-step-label {
+      display: grid;
+      place-items: center;
+      min-width: 24px;
+      height: 24px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 30%, #fde68a, #f59e0b 68%, #b45309);
+      color: #1f2937;
+      font-size: 12px;
+      font-weight: 900;
+      border: 1px solid rgba(255, 244, 214, 0.75);
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.14), 0 6px 16px rgba(0, 0, 0, 0.32);
+    }
+    .preview-exact {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #22c55e;
+      border: 2px solid rgba(255, 255, 255, 0.92);
+      box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.18);
+    }
+    @media (max-width: 720px) {
+      .preview-card {
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        max-width: none;
+      }
+      .preview-card h1 {
+        font-size: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="preview-map"></div>
+  <div class="preview-shell">
+    <div class="preview-card">
+      <h1>${title}</h1>
+      <p class="preview-subtitle">Geodesic shrink preview for ${escapeHtml(payload.roomCode || 'unknown room')}.</p>
+      <div class="preview-chips">
+        <span class="preview-chip">${escapeHtml(String(payload.shrinkCount))} shrink${payload.shrinkCount === 1 ? '' : 's'}</span>
+        <span class="preview-chip">${escapeHtml(payload.status || 'archived')}</span>
+        ${payload.exactSpot ? `<span class="preview-chip">Exact: ${escapeHtml(payload.exactSpot)}</span>` : ''}
+      </div>
+      <p>Each ring is one recorded shrink step, connected in order by the center path.</p>
+      ${payload.note ? `<div class="preview-note">${escapeHtml(payload.note)}</div>` : ''}
+    </div>
+  </div>
+  <script>
+    (function () {
+      const payload = ${serializedPayload};
+      maptilersdk.config.apiKey = payload.apiKey || '';
+      const map = new maptilersdk.Map({
+        container: 'preview-map',
+        style: payload.styleUrl,
+        center: [103.8198, 1.3521],
+        zoom: 12,
+        pitch: 0,
+        bearing: 0,
+        hash: false,
+        geolocate: false,
+        navigationControl: true
+      });
+
+      function addStepMarkers() {
+        (payload.centers.features || []).forEach((feature) => {
+          const el = document.createElement('div');
+          el.className = 'preview-step-label';
+          el.textContent = String(feature.properties.step || '');
+          new maptilersdk.Marker({ element: el, anchor: 'center' })
+            .setLngLat(feature.geometry.coordinates)
+            .addTo(map);
+        });
+        if (payload.exact) {
+          const el = document.createElement('div');
+          el.className = 'preview-exact';
+          new maptilersdk.Marker({ element: el, anchor: 'center' })
+            .setLngLat(payload.exact.geometry.coordinates)
+            .addTo(map);
+        }
+      }
+
+      map.on('load', () => {
+        map.addSource('coin-preview-circles', { type: 'geojson', data: payload.circles });
+        map.addSource('coin-preview-centers', { type: 'geojson', data: payload.centers });
+        if (payload.path) {
+          map.addSource('coin-preview-path', { type: 'geojson', data: payload.path });
+          map.addLayer({
+            id: 'coin-preview-path-line',
+            type: 'line',
+            source: 'coin-preview-path',
+            paint: {
+              'line-color': '#f59e0b',
+              'line-width': 3,
+              'line-opacity': 0.88
+            }
+          });
+        }
+        map.addLayer({
+          id: 'coin-preview-circles-fill',
+          type: 'fill',
+          source: 'coin-preview-circles',
+          paint: {
+            'fill-color': '#f59e0b',
+            'fill-opacity': 0.08
+          }
+        });
+        map.addLayer({
+          id: 'coin-preview-circles-line',
+          type: 'line',
+          source: 'coin-preview-circles',
+          paint: {
+            'line-color': '#fde68a',
+            'line-width': 2,
+            'line-opacity': 0.75
+          }
+        });
+        map.addLayer({
+          id: 'coin-preview-centers-core',
+          type: 'circle',
+          source: 'coin-preview-centers',
+          paint: {
+            'circle-radius': 4,
+            'circle-color': '#fef3c7',
+            'circle-stroke-color': '#f59e0b',
+            'circle-stroke-width': 2
+          }
+        });
+        if (payload.exact) {
+          map.addSource('coin-preview-exact', { type: 'geojson', data: payload.exact });
+          map.addLayer({
+            id: 'coin-preview-exact-halo',
+            type: 'circle',
+            source: 'coin-preview-exact',
+            paint: {
+              'circle-radius': 16,
+              'circle-color': '#22c55e',
+              'circle-opacity': 0.16
+            }
+          });
+        }
+        addStepMarkers();
+        if (Array.isArray(payload.bounds) && payload.bounds.length === 4) {
+          map.fitBounds([[payload.bounds[0], payload.bounds[1]], [payload.bounds[2], payload.bounds[3]]], {
+            padding: { top: 110, right: 70, bottom: 70, left: 430 },
+            duration: 0
+          });
+        }
+      });
+    })();
+  </script>
+</body>
+</html>`;
+      }
+
+      function openCoinDbPreview(entryId) {
+        const entry = coinDbEntriesCache.find((item) => String(item.id) === String(entryId));
+        const payload = buildCoinDbPreviewPayload(entry);
+        if (!payload) {
+          coinDbSetStatus('No valid shrink steps available to preview for this coin.', true);
+          return;
+        }
+
+        const previewWindow = window.open('', `coin-db-preview-${entryId}`, 'popup=yes,width=1320,height=860,resizable=yes,scrollbars=yes');
+        if (!previewWindow) {
+          coinDbSetStatus('Preview popup was blocked. Allow popups for this site and try again.', true);
+          return;
+        }
+
+        previewWindow.document.open();
+        previewWindow.document.write(buildCoinDbPreviewDocument(payload));
+        previewWindow.document.close();
+        previewWindow.focus();
+      }
+
       async function deleteCoinDbEntry(entryId) {
         const entry = coinDbEntriesCache.find((item) => String(item.id) === String(entryId));
         const label = coinDbCanonicalLabel(entry?.coin_label || '') || 'this coin';
@@ -6914,6 +7276,12 @@
         const saveBtn = e.target.closest('.coin-db-save-note');
         if (saveBtn) {
           await saveCoinDbExactSpot(saveBtn.dataset.entryId);
+          return;
+        }
+
+        const previewBtn = e.target.closest('.coin-db-preview-entry');
+        if (previewBtn) {
+          openCoinDbPreview(previewBtn.dataset.entryId);
           return;
         }
 
