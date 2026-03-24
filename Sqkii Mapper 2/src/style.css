@@ -1036,7 +1036,8 @@
       min-height: 0;
       overscroll-behavior: contain;
       -webkit-overflow-scrolling: touch;
-      display: grid;
+      display: flex;
+      flex-direction: column;
       gap: 12px;
       padding-right: 4px;
     }
@@ -1063,10 +1064,12 @@
       background: var(--panel-2);
       overflow: hidden;
       transition: border-color 0.2s;
+      flex: 0 0 auto;
     }
 
     .coin-db-dropdown[open] {
       border-color: rgba(96, 165, 250, 0.35);
+      overflow: visible;
     }
 
     .coin-db-dropdown-header {
@@ -1163,6 +1166,7 @@
       max-height: min(62vh, 720px);
       overflow: auto;
       min-height: 0;
+      height: auto;
       overscroll-behavior: contain;
       -webkit-overflow-scrolling: touch;
     }
