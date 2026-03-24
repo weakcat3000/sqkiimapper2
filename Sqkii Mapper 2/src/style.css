@@ -129,8 +129,15 @@
       position: relative;
       display: grid;
       grid-template-columns: var(--side) 1fr;
-      height: 100vh;
+      min-height: 100vh;
+      height: 100dvh;
       transition: grid-template-columns .28s ease
+    }
+
+    @supports not (height: 100dvh) {
+      .app {
+        height: 100vh;
+      }
     }
 
     .ui-reopen {
