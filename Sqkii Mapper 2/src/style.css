@@ -447,7 +447,7 @@
     /* Feature rows (compact) */
     .feature {
       display: grid;
-      grid-template-columns: 14px 1fr auto auto;
+      grid-template-columns: 14px 1fr auto auto auto;
       gap: 4px;
       align-items: center;
       padding: 2px 8px;
@@ -498,6 +498,32 @@
 
     .eye-btn.off {
       opacity: .6
+    }
+
+    .trash-btn {
+      display: inline-grid;
+      place-items: center;
+      width: 30px;
+      height: 22px;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 8px;
+      background: rgba(127, 29, 29, 0.18);
+      cursor: pointer;
+    }
+
+    .trash-btn svg {
+      width: 13px;
+      height: 13px;
+      stroke: #fca5a5;
+      fill: none;
+      stroke-width: 1.9;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .trash-btn:hover {
+      background: rgba(153, 27, 27, 0.3);
+      border-color: rgba(248, 113, 113, 0.4);
     }
 
     /* Toggles + chips */
@@ -1607,9 +1633,8 @@
     .sheets-btn svg {
       width: 28px;
       height: 28px;
-      stroke: #e5e7eb;
-      fill: none;
-      stroke-width: 2
+      fill: #e5e7eb;
+      stroke: none;
     }
 
     .sheets-view {
@@ -1906,6 +1931,45 @@
     }
 
     @media (max-width: 820px) {
+      .btn {
+        padding: 5px 8.5px;
+        font-size: 12px;
+        border-radius: 7px;
+      }
+
+      .btn.small {
+        padding: 3.4px 6.8px;
+        font-size: 10.2px;
+      }
+
+      .seg .chip,
+      .recon-precision-btn {
+        font-size: 10.2px !important;
+        padding: 5px !important;
+      }
+
+      .map-edit-fab,
+      .sheets-btn,
+      #pixelgrid-fab,
+      .sonar-btn {
+        width: 47.6px;
+        height: 47.6px;
+      }
+
+      .map-edit-fab img,
+      .sheets-btn svg,
+      #pixelgrid-fab img {
+        width: 23.8px;
+        height: 23.8px;
+      }
+
+      .project-title > .icon-btn,
+      .style-editor-x {
+        width: 25.5px;
+        height: 25.5px;
+        flex-basis: 25.5px;
+      }
+
       .coin-db-toolbar {
         grid-template-columns: 1fr;
       }
