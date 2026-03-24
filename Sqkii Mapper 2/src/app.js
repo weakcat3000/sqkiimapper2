@@ -6944,6 +6944,16 @@
         ];
 
         return {
+          firstRadiusMeters: steps[0].radiusMeters,
+          lastRadiusMeters: steps[steps.length - 1].radiusMeters,
+          totalShrinkMeters: Math.max(0, steps[0].radiusMeters - steps[steps.length - 1].radiusMeters),
+          centerTravelMeters: steps.slice(1).reduce((total, step, index) => (
+            total + turf.distance(
+              turf.point([steps[index].lng, steps[index].lat]),
+              turf.point([step.lng, step.lat]),
+              { units: 'kilometers' }
+            ) * 1000
+          ), 0),
           label: coinDbCanonicalLabel(entry?.coin_label || 'Unnamed coin') || 'Unnamed coin',
           roomCode: String(entry?.room_code || ''),
           status: String(entry?.status || ''),
@@ -7092,6 +7102,34 @@
       line-height: 1.4;
       white-space: pre-wrap;
     }
+    .preview-stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .preview-stat {
+      padding: 9px 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+    }
+    .preview-stat-label {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .preview-stat-value {
+      display: block;
+      color: #f8fafc;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.2;
+    }
     .preview-step-label {
       display: grid;
       place-items: center;
@@ -7124,6 +7162,9 @@
       .preview-card h1 {
         font-size: 18px;
       }
+      .preview-stats {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -7141,7 +7182,24 @@
       <div class="preview-actions">
         <button id="preview-download" class="preview-btn" type="button">Download Screenshot</button>
       </div>
-      <p>Each ring is one recorded shrink step, connected in order by the center path.</p>
+      <div class="preview-stats">
+        <div class="preview-stat">
+          <span class="preview-stat-label">First Radius</span>
+          <span class="preview-stat-value">${escapeHtml(coinDbFormatRadius(payload.firstRadiusMeters))}</span>
+        </div>
+        <div class="preview-stat">
+          <span class="preview-stat-label">Last Radius</span>
+          <span class="preview-stat-value">${escapeHtml(coinDbFormatRadius(payload.lastRadiusMeters))}</span>
+        </div>
+        <div class="preview-stat">
+          <span class="preview-stat-label">Total Shrink</span>
+          <span class="preview-stat-value">${escapeHtml(coinDbFormatRadius(payload.totalShrinkMeters))}</span>
+        </div>
+        <div class="preview-stat">
+          <span class="preview-stat-label">Center Travel</span>
+          <span class="preview-stat-value">${escapeHtml(coinDbFormatRadius(payload.centerTravelMeters))}</span>
+        </div>
+      </div>
       ${payload.note ? `<div class="preview-note">${escapeHtml(payload.note)}</div>` : ''}
     </div>
   </div>
@@ -7162,21 +7220,9 @@
         preserveDrawingBuffer: true
       });
 
-      function downloadMapScreenshot() {
-        const triggerDownload = () => {
-          const canvas = map.getCanvas && map.getCanvas();
-          if (!canvas) return;
-          const link = document.createElement('a');
-          const safeLabel = String(payload.label || 'coin-preview').replace(/[^a-z0-9_-]+/gi, '_').replace(/^_+|_+$/g, '') || 'coin-preview';
-          link.download = safeLabel + '-step-' + String(payload.firstStep || 1) + '.png';
-          link.href = canvas.toDataURL('image/png');
-          link.click();
-        };
-
-        const targetCenter = Array.isArray(payload.firstCenter) ? payload.firstCenter : null;
+      async function downloadMapScreenshot() {
         const screenshotBounds = Array.isArray(payload.screenshotBounds) && payload.screenshotBounds.length === 4 ? payload.screenshotBounds : null;
-        if (!targetCenter || !screenshotBounds) {
-          triggerDownload();
+        if (!screenshotBounds) {
           return;
         }
 
@@ -7184,9 +7230,21 @@
           padding: { top: 64, right: 64, bottom: 64, left: 64 },
           duration: 500
         });
-        map.once('idle', () => {
-          map.easeTo({ center: targetCenter, duration: 0, essential: true });
-          map.once('idle', () => setTimeout(triggerDownload, 120));
+        map.once('idle', async () => {
+          const filename = (String(payload.label || 'coin-preview').replace(/[^a-z0-9_-]+/gi, '_').replace(/^_+|_+$/g, '') || 'coin-preview') + '-step-' + String(payload.firstStep || 1) + '.png';
+          if (maptilersdk.helpers?.takeScreenshot) {
+            await maptilersdk.helpers.takeScreenshot(map, {
+              download: true,
+              filename
+            });
+            return;
+          }
+          const canvas = map.getCanvas && map.getCanvas();
+          if (!canvas) return;
+          const link = document.createElement('a');
+          link.download = filename;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
         });
       }
 
