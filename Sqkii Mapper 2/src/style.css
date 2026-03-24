@@ -2009,12 +2009,109 @@
     }
 
     @media (max-width: 820px) {
+      .header {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+          "title hide"
+          "toolbar toolbar";
+        align-items: start;
+        gap: 10px 12px;
+        padding: 14px 14px 12px;
+      }
+
+      .project-title {
+        grid-area: title;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        align-items: start;
+        column-gap: 10px;
+        row-gap: 8px;
+        min-width: 0;
+      }
+
+      #brand-stack {
+        grid-column: 1 / -1;
+        gap: 8px;
+      }
+
+      #brand-title {
+        font-size: 18px;
+        line-height: 0.98;
+      }
+
+      #cat-lottie {
+        width: 84px;
+        height: 84px;
+      }
+
+      .project-title > .icon-btn {
+        grid-column: 2;
+        grid-row: 2;
+        justify-self: start;
+        align-self: center;
+      }
+
+      .header .toolbar {
+        grid-area: toolbar;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 9px;
+        width: 100%;
+      }
+
+      #delete-toggle {
+        grid-column: 1 / -1;
+        justify-self: center;
+        min-width: 134px;
+      }
+
+      .header .toolbar .btn.small {
+        width: 100%;
+        min-height: 40px;
+      }
+
+      .ui-hide {
+        grid-area: hide;
+        align-self: stretch;
+        min-width: 88px;
+        min-height: 88px;
+        justify-self: end;
+      }
+
+      .mapstyle-row {
+        padding: 13px 14px;
+      }
+
+      .mapstyle-left,
+      .mapstyle-right {
+        min-width: 0;
+      }
+
+      .mapstyle-right {
+        text-align: right;
+      }
+
+      .row-split {
+        grid-template-columns: 1fr;
+      }
+
+      .row-split > .btn.small,
+      .row-split > .btn {
+        width: 100%;
+      }
+
+      .draw-grid,
+      .line-grid {
+        grid-template-columns: 1fr;
+      }
+
       .compass-btn {
         display: grid;
       }
 
       .ui-reopen {
         top: 71.6px;
+        left: 7px;
         padding: 5.1px 8.5px;
         font-size: 12px;
         border-radius: 8.5px;
@@ -2081,6 +2178,12 @@
 
       .compass-btn {
         bottom: calc(16px + 47.6px + 10px);
+      }
+
+      .app.ui-collapsed .ui-reopen {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
       }
     }
 

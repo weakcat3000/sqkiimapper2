@@ -4540,8 +4540,10 @@
       let geolocate = null;
       const COMPASS_OVERLAY_SOURCE = 'user-heading-src';
       const COMPASS_OVERLAY_FILL_LAYER = 'user-heading-fill';
+      const COMPASS_OVERLAY_INNER_FILL_LAYER = 'user-heading-fill-inner';
       const COMPASS_OVERLAY_LINE_LAYER = 'user-heading-line';
       const COMPASS_OVERLAY_CENTER_LAYER = 'user-heading-center';
+      const COMPASS_OVERLAY_AURA_LAYER = 'user-heading-aura';
       const COMPASS_OVERLAY_CONE_LENGTH_METERS = 42;
       const COMPASS_OVERLAY_SPREAD_DEG = 42;
       let compassEnabled = false;
@@ -4551,6 +4553,8 @@
       let compassPermissionDenied = false;
       let compassListenersAttached = false;
       let compassLeafletLayer = null;
+      let compassLeafletParts = null;
+      let compassPulseFrame = 0;
 
       function ensureGeolocateControl() {
         if (geolocate) return geolocate; // Don't create if we already have one
@@ -4619,11 +4623,12 @@
           try { mapleaf.removeLayer(compassLeafletLayer); } catch { }
         }
         compassLeafletLayer = null;
+        compassLeafletParts = null;
       }
 
       function clearCompassGlOverlay() {
         if (!mapgl?.getStyle?.()) return;
-        [COMPASS_OVERLAY_FILL_LAYER, COMPASS_OVERLAY_LINE_LAYER, COMPASS_OVERLAY_CENTER_LAYER].forEach((layerId) => {
+        [COMPASS_OVERLAY_FILL_LAYER, COMPASS_OVERLAY_INNER_FILL_LAYER, COMPASS_OVERLAY_LINE_LAYER, COMPASS_OVERLAY_CENTER_LAYER, COMPASS_OVERLAY_AURA_LAYER].forEach((layerId) => {
           if (mapgl.getLayer(layerId)) {
             try { mapgl.removeLayer(layerId); } catch { }
           }
@@ -4638,6 +4643,13 @@
         clearCompassLeafletOverlay();
       }
 
+      function stopCompassPulseAnimation() {
+        if (compassPulseFrame) {
+          cancelAnimationFrame(compassPulseFrame);
+          compassPulseFrame = 0;
+        }
+      }
+
       function buildCompassOverlayData(position, headingDeg) {
         if (!Array.isArray(position) || position.length < 2 || !Number.isFinite(headingDeg)) {
           return { type: 'FeatureCollection', features: [] };
@@ -4646,13 +4658,18 @@
         const [lng, lat] = position;
         const base = [lng, lat];
         const halfSpread = COMPASS_OVERLAY_SPREAD_DEG / 2;
+        const innerHalfSpread = halfSpread * 0.58;
         const arcSteps = 8;
         const coneCoords = [base];
+        const innerConeCoords = [base];
         for (let i = 0; i <= arcSteps; i++) {
           const bearing = headingDeg - halfSpread + (COMPASS_OVERLAY_SPREAD_DEG * i / arcSteps);
           coneCoords.push(destinationPoint(lng, lat, bearing, COMPASS_OVERLAY_CONE_LENGTH_METERS));
+          const innerBearing = headingDeg - innerHalfSpread + ((innerHalfSpread * 2) * i / arcSteps);
+          innerConeCoords.push(destinationPoint(lng, lat, innerBearing, COMPASS_OVERLAY_CONE_LENGTH_METERS * 0.76));
         }
         coneCoords.push(base);
+        innerConeCoords.push(base);
 
         const tip = destinationPoint(lng, lat, headingDeg, COMPASS_OVERLAY_CONE_LENGTH_METERS);
         const shortTip = destinationPoint(lng, lat, headingDeg, COMPASS_OVERLAY_CONE_LENGTH_METERS * 0.52);
@@ -4667,12 +4684,22 @@
             },
             {
               type: 'Feature',
+              properties: { kind: 'cone-inner' },
+              geometry: { type: 'Polygon', coordinates: [innerConeCoords] }
+            },
+            {
+              type: 'Feature',
               properties: { kind: 'line' },
               geometry: { type: 'LineString', coordinates: [base, tip] }
             },
             {
               type: 'Feature',
               properties: { kind: 'center' },
+              geometry: { type: 'Point', coordinates: base }
+            },
+            {
+              type: 'Feature',
+              properties: { kind: 'aura' },
               geometry: { type: 'Point', coordinates: base }
             },
             {
@@ -4684,8 +4711,61 @@
         };
       }
 
+      function ensureCompassPulseAnimation() {
+        if (compassPulseFrame || !compassEnabled) return;
+
+        const tick = (timestamp) => {
+          if (!compassEnabled) {
+            stopCompassPulseAnimation();
+            return;
+          }
+
+          const phase = (Math.sin(timestamp / 560) + 1) / 2;
+          const outerOpacity = 0.16 + phase * 0.08;
+          const innerOpacity = 0.2 + phase * 0.1;
+          const lineOpacity = 0.82 + phase * 0.12;
+          const auraRadius = 13 + phase * 7;
+          const auraOpacity = 0.12 + phase * 0.1;
+          const centerRadius = 5.3 + phase * 0.8;
+
+          try {
+            if (engine === 'gl' && mapgl?.getStyle?.()) {
+              if (mapgl.getLayer(COMPASS_OVERLAY_FILL_LAYER)) {
+                mapgl.setPaintProperty(COMPASS_OVERLAY_FILL_LAYER, 'fill-opacity', outerOpacity);
+              }
+              if (mapgl.getLayer(COMPASS_OVERLAY_INNER_FILL_LAYER)) {
+                mapgl.setPaintProperty(COMPASS_OVERLAY_INNER_FILL_LAYER, 'fill-opacity', innerOpacity);
+              }
+              if (mapgl.getLayer(COMPASS_OVERLAY_LINE_LAYER)) {
+                mapgl.setPaintProperty(COMPASS_OVERLAY_LINE_LAYER, 'line-opacity', ['case', ['==', ['get', 'kind'], 'line'], lineOpacity, Math.min(0.98, lineOpacity + 0.08)]);
+                mapgl.setPaintProperty(COMPASS_OVERLAY_LINE_LAYER, 'line-width', ['case', ['==', ['get', 'kind'], 'line'], 3 + phase * 0.6, 2.2 + phase * 0.4]);
+              }
+              if (mapgl.getLayer(COMPASS_OVERLAY_AURA_LAYER)) {
+                mapgl.setPaintProperty(COMPASS_OVERLAY_AURA_LAYER, 'circle-radius', auraRadius);
+                mapgl.setPaintProperty(COMPASS_OVERLAY_AURA_LAYER, 'circle-opacity', auraOpacity);
+              }
+              if (mapgl.getLayer(COMPASS_OVERLAY_CENTER_LAYER)) {
+                mapgl.setPaintProperty(COMPASS_OVERLAY_CENTER_LAYER, 'circle-radius', centerRadius);
+              }
+            } else if (compassLeafletParts) {
+              compassLeafletParts.outerCone?.setStyle({ fillOpacity: outerOpacity, opacity: Math.min(0.9, outerOpacity + 0.42) });
+              compassLeafletParts.innerCone?.setStyle({ fillOpacity: innerOpacity, opacity: Math.min(0.98, innerOpacity + 0.45) });
+              compassLeafletParts.line?.setStyle({ opacity: lineOpacity, weight: 3 + phase * 0.6 });
+              compassLeafletParts.tip?.setStyle({ opacity: Math.min(0.98, lineOpacity + 0.08), weight: 2.1 + phase * 0.35 });
+              compassLeafletParts.aura?.setStyle({ fillOpacity: auraOpacity, opacity: auraOpacity * 1.25, radius: auraRadius });
+              compassLeafletParts.center?.setStyle({ radius: centerRadius });
+            }
+          } catch { }
+
+          compassPulseFrame = requestAnimationFrame(tick);
+        };
+
+        compassPulseFrame = requestAnimationFrame(tick);
+      }
+
       function renderCompassOverlay() {
         if (!compassEnabled || !lastUserPos || !Number.isFinite(compassHeadingDeg)) {
+          stopCompassPulseAnimation();
           clearCompassOverlay();
           updateCompassButtonState();
           return;
@@ -4709,7 +4789,17 @@
                 filter: ['==', ['get', 'kind'], 'cone'],
                 paint: {
                   'fill-color': '#60a5fa',
-                  'fill-opacity': 0.17
+                  'fill-opacity': 0.2
+                }
+              });
+              mapgl.addLayer({
+                id: COMPASS_OVERLAY_INNER_FILL_LAYER,
+                type: 'fill',
+                source: COMPASS_OVERLAY_SOURCE,
+                filter: ['==', ['get', 'kind'], 'cone-inner'],
+                paint: {
+                  'fill-color': '#dbeafe',
+                  'fill-opacity': 0.26
                 }
               });
               mapgl.addLayer({
@@ -4721,6 +4811,18 @@
                   'line-color': '#bfdbfe',
                   'line-width': ['case', ['==', ['get', 'kind'], 'line'], 3, 2],
                   'line-opacity': ['case', ['==', ['get', 'kind'], 'line'], 0.82, 0.94]
+                }
+              });
+              mapgl.addLayer({
+                id: COMPASS_OVERLAY_AURA_LAYER,
+                type: 'circle',
+                source: COMPASS_OVERLAY_SOURCE,
+                filter: ['==', ['get', 'kind'], 'aura'],
+                paint: {
+                  'circle-radius': 15,
+                  'circle-color': '#60a5fa',
+                  'circle-opacity': 0.16,
+                  'circle-blur': 0.8
                 }
               });
               mapgl.addLayer({
@@ -4736,6 +4838,7 @@
                 }
               });
             }
+            ensureCompassPulseAnimation();
           });
         } else {
           clearCompassGlOverlay();
@@ -4743,39 +4846,82 @@
 
           const features = geojson.features || [];
           const cone = features.find((feature) => feature.properties?.kind === 'cone');
+          const innerCone = features.find((feature) => feature.properties?.kind === 'cone-inner');
           const line = features.find((feature) => feature.properties?.kind === 'line');
           const center = features.find((feature) => feature.properties?.kind === 'center');
-          if (!cone || !line || !center) return;
+          const tip = features.find((feature) => feature.properties?.kind === 'tip');
+          const aura = features.find((feature) => feature.properties?.kind === 'aura');
+          if (!cone || !innerCone || !line || !center || !tip || !aura) return;
 
           const coneLatLngs = cone.geometry.coordinates[0].map(([lng, lat]) => [lat, lng]);
+          const innerConeLatLngs = innerCone.geometry.coordinates[0].map(([lng, lat]) => [lat, lng]);
           const lineLatLngs = line.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+          const tipLatLngs = tip.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
           const centerLatLng = [center.geometry.coordinates[1], center.geometry.coordinates[0]];
+          const auraLatLng = [aura.geometry.coordinates[1], aura.geometry.coordinates[0]];
 
           clearCompassLeafletOverlay();
+          const outerConeLayer = L.polygon(coneLatLngs, {
+            color: '#93c5fd',
+            weight: 1.45,
+            opacity: 0.6,
+            fillColor: '#60a5fa',
+            fillOpacity: 0.2,
+            interactive: false
+          });
+          const innerConeLayer = L.polygon(innerConeLatLngs, {
+            color: '#dbeafe',
+            weight: 1.15,
+            opacity: 0.82,
+            fillColor: '#dbeafe',
+            fillOpacity: 0.26,
+            interactive: false
+          });
+          const lineLayer = L.polyline(lineLatLngs, {
+            color: '#dbeafe',
+            weight: 3,
+            opacity: 0.86,
+            interactive: false
+          });
+          const tipLayer = L.polyline(tipLatLngs, {
+            color: '#eff6ff',
+            weight: 2.2,
+            opacity: 0.94,
+            interactive: false
+          });
+          const auraLayer = L.circleMarker(auraLatLng, {
+            radius: 15,
+            color: '#60a5fa',
+            weight: 0,
+            fillColor: '#60a5fa',
+            fillOpacity: 0.16,
+            interactive: false
+          });
+          const centerLayer = L.circleMarker(centerLatLng, {
+            radius: 5.5,
+            color: '#2563eb',
+            weight: 2,
+            fillColor: '#e0f2fe',
+            fillOpacity: 1,
+            interactive: false
+          });
+          compassLeafletParts = {
+            outerCone: outerConeLayer,
+            innerCone: innerConeLayer,
+            line: lineLayer,
+            tip: tipLayer,
+            aura: auraLayer,
+            center: centerLayer
+          };
           compassLeafletLayer = L.layerGroup([
-            L.polygon(coneLatLngs, {
-              color: '#93c5fd',
-              weight: 1.5,
-              opacity: 0.78,
-              fillColor: '#60a5fa',
-              fillOpacity: 0.17,
-              interactive: false
-            }),
-            L.polyline(lineLatLngs, {
-              color: '#dbeafe',
-              weight: 3,
-              opacity: 0.84,
-              interactive: false
-            }),
-            L.circleMarker(centerLatLng, {
-              radius: 5,
-              color: '#2563eb',
-              weight: 2,
-              fillColor: '#e0f2fe',
-              fillOpacity: 1,
-              interactive: false
-            })
+            outerConeLayer,
+            innerConeLayer,
+            lineLayer,
+            tipLayer,
+            auraLayer,
+            centerLayer
           ]).addTo(mapleaf);
+          ensureCompassPulseAnimation();
         }
 
         updateCompassButtonState();
@@ -4874,6 +5020,7 @@
         compassPending = false;
         compassHeadingDeg = null;
         detachCompassListeners();
+        stopCompassPulseAnimation();
         clearCompassOverlay();
         updateCompassButtonState();
       }
