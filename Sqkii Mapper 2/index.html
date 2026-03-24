@@ -128,10 +128,15 @@
           <button class="btn small" id="export-kmz">Export KMZ</button>
         </div>
 
-        <div class="row-split" style="margin-top:10px;">
-          <input id="url-input" type="url" placeholder="https://example.com/map.kml or .kmz" />
-          <button class="btn small" id="url-load">Load URL</button>
-        </div>
+        <details class="advanced-panel" style="margin-top:10px;">
+          <summary class="advanced-summary">Advanced</summary>
+          <div class="advanced-body">
+            <div class="row-split">
+              <input id="url-input" type="url" placeholder="https://example.com/map.kml or .kmz" />
+              <button class="btn small" id="url-load">Load URL</button>
+            </div>
+          </div>
+        </details>
       </div>
 
       <!-- Draw Circle quick tool -->

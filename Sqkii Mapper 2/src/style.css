@@ -351,6 +351,52 @@
       align-items: center
     }
 
+    .advanced-panel {
+      border: 1px solid rgba(90, 98, 116, 0.28);
+      border-radius: 12px;
+      background: rgba(10, 14, 22, 0.34);
+      overflow: hidden;
+    }
+
+    .advanced-summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 10px 12px;
+      font-weight: 700;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      user-select: none;
+    }
+
+    .advanced-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .advanced-summary::after {
+      content: "";
+      width: 9px;
+      height: 9px;
+      border-right: 2px solid rgba(203, 213, 225, 0.82);
+      border-bottom: 2px solid rgba(203, 213, 225, 0.82);
+      transform: rotate(45deg);
+      transition: transform .18s ease;
+      margin-top: -2px;
+    }
+
+    .advanced-panel[open] .advanced-summary::after {
+      transform: rotate(225deg);
+      margin-top: 4px;
+    }
+
+    .advanced-body {
+      padding: 0 12px 12px;
+      border-top: 1px solid rgba(90, 98, 116, 0.18);
+      background: rgba(10, 14, 22, 0.24);
+    }
+
     input[type="url"],
     select,
     input[type="text"],
