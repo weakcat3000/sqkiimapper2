@@ -427,6 +427,25 @@
       line-height: 1.05;
     }
 
+    #brand-title-wrap {
+      position: relative;
+      display: inline-block;
+    }
+
+    #brand-version {
+      position: absolute;
+      left: calc(100% + 6px);
+      top: 2px;
+      font-size: 10px;
+      line-height: 1;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: rgba(148, 163, 184, 0.56);
+      white-space: nowrap;
+      pointer-events: none;
+      user-select: none;
+    }
+
     #cat-lottie {
       width: 90px;
       height: 90px;

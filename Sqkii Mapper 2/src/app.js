@@ -1430,6 +1430,9 @@
       const MAPGL_PIXEL_RATIO = IS_IOS_DEVICE
         ? Math.min(Math.max(1, baseDevicePixelRatio * 0.8), 1.8)
         : Math.min(baseDevicePixelRatio * 1.25, 3);
+      const APP_BUILD_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
+      const brandVersionEl = document.getElementById('brand-version');
+      if (brandVersionEl) brandVersionEl.textContent = APP_BUILD_VERSION;
 
       const mapgl = new maptilersdk.Map({
         container: 'mapgl',
@@ -5070,6 +5073,7 @@
       let reconConstraints = [];
       let currentReconCircle = null;
       let reconPrecision = 30; // Default: 30m spacing
+      const reconStateByFid = new Map();
       const RECON_OVERLAY_SOURCE = 'recon-overlay-src';
       const RECON_OVERLAY_LAYER = 'recon-overlay-layer';
       const RECON_OVERLAY_HALO_SOURCE = 'recon-overlay-halo-src';
@@ -5317,19 +5321,28 @@
           grantReconAccess();
         }
 
+        if (currentReconCircle?.fid != null && String(currentReconCircle.fid) !== String(fid)) {
+          saveReconState(currentReconCircle.fid);
+        }
+
         currentReconCircle = { fid, center, radius };
-        reconConstraints = [];
-        reconPrecision = 20; //Reset to Default
+        const savedState = getSavedReconState(fid);
+        reconConstraints = savedState?.constraints?.length
+          ? savedState.constraints.map(c => ({ ...c }))
+          : [];
+        reconPrecision = Number(savedState?.precision) || 20;
 
         const modal = document.getElementById('recon-modal');
         modal.classList.add('visible');
         document.getElementById('app').classList.add('blocked-by-modal');
+        document.getElementById('recon-status').textContent = '';
+        document.getElementById('recon-constraints').innerHTML = '';
 
         // Set up precision buttons
         setupPrecisionButtons();
 
-        // Add first constraint by default
-        addReconConstraint();
+        if (reconConstraints.length) renderReconConstraints();
+        else addReconConstraint();
       }
 
       function setupPrecisionButtons() {
@@ -5342,36 +5355,43 @@
           '10': 'Slower, highest precision'
         };
 
+        const applyPrecisionSelection = (precision) => {
+          const normalizedPrecision = Number(precision) || 20;
+          reconPrecision = normalizedPrecision;
+          buttons.forEach(b => {
+            b.style.border = '1px solid var(--border)';
+            b.classList.remove('active');
+          });
+
+          const selectedBtn = Array.from(buttons).find(
+            btn => parseInt(btn.dataset.precision, 10) === normalizedPrecision
+          ) || buttons[1] || buttons[0];
+
+          if (selectedBtn) {
+            selectedBtn.style.border = '2px solid #60a5fa';
+            selectedBtn.classList.add('active');
+            hint.textContent = hintText[selectedBtn.dataset.precision] || hintText['20'];
+          } else {
+            hint.textContent = hintText['20'];
+          }
+        };
+
         buttons.forEach(btn => {
           btn.onclick = () => {
-            // Remove active class from all
-            buttons.forEach(b => {
-              b.style.border = '1px solid var(--border)';
-              b.classList.remove('active');
-            });
-
-            // Add active class to clicked
-            btn.style.border = '2px solid #60a5fa';
-            btn.classList.add('active');
-
-            // Update precision value
-            reconPrecision = parseInt(btn.dataset.precision);
-            hint.textContent = hintText[btn.dataset.precision];
-
+            applyPrecisionSelection(parseInt(btn.dataset.precision, 10));
             console.log('Recon precision set to:', reconPrecision, 'm');
           };
         });
+
+        applyPrecisionSelection(reconPrecision);
       }
 
       function closeReconModal() {
         const modal = document.getElementById('recon-modal');
+        saveReconState(currentReconCircle?.fid);
         modal.classList.remove('visible');
         document.getElementById('app').classList.remove('blocked-by-modal');
         setReconAnalysisPriority(false);
-
-        reconConstraints = [];
-        currentReconCircle = null;
-        document.getElementById('recon-constraints').innerHTML = '';
         document.getElementById('recon-status').textContent = '';
       }
 
@@ -5437,6 +5457,38 @@
         if (reconConstraints[index]) {
           reconConstraints[index][field] = value;
         }
+      }
+
+      function syncReconConstraintsFromDom() {
+        const container = document.getElementById('recon-constraints');
+        if (!container) return;
+        const rows = Array.from(container.children || []);
+        if (!rows.length) return;
+
+        reconConstraints = rows.map((row) => {
+          const select = row.querySelector('select');
+          const inputs = row.querySelectorAll('input');
+          return {
+            type: select?.value || 'LAMP_POST',
+            min: Number(inputs?.[0]?.value ?? 100),
+            max: Number(inputs?.[1]?.value ?? 105),
+            radius: Number(inputs?.[2]?.value ?? 350)
+          };
+        });
+      }
+
+      function getSavedReconState(fid) {
+        if (fid == null) return null;
+        return reconStateByFid.get(String(fid)) || null;
+      }
+
+      function saveReconState(fid = currentReconCircle?.fid) {
+        if (fid == null) return;
+        syncReconConstraintsFromDom();
+        reconStateByFid.set(String(fid), {
+          precision: reconPrecision,
+          constraints: reconConstraints.map(c => ({ ...c }))
+        });
       }
 
       // Recon rows use inline onchange/onclick handlers in generated HTML, so these
@@ -5986,6 +6038,7 @@
        */
 
       async function revealReconLocations() {
+        syncReconConstraintsFromDom();
         if (!currentReconCircle || !reconConstraints?.length) {
           alert('No constraints defined.');
           return;
