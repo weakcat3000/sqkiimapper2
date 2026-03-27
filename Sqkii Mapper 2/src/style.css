@@ -434,7 +434,7 @@
 
     #brand-version {
       position: absolute;
-      left: calc(100% + 6px);
+      left: calc(100% - 12px);
       top: 2px;
       font-size: 10px;
       line-height: 1;
