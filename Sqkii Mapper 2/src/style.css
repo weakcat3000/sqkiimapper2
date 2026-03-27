@@ -293,14 +293,6 @@
       align-items: center
     }
 
-    .header-icon-stack {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      flex: 0 0 30px;
-      align-self: flex-start;
-    }
-
     .toolbar {
       position: relative;
       z-index: 1;
@@ -313,11 +305,22 @@
       margin-top: 0
     }
 
-    .project-title>.icon-btn,
-    .project-title .header-icon-stack>.icon-btn {
+    .project-title>.icon-btn {
       width: 30px;
       height: 30px;
       flex: 0 0 30px
+    }
+
+    .project-title > .icon-btn {
+      align-self: flex-start;
+      margin-top: 14px;
+    }
+
+    .toolbar > .icon-btn {
+      width: 30px;
+      height: 30px;
+      flex: 0 0 30px;
+      padding: 0;
     }
 
     .btn {
@@ -443,7 +446,7 @@
 
     #brand-version {
       position: absolute;
-      left: calc(100% - 12px);
+      left: calc(100% - 28px);
       top: 2px;
       font-size: 10px;
       line-height: 1;
@@ -1964,6 +1967,11 @@
       overflow: hidden;
     }
 
+    .toolbar-power-save {
+      order: 4;
+      align-self: center;
+    }
+
     .power-save-battery {
       position: relative;
       width: 14px;
@@ -2207,7 +2215,7 @@
       }
 
       .project-title > .icon-btn,
-      .project-title .header-icon-stack > .icon-btn,
+      .toolbar > .icon-btn,
       .style-editor-x {
         width: 25.5px;
         height: 25.5px;
