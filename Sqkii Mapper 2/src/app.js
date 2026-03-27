@@ -1435,7 +1435,7 @@
       const HTM_ICONS_LS_KEY = 'sqkii-htm-icons';
       const HTM_ICONS_SETTINGS_LS_KEY = 'sqkii-htm-icons-settings';
       const HTM_ICONS_SOURCE_ID = 'htm-icons-src';
-      const HTM_ICONS_TILEJSON_URL = `${BASE_URL}worldwidemaps/tiles/htm_icons/tiles.json`;
+      const HTM_ICONS_TILE_URL = `${BASE_URL}worldwidemaps/tiles/htm_icons/{z}/{x}/{y}.pbf`;
       const HTM_ICONS_SV_ICON_NAME = 'htm-sv-ticket';
       const HTM_ICONS_SV_ICON_URL = `${BASE_URL}voucher.png`;
       const HTM_ICONS_SV_BRAND_IMAGE_PREFIX = 'htm-sv-brand-';
@@ -1832,7 +1832,10 @@
             if (!mapgl.getSource(HTM_ICONS_SOURCE_ID)) {
               mapgl.addSource(HTM_ICONS_SOURCE_ID, {
                 type: 'vector',
-                url: HTM_ICONS_TILEJSON_URL
+                tiles: [HTM_ICONS_TILE_URL],
+                minzoom: 0,
+                maxzoom: 14,
+                scheme: 'xyz'
               });
             }
 
