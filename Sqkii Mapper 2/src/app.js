@@ -1575,7 +1575,7 @@
       }, 2000);
 
       setInterval(() => {
-        if (document.visibilityState === 'visible') scheduleGlHeal('watchdog');
+        if (!powerSavingEnabled && document.visibilityState === 'visible') scheduleGlHeal('watchdog');
       }, 4000);
 
 
@@ -4594,6 +4594,7 @@
         document.getElementById('cat-lottie')?._lottieAnimation?.pause?.();
         if (typeof stopReconHaloPulse === 'function') stopReconHaloPulse();
         if (typeof cancelLampPostSearchPulse === 'function') cancelLampPostSearchPulse();
+        if (typeof stopPulseAnimation === 'function') stopPulseAnimation();
       }
       function resumeNonEssentialEffects() {
         ensureVeilResumeGuard();
@@ -4602,6 +4603,15 @@
         document.getElementById('cat-lottie')?._lottieAnimation?.play?.();
         if (reconOverlayPoints.length && typeof startReconHaloPulse === 'function') startReconHaloPulse();
         if (lampPostSearchFeatures.length && typeof animateLampPostSearchPulse === 'function') animateLampPostSearchPulse();
+        if (typeof startPulseAnimation === 'function' && typeof map !== 'undefined' && map) {
+          try {
+            const hasPreviewPulse =
+              map.getLayer?.('coin-preview-first-halo') ||
+              map.getLayer?.('coin-preview-last-halo') ||
+              map.getLayer?.('coin-preview-exact-halo');
+            if (hasPreviewPulse) startPulseAnimation();
+          } catch { }
+        }
       }
       function ensureVeilResumeGuard() {
         if (!window.__resumeVeil || window.__resumeVeil.__powerSaveWrapped) return;
@@ -7897,6 +7907,7 @@
 
       function startPulseAnimation() {
         stopPulseAnimation();
+        if (powerSavingEnabled) return;
         const tick = (ts) => {
           const phase = (Math.sin(ts / 520) + 1) / 2;
           const firstRadius = 14 + phase * 10;
