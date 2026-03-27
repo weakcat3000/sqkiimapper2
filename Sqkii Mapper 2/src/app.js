@@ -1436,6 +1436,8 @@
       const HTM_ICONS_SETTINGS_LS_KEY = 'sqkii-htm-icons-settings';
       const HTM_ICONS_SOURCE_ID = 'htm-icons-src';
       const HTM_ICONS_TILE_URL = 'https://worldwidemaps.sqkii.com/api/tiles/htm_icons/{z}/{x}/{y}';
+      const HTM_ICONS_SV_ICON_NAME = 'htm-sv-ticket';
+      const HTM_ICONS_SV_ICON_URL = `${BASE_URL}voucher.png`;
       const HTM_ICONS_LAYER_DEFS = [
         { id: 'htm-icons-lamp', sourceLayer: 'LTALampPostSilm', name: 'Lamp Posts', meta: 'Singapore lamp post markers', labelPrefix: 'Lamp', labelProps: ['Name'], color: '#f59e0b', stroke: '#7c2d12', minzoom: 13, radius: [13, 1.8, 16, 3.4] },
         { id: 'htm-icons-aed', sourceLayer: 'aed', name: 'AED', meta: 'Defibrillator locations', labelPrefix: 'AED', labelProps: ['BUILDING_NAME', 'AED_LOCATION_DESCRIPTION', 'ROAD_NAME'], color: '#22c55e', stroke: '#14532d', minzoom: 11, radius: [11, 3.2, 16, 5.3] },
@@ -1456,11 +1458,11 @@
         { id: 'htm-icons-sponsor-1', sourceLayer: 'sponsor_1', name: 'Sponsor 1', meta: 'Sponsor location set 1', labelPrefix: 'Sponsor', labelProps: ['Sponsor', 'Address'], color: '#f97316', stroke: '#7c2d12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
         { id: 'htm-icons-sponsor-2', sourceLayer: 'sponsor_2', name: 'Sponsor 2', meta: 'Sponsor location set 2', labelPrefix: 'Sponsor', labelProps: ['Sponsor', 'Address'], color: '#f97316', stroke: '#7c2d12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
         { id: 'htm-icons-sponsor-3', sourceLayer: 'sponsor_3', name: 'Sponsor 3', meta: 'Sponsor location set 3', labelPrefix: 'Sponsor', labelProps: ['Sponsor', 'Address'], color: '#f97316', stroke: '#7c2d12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
-        { id: 'htm-icons-sv-1', sourceLayer: 'sv1', name: 'SV 1', meta: 'SV merchant set 1', labelPrefix: 'SV', labelProps: ['Outlet brand', 'Outlet name', 'Full address'], color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
-        { id: 'htm-icons-sv-2', sourceLayer: 'sv2', name: 'SV 2', meta: 'SV merchant set 2', labelPrefix: 'SV', labelProps: ['Outlet brand', 'Outlet name', 'Full address'], color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
-        { id: 'htm-icons-sv-3', sourceLayer: 'sv3', name: 'SV 3', meta: 'SV merchant set 3', labelPrefix: 'SV', labelProps: ['Outlet brand', 'Outlet name', 'Full address'], color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
-        { id: 'htm-icons-sv-4', sourceLayer: 'sv4', name: 'SV 4', meta: 'SV merchant set 4', labelPrefix: 'SV', labelProps: ['Outlet brand', 'Outlet name', 'Full address'], color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
-        { id: 'htm-icons-sv-5', sourceLayer: 'sv5', name: 'SV 5', meta: 'SV merchant set 5', labelPrefix: 'SV', labelProps: ['Outlet brand', 'Outlet name', 'Full address'], color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] }
+        { id: 'htm-icons-sv-1', sourceLayer: 'sv1', name: 'SV 1', meta: 'SV merchant set 1', labelPrefix: 'SV', labelProps: ['Outlet brand', 'Outlet name', 'Full address'], color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7], markerKind: 'sv-ticket' },
+        { id: 'htm-icons-sv-2', sourceLayer: 'sv2', name: 'SV 2', meta: 'SV merchant set 2', labelPrefix: 'SV', labelProps: ['Outlet brand', 'Outlet name', 'Full address'], color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7], markerKind: 'sv-ticket' },
+        { id: 'htm-icons-sv-3', sourceLayer: 'sv3', name: 'SV 3', meta: 'SV merchant set 3', labelPrefix: 'SV', labelProps: ['Outlet brand', 'Outlet name', 'Full address'], color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7], markerKind: 'sv-ticket' },
+        { id: 'htm-icons-sv-4', sourceLayer: 'sv4', name: 'SV 4', meta: 'SV merchant set 4', labelPrefix: 'SV', labelProps: ['Outlet brand', 'Outlet name', 'Full address'], color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7], markerKind: 'sv-ticket' },
+        { id: 'htm-icons-sv-5', sourceLayer: 'sv5', name: 'SV 5', meta: 'SV merchant set 5', labelPrefix: 'SV', labelProps: ['Outlet brand', 'Outlet name', 'Full address'], color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7], markerKind: 'sv-ticket' }
       ];
       const brandVersionEl = document.getElementById('brand-version');
       if (brandVersionEl) brandVersionEl.textContent = APP_BUILD_VERSION;
@@ -1612,7 +1614,13 @@
       }, 4000);
 
       const htmIconsLabelLayerId = (layerId) => `${layerId}-label`;
+      const htmIconsGlowLayerId = (layerId) => `${layerId}-glow`;
       const isHtmIconsLayerEnabled = (layerId) => htmIconsLayerVisibility[layerId] !== false;
+
+      async function ensureHtmSvIcon() {
+        if (mapgl.hasImage?.(HTM_ICONS_SV_ICON_NAME)) return;
+        await addImageToGL(HTM_ICONS_SV_ICON_NAME, HTM_ICONS_SV_ICON_URL);
+      }
 
       function buildHtmIconsLabelExpression(layer) {
         const labelCandidates = (layer.labelProps || []).map((prop) => ['get', prop]);
@@ -1624,6 +1632,10 @@
       function applyHtmIconsOverlayVisibility() {
         for (const layer of HTM_ICONS_LAYER_DEFS) {
           const visible = htmIconsEnabled && isHtmIconsLayerEnabled(layer.id);
+          const glowId = htmIconsGlowLayerId(layer.id);
+          if (mapgl.getLayer(glowId)) {
+            mapgl.setLayoutProperty(glowId, 'visibility', visible ? 'visible' : 'none');
+          }
           if (mapgl.getLayer(layer.id)) {
             mapgl.setLayoutProperty(layer.id, 'visibility', visible ? 'visible' : 'none');
           }
@@ -1636,6 +1648,10 @@
 
       function removeHtmIconsOverlay() {
         for (const layer of HTM_ICONS_LAYER_DEFS) {
+          const glowId = htmIconsGlowLayerId(layer.id);
+          if (mapgl.getLayer(glowId)) {
+            try { mapgl.removeLayer(glowId); } catch { }
+          }
           if (mapgl.getLayer(layer.id)) {
             try { mapgl.removeLayer(layer.id); } catch { }
           }
@@ -1652,70 +1668,116 @@
       function ensureHtmIconsOverlay() {
         if (!htmIconsEnabled || engine !== 'gl') return;
         glReady(() => {
-          if (!htmIconsEnabled || engine !== 'gl') return;
-          if (!mapgl.getSource(HTM_ICONS_SOURCE_ID)) {
-            mapgl.addSource(HTM_ICONS_SOURCE_ID, {
-              type: 'vector',
-              tiles: [HTM_ICONS_TILE_URL],
-              minzoom: 0,
-              maxzoom: 14,
-              scheme: 'xyz'
-            });
-          }
-
-          for (const layer of HTM_ICONS_LAYER_DEFS) {
-            if (!mapgl.getLayer(layer.id)) {
-              mapgl.addLayer({
-                id: layer.id,
-                type: 'circle',
-                source: HTM_ICONS_SOURCE_ID,
-                'source-layer': layer.sourceLayer,
-                minzoom: layer.minzoom,
-                paint: {
-                  'circle-color': layer.color,
-                  'circle-radius': [
-                    'interpolate', ['linear'], ['zoom'],
-                    layer.radius[0], layer.radius[1],
-                    layer.radius[2], layer.radius[3]
-                  ],
-                  'circle-opacity': 0.92,
-                  'circle-stroke-color': layer.stroke,
-                  'circle-stroke-width': 1.15
-                }
+          void (async () => {
+            if (!htmIconsEnabled || engine !== 'gl') return;
+            if (!mapgl.getSource(HTM_ICONS_SOURCE_ID)) {
+              mapgl.addSource(HTM_ICONS_SOURCE_ID, {
+                type: 'vector',
+                tiles: [HTM_ICONS_TILE_URL],
+                minzoom: 0,
+                maxzoom: 14,
+                scheme: 'xyz'
               });
             }
 
-            const labelId = htmIconsLabelLayerId(layer.id);
-            if (!mapgl.getLayer(labelId)) {
-              mapgl.addLayer({
-                id: labelId,
-                type: 'symbol',
-                source: HTM_ICONS_SOURCE_ID,
-                'source-layer': layer.sourceLayer,
-                minzoom: Math.max(layer.minzoom, 11.5),
-                layout: {
-                  'text-field': buildHtmIconsLabelExpression(layer),
-                  'text-size': [
-                    'interpolate', ['linear'], ['zoom'],
-                    Math.max(layer.minzoom, 11.5), 10,
-                    16, 12
-                  ],
-                  'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
-                  'text-offset': [0, 1.1],
-                  'text-anchor': 'top',
-                  'text-max-width': 18,
-                  'text-optional': true
-                },
-                paint: {
-                  'text-color': '#f8fafc',
-                  'text-halo-color': 'rgba(15, 17, 21, 0.92)',
-                  'text-halo-width': 1.35,
-                  'text-halo-blur': 0.2
-                }
-              });
+            if (HTM_ICONS_LAYER_DEFS.some((layer) => layer.markerKind === 'sv-ticket')) {
+              await ensureHtmSvIcon();
             }
-          }
-          applyHtmIconsOverlayVisibility();
+
+            for (const layer of HTM_ICONS_LAYER_DEFS) {
+              if (layer.markerKind === 'sv-ticket') {
+                const glowId = htmIconsGlowLayerId(layer.id);
+                if (!mapgl.getLayer(glowId)) {
+                  mapgl.addLayer({
+                    id: glowId,
+                    type: 'circle',
+                    source: HTM_ICONS_SOURCE_ID,
+                    'source-layer': layer.sourceLayer,
+                    minzoom: layer.minzoom,
+                    paint: {
+                      'circle-color': '#facc15',
+                      'circle-radius': [
+                        'interpolate', ['linear'], ['zoom'],
+                        layer.radius[0], 9,
+                        16, 14
+                      ],
+                      'circle-opacity': 0.34,
+                      'circle-blur': 0.9
+                    }
+                  });
+                }
+                if (!mapgl.getLayer(layer.id)) {
+                  mapgl.addLayer({
+                    id: layer.id,
+                    type: 'symbol',
+                    source: HTM_ICONS_SOURCE_ID,
+                    'source-layer': layer.sourceLayer,
+                    minzoom: layer.minzoom,
+                    layout: {
+                      'icon-image': HTM_ICONS_SV_ICON_NAME,
+                      'icon-size': [
+                        'interpolate', ['linear'], ['zoom'],
+                        layer.minzoom, 0.5,
+                        16, 0.72
+                      ],
+                      'icon-allow-overlap': true,
+                      'icon-ignore-placement': true
+                    }
+                  });
+                }
+              } else if (!mapgl.getLayer(layer.id)) {
+                mapgl.addLayer({
+                  id: layer.id,
+                  type: 'circle',
+                  source: HTM_ICONS_SOURCE_ID,
+                  'source-layer': layer.sourceLayer,
+                  minzoom: layer.minzoom,
+                  paint: {
+                    'circle-color': layer.color,
+                    'circle-radius': [
+                      'interpolate', ['linear'], ['zoom'],
+                      layer.radius[0], layer.radius[1],
+                      layer.radius[2], layer.radius[3]
+                    ],
+                    'circle-opacity': 0.92,
+                    'circle-stroke-color': layer.stroke,
+                    'circle-stroke-width': 1.15
+                  }
+                });
+              }
+
+              const labelId = htmIconsLabelLayerId(layer.id);
+              if (!mapgl.getLayer(labelId)) {
+                mapgl.addLayer({
+                  id: labelId,
+                  type: 'symbol',
+                  source: HTM_ICONS_SOURCE_ID,
+                  'source-layer': layer.sourceLayer,
+                  minzoom: Math.max(layer.minzoom, 11.5),
+                  layout: {
+                    'text-field': buildHtmIconsLabelExpression(layer),
+                    'text-size': [
+                      'interpolate', ['linear'], ['zoom'],
+                      Math.max(layer.minzoom, 11.5), 10,
+                      16, 12
+                    ],
+                    'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+                    'text-offset': layer.markerKind === 'sv-ticket' ? [0, 1.45] : [0, 1.1],
+                    'text-anchor': 'top',
+                    'text-max-width': 18,
+                    'text-optional': true
+                  },
+                  paint: {
+                    'text-color': '#f8fafc',
+                    'text-halo-color': 'rgba(15, 17, 21, 0.92)',
+                    'text-halo-width': 1.35,
+                    'text-halo-blur': 0.2
+                  }
+                });
+              }
+            }
+            applyHtmIconsOverlayVisibility();
+          })();
         });
       }
 
