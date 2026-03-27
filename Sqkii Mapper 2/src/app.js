@@ -1437,6 +1437,7 @@
       const HTM_ICONS_SETTINGS_LS_KEY = 'sqkii-htm-icons-settings';
       const HTM_ICONS_SOURCE_ID = 'htm-icons-src';
       const HTM_ICONS_TILE_URL = `${ABS_BASE_URL}worldwidemaps/tiles/htm_icons/{z}/{x}/{y}.pbf`;
+      const HTM_ICONS_TILEJSON_URL = `${ABS_BASE_URL}worldwidemaps/tiles/htm_icons/tiles.json`;
       const HTM_ICONS_SV_ICON_NAME = 'htm-sv-ticket';
       const HTM_ICONS_SV_ICON_URL = `${ABS_BASE_URL}voucher.png`;
       const HTM_ICONS_SV_BRAND_IMAGE_PREFIX = 'htm-sv-brand-';
@@ -1647,6 +1648,8 @@
       let htmSvSpriteManifestPromise = null;
       let htmSvSpriteSheetPromise = null;
       let htmSvSpriteNormalizedKeysPromise = null;
+      let htmSvKnownBrandsPromise = null;
+      let htmSvBrandPreloadPromise = null;
       const htmSvSpriteCropCache = new Map();
 
       async function ensureHtmSvIcon() {
@@ -1710,6 +1713,36 @@
           });
         }
         return htmSvSpriteNormalizedKeysPromise;
+      }
+
+      async function fetchHtmSvKnownBrands() {
+        if (!htmSvKnownBrandsPromise) {
+          htmSvKnownBrandsPromise = fetch(HTM_ICONS_TILEJSON_URL)
+            .then((resp) => {
+              if (!resp.ok) throw new Error(`HTM TileJSON ${resp.status}`);
+              return resp.json();
+            })
+            .then((tilejson) => {
+              const brands = new Set();
+              const layers = tilejson?.tilestats?.layers || [];
+              for (const layer of layers) {
+                if (!/^sv[1-5]$/i.test(String(layer?.layer || ''))) continue;
+                for (const attr of (layer.attributes || [])) {
+                  if (String(attr?.attribute || '') !== 'Outlet brand') continue;
+                  for (const value of (attr.values || [])) {
+                    const brand = String(value || '').trim();
+                    if (brand) brands.add(brand);
+                  }
+                }
+              }
+              return [...brands];
+            })
+            .catch((error) => {
+              console.warn('Failed to load HTM SV brand list', error);
+              return [];
+            });
+        }
+        return htmSvKnownBrandsPromise;
       }
 
       async function resolveHtmSvSpriteKey(brand) {
@@ -1782,6 +1815,18 @@
         }
       }
 
+      async function preloadHtmSvBrandIcons() {
+        if (htmSvBrandPreloadPromise) return htmSvBrandPreloadPromise;
+        htmSvBrandPreloadPromise = (async () => {
+          const brands = await fetchHtmSvKnownBrands();
+          if (!brands.length) return;
+          await Promise.all(brands.map((brand) => ensureHtmSvBrandIcon(brand)));
+        })().catch((error) => {
+          console.warn('Failed to preload HTM SV brand icons', error);
+        });
+        return htmSvBrandPreloadPromise;
+      }
+
       function buildHtmIconsLabelExpression(layer) {
         const labelCandidates = (layer.labelProps || []).map((prop) => ['get', prop]);
         const baseLabel = ['to-string', ['coalesce', ...labelCandidates, '']];
@@ -1842,6 +1887,7 @@
 
             if (HTM_ICONS_LAYER_DEFS.some((layer) => layer.markerKind === 'sv-ticket')) {
               await ensureHtmSvIcon();
+              await preloadHtmSvBrandIcons();
             }
 
             for (const layer of HTM_ICONS_LAYER_DEFS) {
