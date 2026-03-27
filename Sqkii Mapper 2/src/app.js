@@ -4162,8 +4162,6 @@
         updateConnectionIndicator();
       }
 
-      initializeUserInfo();
-
       const ROOM_PRESENCE_TABLE = 'room_presence';
       const ROOM_PRESENCE_HEARTBEAT_MS = 15000;
       const ROOM_PRESENCE_REFRESH_MS = 10000;
@@ -4175,6 +4173,8 @@
       let roomPresenceHeartbeatTimer = 0;
       let roomPresenceRefreshTimer = 0;
       let connectedUsers = 1; // Start with self
+
+      initializeUserInfo();
 
       function clearRoomPresenceTimers() {
         clearInterval(roomPresenceHeartbeatTimer);
