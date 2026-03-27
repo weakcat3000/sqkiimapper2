@@ -5368,12 +5368,6 @@
         modal.classList.remove('visible');
         document.getElementById('app').classList.remove('blocked-by-modal');
         setReconAnalysisPriority(false);
-        activeReconRequestId++;
-        if (typeof rejectActiveReconRun === 'function') {
-          const reject = rejectActiveReconRun;
-          rejectActiveReconRun = null;
-          reject(Object.assign(new Error('Recon cancelled'), { name: 'AbortError' }));
-        }
 
         reconConstraints = [];
         currentReconCircle = null;
@@ -5964,56 +5958,6 @@
         return required;
       }
 
-      let activeReconRequestId = 0;
-      let rejectActiveReconRun = null;
-
-      function getReconConstraintCost(type) {
-        const costRank = { AED: 1, BUS_STOP: 1, LAMP_POST: 2, NO_ENTRY: 3, SLOW: 3, STOP: 3, HDB: 99 };
-        return costRank[type] ?? 50;
-      }
-
-      function buildReconWorkerConstraint(constraint) {
-        const base = {
-          min: Number(constraint?.min) || 0,
-          max: Number(constraint?.max) || 0,
-          radius: Number(constraint?.radius) || 0
-        };
-        switch (constraint?.type) {
-          case 'LAMP_POST': return { ...base, dataset: 'lamp' };
-          case 'HDB': return { ...base, dataset: 'hdb' };
-          case 'AED': return { ...base, dataset: 'aed' };
-          case 'BUS_STOP': return { ...base, dataset: 'bus' };
-          case 'NO_ENTRY': return { ...base, dataset: 'traffic', category: 'NO_ENTRY' };
-          case 'SLOW': return { ...base, dataset: 'traffic', category: 'SLOW' };
-          case 'STOP': return { ...base, dataset: 'traffic', category: 'STOP' };
-          default: return null;
-        }
-      }
-
-      async function fetchExactAnalysisDownloadUrl(datasetId, label = '') {
-        const pollUrl = `https://api-open.data.gov.sg/v1/public/api/datasets/${datasetId}/poll-download`;
-        const name = label || datasetId;
-        const pollResp = await fetch(workerProxy(pollUrl));
-        if (!pollResp.ok) throw new Error(`${name} poll failed (${pollResp.status})`);
-
-        const pollJson = await pollResp.json();
-        if (pollJson && pollJson.type === 'FeatureCollection' && Array.isArray(pollJson.features)) {
-          return URL.createObjectURL(new Blob([JSON.stringify(pollJson)], { type: 'application/json' }));
-        }
-
-        const downloadUrl = pollJson?.data?.url;
-        if (!downloadUrl) throw new Error(`${name} download URL missing`);
-        return workerProxy(downloadUrl);
-      }
-
-      function getExactAnalysisDownloadUrlCached(datasetId, label = '') {
-        window.__DG_EXACT_URL_CACHE = window.__DG_EXACT_URL_CACHE || {};
-        if (!window.__DG_EXACT_URL_CACHE[datasetId]) {
-          window.__DG_EXACT_URL_CACHE[datasetId] = fetchExactAnalysisDownloadUrl(datasetId, label);
-        }
-        return window.__DG_EXACT_URL_CACHE[datasetId];
-      }
-
 
       /**
        * Requires:
@@ -6041,12 +5985,29 @@
             : '🔍 Reveal Locations';
         };
 
+        const yieldToBrowser = () => new Promise(r => setTimeout(r, 0));
+
         setLoading(true, 'Loading data and analyzing...');
 
-        const requestId = ++activeReconRequestId;
-
         try {
-          const requiredDatasets = getRequiredReconDatasets(reconConstraints);
+          // Match the original mapper exactly: same worker-only cache path, same
+          // dataset preload order, same preprocessing sequence.
+          let [lampData, hdbData, aedData, busData, trafficData] = await Promise.all([
+            getExactAnalysisCached(DATASET_IDS.LAMP_POST, 'Lamp Post'),
+            getExactAnalysisCached(DATASET_IDS.HDB, 'HDB'),
+            getExactAnalysisCached(DATASET_IDS.AED, 'AED'),
+            getExactAnalysisCached(DATASET_IDS.BUS_STOP, 'Bus Stop'),
+            getExactAnalysisCached(DATASET_IDS.TRAFFIC_SIGN, 'Traffic Sign')
+          ]);
+
+          lampData = prepDataset(lampData);
+          hdbData = prepDataset(hdbData);
+          ensureHdbIndex(hdbData);
+          aedData = prepDataset(aedData);
+          busData = prepDataset(busData);
+          trafficData = prepDataset(trafficData);
+
+          // Build recon search circle + adaptive precision
           const searchCircle = turf.circle(
             currentReconCircle.center,
             currentReconCircle.radius,
@@ -6056,6 +6017,7 @@
           const circleArea = turf.area(searchCircle); // m²
           let adaptivePrecision = reconPrecision;
 
+          // thresholds from largest to smallest
           const thresholds = [
             [10_000_000, 40],
             [5_000_000, 25],
@@ -6071,12 +6033,14 @@
             { units: 'kilometers' }
           );
 
+          // Filter test points inside circle
           const testPoints = [];
           for (const pt of grid.features) {
             const coords = pt.geometry?.coordinates;
             if (coords && turf.booleanPointInPolygon(coords, searchCircle)) testPoints.push(pt);
           }
 
+          // Safety check
           const MAX_POINTS = 2000;
           if (testPoints.length > MAX_POINTS) {
             const ok = confirm(
@@ -6089,83 +6053,60 @@
 
           status.textContent = `🔍 Testing ${testPoints.length} locations at ${adaptivePrecision}m spacing...`;
 
+          // Map constraint -> counting logic
+          const trafficCat = { NO_ENTRY: 'NO_ENTRY', SLOW: 'SLOW', STOP: 'STOP' };
+          const dataByType = { LAMP_POST: lampData, AED: aedData, BUS_STOP: busData };
+
+          // ✅ Run cheaper constraints first, HDB last
+          const costRank = { AED: 1, BUS_STOP: 1, LAMP_POST: 2, NO_ENTRY: 3, SLOW: 3, STOP: 3, HDB: 99 };
           const constraintsSorted = [...reconConstraints].sort(
-            (a, b) => getReconConstraintCost(a.type) - getReconConstraintCost(b.type)
+            (a, b) => (costRank[a.type] ?? 50) - (costRank[b.type] ?? 50)
           );
-          const workerConstraints = constraintsSorted
-            .map(buildReconWorkerConstraint)
-            .filter(Boolean);
 
-          const fetchUrls = {};
-          await Promise.all([
-            requiredDatasets.has('LAMP_POST')
-              ? getExactAnalysisDownloadUrlCached(DATASET_IDS.LAMP_POST, 'Lamp Post').then((url) => { fetchUrls.lampUrl = url; })
-              : Promise.resolve(),
-            requiredDatasets.has('HDB')
-              ? getExactAnalysisDownloadUrlCached(DATASET_IDS.HDB, 'HDB').then((url) => { fetchUrls.hdbUrl = url; })
-              : Promise.resolve(),
-            requiredDatasets.has('AED')
-              ? getExactAnalysisDownloadUrlCached(DATASET_IDS.AED, 'AED').then((url) => { fetchUrls.aedUrl = url; })
-              : Promise.resolve(),
-            requiredDatasets.has('BUS_STOP')
-              ? getExactAnalysisDownloadUrlCached(DATASET_IDS.BUS_STOP, 'Bus Stop').then((url) => { fetchUrls.busUrl = url; })
-              : Promise.resolve(),
-            requiredDatasets.has('TRAFFIC_SIGN')
-              ? getExactAnalysisDownloadUrlCached(DATASET_IDS.TRAFFIC_SIGN, 'Traffic Sign').then((url) => { fetchUrls.trafficUrl = url; })
-              : Promise.resolve()
-          ]);
+          const matchingPoints = [];
+          const timeSliceMs = 24;
 
-          const matchingPoints = await new Promise((resolve, reject) => {
-            const worker = getReconWorker();
-            rejectActiveReconRun = reject;
+          for (let i = 0; i < testPoints.length;) {
+            const sliceStart = performance.now();
 
-            worker.onerror = (event) => {
-              if (requestId !== activeReconRequestId) return;
-              rejectActiveReconRun = null;
-              reject(new Error(event?.message || 'Recon worker failed'));
-            };
+            while (i < testPoints.length && (performance.now() - sliceStart) < timeSliceMs) {
+              const testPt = testPoints[i++];
+              const center = testPt.geometry.coordinates;
 
-            worker.onmessage = (event) => {
-              const msg = event.data || {};
-              if (msg.requestId !== requestId) return;
+              // ✅ cache circles per point (same radius reused across constraints)
+              const circleCache = new Map(); // radius -> circle feature
 
-              if (msg.type === 'META') {
-                status.textContent = `🔍 Testing ${msg.total} locations at ${adaptivePrecision}m spacing...`;
-                return;
+              let ok = true;
+              for (const c of constraintsSorted) {
+                let testCircle = circleCache.get(c.radius);
+                if (!testCircle) {
+                  // Keep steps=32 to preserve exact behavior vs your current version
+                  testCircle = turf.circle(center, c.radius, { steps: 32, units: 'meters' });
+                  circleCache.set(c.radius, testCircle);
+                }
+
+                let cnt = 0;
+
+                if (c.type === 'HDB') {
+                  // ✅ indexed HDB count (still uses booleanIntersects inside)
+                  cnt = countHdbInCircleIndexed(hdbData, testCircle);
+                } else if (dataByType[c.type]) {
+                  cnt = countInCircle(dataByType[c.type], testCircle);
+                } else if (trafficCat[c.type] && trafficData) {
+                  cnt = countTrafficSigns(trafficData, testCircle, trafficCat[c.type]);
+                }
+
+                if (cnt < c.min || cnt > c.max) { ok = false; break; }
               }
 
-              if (msg.type === 'PROGRESS') {
-                const done = Number(msg.done) || 0;
-                const total = Number(msg.total) || testPoints.length || 0;
-                const matches = Number(msg.matches) || 0;
-                const progress = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
-                status.textContent = `🔍 Progress: ${progress}% (${done}/${total} tested, ${matches} matches)`;
-                return;
-              }
+              if (ok) matchingPoints.push(testPt);
+            }
 
-              if (msg.type === 'DONE') {
-                rejectActiveReconRun = null;
-                resolve(Array.isArray(msg.matches) ? msg.matches : []);
-                return;
-              }
+            const progress = Math.min(100, Math.round((i / testPoints.length) * 100));
+            status.textContent = `🔍 Progress: ${progress}% (${i}/${testPoints.length} tested, ${matchingPoints.length} matches)`;
 
-              if (msg.type === 'ERROR') {
-                rejectActiveReconRun = null;
-                reject(new Error(msg.message || 'Recon worker failed'));
-              }
-            };
-
-            worker.postMessage({
-              type: 'START',
-              requestId,
-              fetchUrls,
-              reconCenter: currentReconCircle.center,
-              reconRadiusMeters: currentReconCircle.radius,
-              reconPrecisionMeters: adaptivePrecision,
-              constraints: workerConstraints,
-              steps: 64
-            });
-          });
+            await yieldToBrowser();
+          }
 
           status.textContent =
             `✅ Found ${matchingPoints.length} matching locations (tested ${testPoints.length} points at ${adaptivePrecision}m spacing)`;
@@ -6177,16 +6118,11 @@
             renderReconOverlay(matchingPoints, { spacingMeters: adaptivePrecision });
           }
         } catch (err) {
-          rejectActiveReconRun = null;
-          if (err?.name === 'AbortError') {
-            status.textContent = '❌ Cancelled';
-            return;
-          }
           console.error('Recon analysis failed:', err);
           status.textContent = '❌ Analysis failed';
           alert('Failed to analyze locations: ' + (err?.message || err));
         } finally {
-          if (activeReconRequestId === requestId) setLoading(false);
+          setLoading(false);
         }
       }
 
@@ -8283,10 +8219,8 @@
         if (reconWorker) return reconWorker;
 
         const workerCode = `
-    importScripts(
-      'https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js',
-      'https://unpkg.com/rbush@3.0.1/rbush.min.js'
-    );
+    // Load turf in the worker (same turf version you use in main page)
+    importScripts('https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js');
 
     let cache = {
       lamp: null, hdb: null, aed: null, bus: null, traffic: null
@@ -8332,30 +8266,6 @@
       }
 
       return fc;
-    }
-
-    function ensureHdbIndex(hdbData) {
-      if (!hdbData?.features || hdbData.__rbush || typeof rbush !== 'function') return;
-      const tree = new rbush();
-      const items = [];
-      for (const f of hdbData.features) {
-        if (!f.__turfGeom || !f.__bbox) continue;
-        const b = f.__bbox;
-        items.push({ minX: b[0], minY: b[1], maxX: b[2], maxY: b[3], f });
-      }
-      tree.load(items);
-      hdbData.__rbush = tree;
-    }
-
-    function countHdbInCircleIndexed(hdbData, circle) {
-      if (!hdbData?.__rbush) return countInCircle(hdbData, circle);
-      const [minX, minY, maxX, maxY] = turf.bbox(circle);
-      const candidates = hdbData.__rbush.search({ minX, minY, maxX, maxY });
-      let count = 0;
-      for (const item of candidates) {
-        if (turf.booleanIntersects(item.f.__turfGeom, circle)) count++;
-      }
-      return count;
     }
 
     function countInCircle(dataset, circle) {
@@ -8432,7 +8342,6 @@
 
       try {
         const {
-          requestId,
           fetchUrls, // { lampUrl, hdbUrl, aedUrl, busUrl, trafficUrl }
           reconCenter, reconRadiusMeters,
           reconPrecisionMeters,
@@ -8440,12 +8349,12 @@
           steps
         } = msg;
 
-        if (fetchUrls?.lampUrl && !cache.lamp) cache.lamp = prepDataset(await fetchGeoJson(fetchUrls.lampUrl));
-        if (fetchUrls?.hdbUrl && !cache.hdb) cache.hdb = prepDataset(await fetchGeoJson(fetchUrls.hdbUrl));
-        if (fetchUrls?.aedUrl && !cache.aed) cache.aed = prepDataset(await fetchGeoJson(fetchUrls.aedUrl));
-        if (fetchUrls?.busUrl && !cache.bus) cache.bus = prepDataset(await fetchGeoJson(fetchUrls.busUrl));
-        if (fetchUrls?.trafficUrl && !cache.traffic) cache.traffic = prepDataset(await fetchGeoJson(fetchUrls.trafficUrl));
-        if (cache.hdb) ensureHdbIndex(cache.hdb);
+        // Load+cache datasets inside worker (so it keeps running even if tab hidden)
+        if (!cache.lamp)    cache.lamp    = prepDataset(await fetchGeoJson(fetchUrls.lampUrl));
+        if (!cache.hdb)     cache.hdb     = prepDataset(await fetchGeoJson(fetchUrls.hdbUrl));
+        if (!cache.aed)     cache.aed     = prepDataset(await fetchGeoJson(fetchUrls.aedUrl));
+        if (!cache.bus)     cache.bus     = prepDataset(await fetchGeoJson(fetchUrls.busUrl));
+        if (!cache.traffic) cache.traffic = prepDataset(await fetchGeoJson(fetchUrls.trafficUrl));
 
         const searchCircle = turf.circle(reconCenter, reconRadiusMeters, { steps: steps || 64, units: 'meters' });
         const bbox = turf.bbox(searchCircle);
@@ -8460,25 +8369,20 @@
           if (turf.booleanPointInPolygon(coords, searchCircle)) testPoints.push(coords);
         }
 
-        postMessage({ type: 'META', requestId, total: testPoints.length });
+        postMessage({ type: 'META', total: testPoints.length });
 
         const matches = [];
         for (let i = 0; i < testPoints.length; i++) {
           const coords = testPoints[i];
           const center = coords; // [lng, lat]
-          const circleCache = new Map();
 
           let ok = true;
           for (const c of constraints) {
-            let circle = circleCache.get(c.radius);
-            if (!circle) {
-              circle = turf.circle(center, c.radius, { steps: 32, units: 'meters' });
-              circleCache.set(c.radius, circle);
-            }
+            const circle = turf.circle(center, c.radius, { steps: 32, units: 'meters' });
 
             let cnt = 0;
             if (c.dataset === 'lamp') cnt = countInCircle(cache.lamp, circle);
-            else if (c.dataset === 'hdb') cnt = countHdbInCircleIndexed(cache.hdb, circle);
+            else if (c.dataset === 'hdb') cnt = countInCircle(cache.hdb, circle);
             else if (c.dataset === 'aed') cnt = countInCircle(cache.aed, circle);
             else if (c.dataset === 'bus') cnt = countInCircle(cache.bus, circle);
             else if (c.dataset === 'traffic') cnt = countTrafficSigns(cache.traffic, circle, c.category);
@@ -8489,12 +8393,12 @@
           if (ok) matches.push(center);
 
           // progress update every ~100 points
-          if (i % 100 === 0) postMessage({ type: 'PROGRESS', requestId, done: i, total: testPoints.length, matches: matches.length });
+          if (i % 100 === 0) postMessage({ type: 'PROGRESS', done: i });
         }
 
-        postMessage({ type: 'DONE', requestId, matches });
+        postMessage({ type: 'DONE', matches });
       } catch (err) {
-        postMessage({ type: 'ERROR', requestId: msg?.requestId, message: String(err?.message || err) });
+        postMessage({ type: 'ERROR', message: String(err?.message || err) });
       }
     };
   `;
