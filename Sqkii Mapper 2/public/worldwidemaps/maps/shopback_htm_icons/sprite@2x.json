@@ -1,0 +1,1394 @@
+{
+    "98": {
+        "x": 5,
+        "y": 5,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "2112": {
+        "x": 139,
+        "y": 5,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "aed": {
+        "x": 273,
+        "y": 5,
+        "width": 29,
+        "height": 29,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "ah_huat_hokkien_prawn_mee": {
+        "x": 307,
+        "y": 5,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "aibi": {
+        "x": 441,
+        "y": 5,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "allbirds": {
+        "x": 575,
+        "y": 5,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "arabica": {
+        "x": 709,
+        "y": 5,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "attea": {
+        "x": 843,
+        "y": 5,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "august_society": {
+        "x": 977,
+        "y": 5,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "avocadoria": {
+        "x": 1111,
+        "y": 5,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "bali_thai": {
+        "x": 1245,
+        "y": 5,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "belle-ville": {
+        "x": 1379,
+        "y": 5,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "beutea": {
+        "x": 1513,
+        "y": 5,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "bike_parking": {
+        "x": 1647,
+        "y": 5,
+        "width": 27,
+        "height": 33,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Bishan-Ang Mo Kio Park": {
+        "x": 1679,
+        "y": 5,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "bnc": {
+        "x": 1821,
+        "y": 5,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "boarding_gate": {
+        "x": 5,
+        "y": 150,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "bratpack": {
+        "x": 139,
+        "y": 150,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "bus_stop": {
+        "x": 273,
+        "y": 150,
+        "width": 28,
+        "height": 28,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "canadian_pizza": {
+        "x": 306,
+        "y": 150,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "candlescape": {
+        "x": 440,
+        "y": 150,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "car_park": {
+        "x": 574,
+        "y": 150,
+        "width": 28,
+        "height": 28,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "carls_jr": {
+        "x": 607,
+        "y": 150,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "cc": {
+        "x": 741,
+        "y": 150,
+        "width": 28,
+        "height": 28,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Central Fire Station": {
+        "x": 774,
+        "y": 150,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "cheers": {
+        "x": 916,
+        "y": 150,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "CHIJMES": {
+        "x": 1050,
+        "y": 150,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "chimichanga": {
+        "x": 1192,
+        "y": 150,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "chimi's": {
+        "x": 1326,
+        "y": 150,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Chinese Garden": {
+        "x": 1460,
+        "y": 150,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "chouniangjiuniang": {
+        "x": 1602,
+        "y": 150,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "churn": {
+        "x": 1736,
+        "y": 150,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Civilian War Memorial": {
+        "x": 5,
+        "y": 295,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Clarke Quay": {
+        "x": 147,
+        "y": 295,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "coca": {
+        "x": 289,
+        "y": 295,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "colorfull_store": {
+        "x": 423,
+        "y": 295,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "cuckoo": {
+        "x": 557,
+        "y": 295,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "daily_beer": {
+        "x": 691,
+        "y": 295,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "daily_chicken": {
+        "x": 825,
+        "y": 295,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "damnmeats": {
+        "x": 959,
+        "y": 295,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "daydream_desserts": {
+        "x": 1093,
+        "y": 295,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "delibowl_rice_kitchen": {
+        "x": 1227,
+        "y": 295,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Dragon Playground": {
+        "x": 1361,
+        "y": 295,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "duke_bakery": {
+        "x": 1503,
+        "y": 295,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "eatersmarket": {
+        "x": 1637,
+        "y": 295,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "egg_thai": {
+        "x": 1771,
+        "y": 295,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "elixir_esports": {
+        "x": 5,
+        "y": 440,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "fairprice_xpress": {
+        "x": 139,
+        "y": 440,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "famous_amos": {
+        "x": 273,
+        "y": 440,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "fareastflora": {
+        "x": 407,
+        "y": 440,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "fernando_pizza": {
+        "x": 541,
+        "y": 440,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "first_bowl_rice_kitchen": {
+        "x": 675,
+        "y": 440,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "firststorycafe": {
+        "x": 809,
+        "y": 440,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "forewordcoffee": {
+        "x": 943,
+        "y": 440,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Former Bukit Timah Railway Station": {
+        "x": 1077,
+        "y": 440,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Former Cathay Building": {
+        "x": 1219,
+        "y": 440,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Former Hill Street Police Station": {
+        "x": 1361,
+        "y": 440,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Former Tanjong Pagar Railway Station": {
+        "x": 1503,
+        "y": 440,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Former Telok Ayer Market": {
+        "x": 1645,
+        "y": 440,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Former Thong Chai Medical Institution": {
+        "x": 1787,
+        "y": 440,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Fort Canning Park": {
+        "x": 5,
+        "y": 585,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Fort Canning Tree Tunnel": {
+        "x": 147,
+        "y": 585,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Fort Siloso": {
+        "x": 289,
+        "y": 585,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "fragrance": {
+        "x": 431,
+        "y": 585,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "fried_chicken_master": {
+        "x": 565,
+        "y": 585,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Fuk Tak Chi Museum and Temple": {
+        "x": 699,
+        "y": 585,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Geylang Serai": {
+        "x": 841,
+        "y": 585,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "go_noodle_house": {
+        "x": 983,
+        "y": 585,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "go_unique": {
+        "x": 1117,
+        "y": 585,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "gopizza": {
+        "x": 1251,
+        "y": 585,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "greentree": {
+        "x": 1385,
+        "y": 585,
+        "width": 16,
+        "height": 27,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Hajjah Fatimah Mosque": {
+        "x": 1406,
+        "y": 585,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "happycup": {
+        "x": 1548,
+        "y": 585,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Haw Par Villa": {
+        "x": 1682,
+        "y": 585,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "hawkers": {
+        "x": 1824,
+        "y": 585,
+        "width": 28,
+        "height": 28,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "herschel": {
+        "x": 1857,
+        "y": 585,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "high_bar_society": {
+        "x": 5,
+        "y": 730,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "homm": {
+        "x": 139,
+        "y": 730,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "hook": {
+        "x": 273,
+        "y": 730,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Huntingstop": {
+        "x": 407,
+        "y": 730,
+        "width": 98,
+        "height": 118,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "hydro_flask": {
+        "x": 510,
+        "y": 730,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "ilovetaimei": {
+        "x": 644,
+        "y": 730,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "irvins": {
+        "x": 778,
+        "y": 730,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "island_run_club": {
+        "x": 912,
+        "y": 730,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Jurong Brickworks Industry and Dragon Kilns": {
+        "x": 1046,
+        "y": 730,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "kakurega": {
+        "x": 1188,
+        "y": 730,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Kampong Lorong Buangkok": {
+        "x": 1322,
+        "y": 730,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Katong & Joo Chiat Shophouses": {
+        "x": 1464,
+        "y": 730,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "kazan": {
+        "x": 1606,
+        "y": 730,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "keong_saik_bakery": {
+        "x": 1740,
+        "y": 730,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "ketojiak": {
+        "x": 5,
+        "y": 875,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "kindkones": {
+        "x": 139,
+        "y": 875,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "kithcafe": {
+        "x": 273,
+        "y": 875,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "kopi&tarts": {
+        "x": 407,
+        "y": 875,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Kranji Marshes": {
+        "x": 541,
+        "y": 875,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Kranji War Memorial": {
+        "x": 683,
+        "y": 875,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "lam_heung_ling": {
+        "x": 825,
+        "y": 875,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "lamppost": {
+        "x": 959,
+        "y": 875,
+        "width": 17,
+        "height": 42,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Loyang Tua Pek Kong Temple": {
+        "x": 981,
+        "y": 875,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "lucine": {
+        "x": 1123,
+        "y": 875,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "makisan": {
+        "x": 1257,
+        "y": 875,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Marina Bay Sands": {
+        "x": 1391,
+        "y": 875,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "megaadventure": {
+        "x": 1533,
+        "y": 875,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Megastop": {
+        "x": 1667,
+        "y": 875,
+        "width": 149,
+        "height": 138,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "melvados": {
+        "x": 1821,
+        "y": 875,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Merlion Park": {
+        "x": 5,
+        "y": 1020,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "mixue": {
+        "x": 147,
+        "y": 1020,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "momolato": {
+        "x": 281,
+        "y": 1020,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "mronigiri": {
+        "x": 415,
+        "y": 1020,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "nana_and_friends": {
+        "x": 549,
+        "y": 1020,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "National Library Singapore": {
+        "x": 683,
+        "y": 1020,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "National Stadium": {
+        "x": 825,
+        "y": 1020,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "niu_dian_beef_noodles": {
+        "x": 967,
+        "y": 1020,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "nong_geng_ji": {
+        "x": 1101,
+        "y": 1020,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "ok_chicken_rice_humfull_laksa": {
+        "x": 1235,
+        "y": 1020,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "onoshi": {
+        "x": 1369,
+        "y": 1020,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "onyafood": {
+        "x": 1503,
+        "y": 1020,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "organic_express_hair_color_lab": {
+        "x": 1637,
+        "y": 1020,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "organic_hair_regrowth_solutions": {
+        "x": 1771,
+        "y": 1020,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "papa_ayam": {
+        "x": 5,
+        "y": 1165,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "papparich": {
+        "x": 139,
+        "y": 1165,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "projectsend": {
+        "x": 273,
+        "y": 1165,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Raffles Hotel": {
+        "x": 407,
+        "y": 1165,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "ramen_champion": {
+        "x": 549,
+        "y": 1165,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Reflections at Bukit Chandu": {
+        "x": 683,
+        "y": 1165,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "rico_rico": {
+        "x": 825,
+        "y": 1165,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "rollney": {
+        "x": 959,
+        "y": 1165,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "rounding": {
+        "x": 1093,
+        "y": 1165,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "saladstop": {
+        "x": 1227,
+        "y": 1165,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "sanchos_taqueria": {
+        "x": 1361,
+        "y": 1165,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Sarimbun Beach Landing": {
+        "x": 1495,
+        "y": 1165,
+        "width": 137,
+        "height": 138,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Seletar Airfield": {
+        "x": 1637,
+        "y": 1165,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "seoul_garden": {
+        "x": 1779,
+        "y": 1165,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "seoul_garden_hotpot": {
+        "x": 5,
+        "y": 1310,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "seoul_garden_hotpot_cafe": {
+        "x": 139,
+        "y": 1310,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "sf": {
+        "x": 273,
+        "y": 1310,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "sgfr": {
+        "x": 407,
+        "y": 1310,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "shake_shack": {
+        "x": 541,
+        "y": 1310,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "shiok_burger": {
+        "x": 675,
+        "y": 1310,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "shopback": {
+        "x": 809,
+        "y": 1310,
+        "width": 130,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "silver flag": {
+        "x": 944,
+        "y": 1310,
+        "width": 81,
+        "height": 139,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Singapore Botanic Gardens": {
+        "x": 1030,
+        "y": 1310,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "so_pho": {
+        "x": 1172,
+        "y": 1310,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "sparkle_please": {
+        "x": 1306,
+        "y": 1310,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "spinpainthouse": {
+        "x": 1440,
+        "y": 1310,
+        "width": 136,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "splatpainthouse": {
+        "x": 1581,
+        "y": 1310,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Sri Veeramakaliamman Temple": {
+        "x": 1715,
+        "y": 1310,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "streats": {
+        "x": 1857,
+        "y": 1310,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "takagi_ramen": {
+        "x": 5,
+        "y": 1455,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "tanyu": {
+        "x": 139,
+        "y": 1455,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "telur_thai": {
+        "x": 273,
+        "y": 1455,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "The Istana and Sri Temasek": {
+        "x": 407,
+        "y": 1455,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "the_fat_sparrow": {
+        "x": 549,
+        "y": 1455,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "the_planet_traveller": {
+        "x": 683,
+        "y": 1455,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "the_wallet_shop": {
+        "x": 817,
+        "y": 1455,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "thebraisedhouse": {
+        "x": 951,
+        "y": 1455,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "theeyesinc": {
+        "x": 1085,
+        "y": 1455,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "thefragmentroom": {
+        "x": 1219,
+        "y": 1455,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "timbuk2": {
+        "x": 1353,
+        "y": 1455,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "tionghoespecialtycoffee": {
+        "x": 1487,
+        "y": 1455,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "tomo_tokyo": {
+        "x": 1621,
+        "y": 1455,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "toms": {
+        "x": 1755,
+        "y": 1455,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "tracys_sarawak_kitchen": {
+        "x": 5,
+        "y": 1600,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "trapo": {
+        "x": 139,
+        "y": 1600,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Tuas Lamp Post 1": {
+        "x": 273,
+        "y": 1600,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "tuktukcha": {
+        "x": 415,
+        "y": 1600,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "turkish_lezzet_house": {
+        "x": 549,
+        "y": 1600,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "two_men_bagel_house": {
+        "x": 683,
+        "y": 1600,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "twyst": {
+        "x": 817,
+        "y": 1600,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "unauna": {
+        "x": 951,
+        "y": 1600,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "vetreska": {
+        "x": 1085,
+        "y": 1600,
+        "width": 129,
+        "height": 130,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "warabimochi": {
+        "x": 1219,
+        "y": 1600,
+        "width": 129,
+        "height": 140,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Woodbridge Museum": {
+        "x": 1353,
+        "y": 1600,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    },
+    "Yishun Dam": {
+        "x": 1495,
+        "y": 1600,
+        "width": 137,
+        "height": 137,
+        "pixelRatio": "1",
+        "scale": 0.9
+    }
+}

@@ -1435,12 +1435,12 @@
       const HTM_ICONS_LS_KEY = 'sqkii-htm-icons';
       const HTM_ICONS_SETTINGS_LS_KEY = 'sqkii-htm-icons-settings';
       const HTM_ICONS_SOURCE_ID = 'htm-icons-src';
-      const HTM_ICONS_TILE_URL = 'https://worldwidemaps.sqkii.com/api/tiles/htm_icons/{z}/{x}/{y}';
+      const HTM_ICONS_TILE_URL = `${BASE_URL}worldwidemaps/tiles/htm_icons/{z}/{x}/{y}.pbf`;
       const HTM_ICONS_SV_ICON_NAME = 'htm-sv-ticket';
       const HTM_ICONS_SV_ICON_URL = `${BASE_URL}voucher.png`;
       const HTM_ICONS_SV_BRAND_IMAGE_PREFIX = 'htm-sv-brand-';
-      const HTM_ICONS_SV_SPRITE_JSON_URL = 'https://worldwidemaps.sqkii.com/api/maps/shopback_htm_icons/sprite@2x.json';
-      const HTM_ICONS_SV_SPRITE_PNG_URL = 'https://worldwidemaps.sqkii.com/api/maps/shopback_htm_icons/sprite@2x.png';
+      const HTM_ICONS_SV_SPRITE_JSON_URL = `${BASE_URL}worldwidemaps/maps/shopback_htm_icons/sprite@2x.json`;
+      const HTM_ICONS_SV_SPRITE_PNG_URL = `${BASE_URL}worldwidemaps/maps/shopback_htm_icons/sprite@2x.png`;
       const HTM_ICONS_LAYER_DEFS = [
         { id: 'htm-icons-lamp', sourceLayer: 'LTALampPostSilm', name: 'Lamp Posts', meta: 'Singapore lamp post markers', labelPrefix: 'Lamp', labelProps: ['Name'], color: '#f59e0b', stroke: '#7c2d12', minzoom: 13, radius: [13, 1.8, 16, 3.4] },
         { id: 'htm-icons-aed', sourceLayer: 'aed', name: 'AED', meta: 'Defibrillator locations', labelPrefix: 'AED', labelProps: ['BUILDING_NAME', 'AED_LOCATION_DESCRIPTION', 'ROAD_NAME'], color: '#22c55e', stroke: '#14532d', minzoom: 11, radius: [11, 3.2, 16, 5.3] },
