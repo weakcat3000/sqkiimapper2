@@ -1431,8 +1431,10 @@
         ? Math.min(Math.max(1, baseDevicePixelRatio * 0.8), 1.8)
         : Math.min(baseDevicePixelRatio * 1.25, 3);
       const APP_BUILD_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
+      const POWER_SAVE_LS_KEY = 'sqkii-power-saving';
       const brandVersionEl = document.getElementById('brand-version');
       if (brandVersionEl) brandVersionEl.textContent = APP_BUILD_VERSION;
+      let powerSavingEnabled = false;
 
       const mapgl = new maptilersdk.Map({
         container: 'mapgl',
@@ -1445,7 +1447,7 @@
       mapgl.on('load', () => { mapglStyleLoaded = true; });
 
       const pauseVeil = () => window.__pauseVeil?.();
-      const resumeVeil = () => window.__resumeVeil?.();
+      const resumeVeil = () => { if (!powerSavingEnabled) window.__resumeVeil?.(); };
 
       mapgl.on('movestart', pauseVeil);
       mapgl.on('moveend', resumeVeil);
@@ -4580,10 +4582,55 @@
       document.addEventListener('pointerdown', unlockAudioFromUserGesture, { capture: true });
 
       const audioBtn = document.getElementById('audio-toggle');
+      const powerSaveBtn = document.getElementById('power-saving-toggle');
       function setAudioIcon(on) {
         audioBtn.innerHTML = on
           ? `<svg viewBox="0 0 24 24" fill="none" stroke="#e5e7eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>`
           : `<svg viewBox="0 0 24 24" fill="none" stroke="#e5e7eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="1" x2="1" y2="23"></line></svg>`;
+      }
+      function stopNonEssentialEffects() {
+        ensureVeilResumeGuard();
+        window.__pauseVeil?.();
+        document.getElementById('cat-lottie')?._lottieAnimation?.pause?.();
+        if (typeof stopReconHaloPulse === 'function') stopReconHaloPulse();
+        if (typeof cancelLampPostSearchPulse === 'function') cancelLampPostSearchPulse();
+      }
+      function resumeNonEssentialEffects() {
+        ensureVeilResumeGuard();
+        if (powerSavingEnabled || document.hidden) return;
+        if (!reconAnalysisInProgress) window.__resumeVeil?.();
+        document.getElementById('cat-lottie')?._lottieAnimation?.play?.();
+        if (reconOverlayPoints.length && typeof startReconHaloPulse === 'function') startReconHaloPulse();
+        if (lampPostSearchFeatures.length && typeof animateLampPostSearchPulse === 'function') animateLampPostSearchPulse();
+      }
+      function ensureVeilResumeGuard() {
+        if (!window.__resumeVeil || window.__resumeVeil.__powerSaveWrapped) return;
+        const rawResumeVeil = window.__resumeVeil;
+        const guardedResumeVeil = () => {
+          if (!powerSavingEnabled) rawResumeVeil();
+        };
+        guardedResumeVeil.__powerSaveWrapped = true;
+        window.__resumeVeil = guardedResumeVeil;
+      }
+      function syncPowerSaveUi() {
+        if (!powerSaveBtn) return;
+        powerSaveBtn.classList.toggle('active', powerSavingEnabled);
+        powerSaveBtn.setAttribute('aria-pressed', powerSavingEnabled ? 'true' : 'false');
+        powerSaveBtn.setAttribute('aria-label', powerSavingEnabled ? 'Power saving on' : 'Power saving off');
+        powerSaveBtn.title = powerSavingEnabled ? 'Power saving on' : 'Power saving off';
+      }
+      function setPowerSavingMode(active, { persist = true } = {}) {
+        powerSavingEnabled = !!active;
+        if (persist) {
+          try {
+            if (powerSavingEnabled) localStorage.setItem(POWER_SAVE_LS_KEY, '1');
+            else localStorage.removeItem(POWER_SAVE_LS_KEY);
+          } catch { }
+        }
+        document.getElementById('app')?.classList.toggle('power-saving', powerSavingEnabled);
+        syncPowerSaveUi();
+        if (powerSavingEnabled) stopNonEssentialEffects();
+        else resumeNonEssentialEffects();
       }
       setAudioIcon(true);
       audioBtn.addEventListener('click', () => {
@@ -4592,6 +4639,11 @@
         if (!audioEnabled) pauseAllAudio({ immediate: true });
         else unlockAudioFromUserGesture();
       });
+      try { powerSavingEnabled = localStorage.getItem(POWER_SAVE_LS_KEY) === '1'; } catch { }
+      syncPowerSaveUi();
+      if (powerSavingEnabled) document.getElementById('app')?.classList.add('power-saving');
+      powerSaveBtn?.addEventListener('click', () => setPowerSavingMode(!powerSavingEnabled));
+      if (powerSavingEnabled) setTimeout(() => stopNonEssentialEffects(), 0);
       document.addEventListener('click', (ev) => { if (ev.target.closest('button')) playClick(); }, { capture: true });
 
       const sonarSfx = new Audio(SCANNING_SOUND_URL);
@@ -5113,7 +5165,7 @@
         try {
           if (reconAnalysisInProgress) {
             window.__pauseVeil?.();
-          } else if (!document.hidden) {
+          } else if (!document.hidden && !powerSavingEnabled) {
             window.__resumeVeil?.();
           }
         } catch (error) {
@@ -5184,7 +5236,7 @@
 
       function startReconHaloPulse() {
         stopReconHaloPulse();
-        if (!reconOverlayPoints.length) return;
+        if (powerSavingEnabled || !reconOverlayPoints.length) return;
 
         const tick = (ts) => {
           if (!reconOverlayPoints.length) return;
@@ -5708,6 +5760,7 @@
 
       function animateLampPostSearchPulse() {
         cancelLampPostSearchPulse();
+        if (powerSavingEnabled) return;
 
         const tick = (ts) => {
           if (!lampPostSearchFeatures.length) return;
@@ -9458,7 +9511,9 @@
           const obs = new IntersectionObserver(function (entries) {
             entries.forEach(function (e) {
               const lottieAnimation = lottieEl._lottieAnimation;
-              if (e.isIntersecting) {
+              if (powerSavingEnabled) {
+                lottieAnimation?.pause?.();
+              } else if (e.isIntersecting) {
                 lottieAnimation?.play?.();
               } else {
                 lottieAnimation?.pause?.();

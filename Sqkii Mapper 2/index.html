@@ -87,8 +87,15 @@
             <div id="cat-lottie" aria-hidden="true"></div>
           </div>
 
-          <!-- Audio toggle -->
-          <button id="audio-toggle" class="icon-btn" title="Audio on/off">...</button>
+          <div class="header-icon-stack">
+            <button id="audio-toggle" class="icon-btn" title="Audio on/off">...</button>
+            <button id="power-saving-toggle" class="icon-btn power-save-btn" title="Power saving off" aria-label="Power saving off" aria-pressed="false">
+              <span class="power-save-battery" aria-hidden="true">
+                <span class="power-save-level"></span>
+                <span class="power-save-cap"></span>
+              </span>
+            </button>
+          </div>
         </div>
 
         <div class="toolbar">
