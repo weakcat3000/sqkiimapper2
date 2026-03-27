@@ -1433,38 +1433,41 @@
       const APP_BUILD_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
       const POWER_SAVE_LS_KEY = 'sqkii-power-saving';
       const HTM_ICONS_LS_KEY = 'sqkii-htm-icons';
+      const HTM_ICONS_SETTINGS_LS_KEY = 'sqkii-htm-icons-settings';
       const HTM_ICONS_SOURCE_ID = 'htm-icons-src';
       const HTM_ICONS_TILE_URL = 'https://worldwidemaps.sqkii.com/api/tiles/htm_icons/{z}/{x}/{y}';
       const HTM_ICONS_LAYER_DEFS = [
-        { id: 'htm-icons-lamp', sourceLayer: 'LTALampPostSilm', color: '#f59e0b', stroke: '#7c2d12', minzoom: 13, radius: [13, 1.8, 16, 3.4] },
-        { id: 'htm-icons-aed', sourceLayer: 'aed', color: '#22c55e', stroke: '#14532d', minzoom: 11, radius: [11, 3.2, 16, 5.3] },
-        { id: 'htm-icons-bike', sourceLayer: 'bicycle_parking', color: '#38bdf8', stroke: '#0f3b52', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
-        { id: 'htm-icons-cc', sourceLayer: 'communityclubs', color: '#60a5fa', stroke: '#1e3a8a', minzoom: 11, radius: [11, 3.2, 16, 5.2] },
-        { id: 'htm-icons-hawker', sourceLayer: 'hawker', color: '#fb923c', stroke: '#7c2d12', minzoom: 11, radius: [11, 3.3, 16, 5.4] },
-        { id: 'htm-icons-huntingstop', sourceLayer: 'huntingstop1', color: '#f472b6', stroke: '#831843', minzoom: 11, radius: [11, 3.1, 16, 5.1] },
-        { id: 'htm-icons-landmark', sourceLayer: 'landmark1', color: '#c084fc', stroke: '#581c87', minzoom: 11, radius: [11, 3.1, 16, 5.1] },
-        { id: 'htm-icons-megastop', sourceLayer: 'megastop1', color: '#a78bfa', stroke: '#4c1d95', minzoom: 11, radius: [11, 3.2, 16, 5.2] },
-        { id: 'htm-icons-ccl', sourceLayer: 'ccl', color: '#fde047', stroke: '#713f12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
-        { id: 'htm-icons-ewl', sourceLayer: 'ewl', color: '#facc15', stroke: '#713f12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
-        { id: 'htm-icons-nsl', sourceLayer: 'nsl', color: '#eab308', stroke: '#713f12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
-        { id: 'htm-icons-rmi-1', sourceLayer: 'rmi_m_1', color: '#34d399', stroke: '#065f46', minzoom: 11, radius: [11, 2.7, 16, 4.5] },
-        { id: 'htm-icons-rmi-2', sourceLayer: 'rmi_m_2', color: '#34d399', stroke: '#065f46', minzoom: 11, radius: [11, 2.7, 16, 4.5] },
-        { id: 'htm-icons-rmi-3', sourceLayer: 'rmi_m_3', color: '#34d399', stroke: '#065f46', minzoom: 11, radius: [11, 2.7, 16, 4.5] },
-        { id: 'htm-icons-rmi-4', sourceLayer: 'rmi_m_4', color: '#34d399', stroke: '#065f46', minzoom: 11, radius: [11, 2.7, 16, 4.5] },
-        { id: 'htm-icons-rmi-5', sourceLayer: 'rmi_m_5', color: '#34d399', stroke: '#065f46', minzoom: 11, radius: [11, 2.7, 16, 4.5] },
-        { id: 'htm-icons-sponsor-1', sourceLayer: 'sponsor_1', color: '#f97316', stroke: '#7c2d12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
-        { id: 'htm-icons-sponsor-2', sourceLayer: 'sponsor_2', color: '#f97316', stroke: '#7c2d12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
-        { id: 'htm-icons-sponsor-3', sourceLayer: 'sponsor_3', color: '#f97316', stroke: '#7c2d12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
-        { id: 'htm-icons-sv-1', sourceLayer: 'sv1', color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
-        { id: 'htm-icons-sv-2', sourceLayer: 'sv2', color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
-        { id: 'htm-icons-sv-3', sourceLayer: 'sv3', color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
-        { id: 'htm-icons-sv-4', sourceLayer: 'sv4', color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
-        { id: 'htm-icons-sv-5', sourceLayer: 'sv5', color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] }
+        { id: 'htm-icons-lamp', sourceLayer: 'LTALampPostSilm', name: 'Lamp Posts', meta: 'Singapore lamp post markers', labelPrefix: 'Lamp', labelProps: ['Name'], color: '#f59e0b', stroke: '#7c2d12', minzoom: 13, radius: [13, 1.8, 16, 3.4] },
+        { id: 'htm-icons-aed', sourceLayer: 'aed', name: 'AED', meta: 'Defibrillator locations', labelPrefix: 'AED', labelProps: ['BUILDING_NAME', 'AED_LOCATION_DESCRIPTION', 'ROAD_NAME'], color: '#22c55e', stroke: '#14532d', minzoom: 11, radius: [11, 3.2, 16, 5.3] },
+        { id: 'htm-icons-bike', sourceLayer: 'bicycle_parking', name: 'Bicycle Parking', meta: 'Bike parking spots', labelPrefix: 'Bike', labelProps: ['location', 'capacity'], color: '#38bdf8', stroke: '#0f3b52', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
+        { id: 'htm-icons-cc', sourceLayer: 'communityclubs', name: 'Community Clubs', meta: 'Community club markers', labelPrefix: 'CC', labelProps: ['Name', 'Description'], color: '#60a5fa', stroke: '#1e3a8a', minzoom: 11, radius: [11, 3.2, 16, 5.2] },
+        { id: 'htm-icons-hawker', sourceLayer: 'hawker', name: 'Hawker Centres', meta: 'Hawker centre locations', labelPrefix: 'Hawker', labelProps: ['NAME', 'DESCRIPTION', 'ADDRESS_MYENV'], color: '#fb923c', stroke: '#7c2d12', minzoom: 11, radius: [11, 3.3, 16, 5.4] },
+        { id: 'htm-icons-huntingstop', sourceLayer: 'huntingstop1', name: 'Hunting Stops', meta: 'Bus stop style hunt markers', labelPrefix: 'Stop', labelProps: ['Name', 'Brand', 'Stop ID', 'Road'], color: '#f472b6', stroke: '#831843', minzoom: 11, radius: [11, 3.1, 16, 5.1] },
+        { id: 'htm-icons-landmark', sourceLayer: 'landmark1', name: 'Landmarks', meta: 'General landmark points', labelPrefix: 'Landmark', labelProps: ['Name', 'Type', 'Address'], color: '#c084fc', stroke: '#581c87', minzoom: 11, radius: [11, 3.1, 16, 5.1] },
+        { id: 'htm-icons-megastop', sourceLayer: 'megastop1', name: 'Mega Stops', meta: 'Mega hunt stop markers', labelPrefix: 'Mega', labelProps: ['Name', 'Type', 'Address'], color: '#a78bfa', stroke: '#4c1d95', minzoom: 11, radius: [11, 3.2, 16, 5.2] },
+        { id: 'htm-icons-ccl', sourceLayer: 'ccl', name: 'CCL', meta: 'Merchant/outlet layer CCL', labelPrefix: 'CCL', labelProps: ['Outlet name', 'Outlet brand'], color: '#fde047', stroke: '#713f12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
+        { id: 'htm-icons-ewl', sourceLayer: 'ewl', name: 'EWL', meta: 'Merchant/outlet layer EWL', labelPrefix: 'EWL', labelProps: ['Outlet name', 'Outlet brand'], color: '#facc15', stroke: '#713f12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
+        { id: 'htm-icons-nsl', sourceLayer: 'nsl', name: 'NSL', meta: 'Merchant/outlet layer NSL', labelPrefix: 'NSL', labelProps: ['Outlet name', 'Outlet brand'], color: '#eab308', stroke: '#713f12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
+        { id: 'htm-icons-rmi-1', sourceLayer: 'rmi_m_1', name: 'RMI 1', meta: 'RMI merchant list 1', labelPrefix: 'RMI', labelProps: ['Merchant/ area', 'brand_unique_ids', 'Address'], color: '#34d399', stroke: '#065f46', minzoom: 11, radius: [11, 2.7, 16, 4.5] },
+        { id: 'htm-icons-rmi-2', sourceLayer: 'rmi_m_2', name: 'RMI 2', meta: 'RMI merchant list 2', labelPrefix: 'RMI', labelProps: ['Merchant/ area', 'brand_unique_ids', 'Address'], color: '#34d399', stroke: '#065f46', minzoom: 11, radius: [11, 2.7, 16, 4.5] },
+        { id: 'htm-icons-rmi-3', sourceLayer: 'rmi_m_3', name: 'RMI 3', meta: 'RMI merchant list 3', labelPrefix: 'RMI', labelProps: ['Merchant/ area', 'brand_unique_ids', 'Address'], color: '#34d399', stroke: '#065f46', minzoom: 11, radius: [11, 2.7, 16, 4.5] },
+        { id: 'htm-icons-rmi-4', sourceLayer: 'rmi_m_4', name: 'RMI 4', meta: 'RMI merchant list 4', labelPrefix: 'RMI', labelProps: ['Merchant/ area', 'brand_unique_ids', 'Address'], color: '#34d399', stroke: '#065f46', minzoom: 11, radius: [11, 2.7, 16, 4.5] },
+        { id: 'htm-icons-rmi-5', sourceLayer: 'rmi_m_5', name: 'RMI 5', meta: 'RMI merchant list 5', labelPrefix: 'RMI', labelProps: ['Merchant/ area', 'brand_unique_ids', 'Address'], color: '#34d399', stroke: '#065f46', minzoom: 11, radius: [11, 2.7, 16, 4.5] },
+        { id: 'htm-icons-sponsor-1', sourceLayer: 'sponsor_1', name: 'Sponsor 1', meta: 'Sponsor location set 1', labelPrefix: 'Sponsor', labelProps: ['Sponsor', 'Address'], color: '#f97316', stroke: '#7c2d12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
+        { id: 'htm-icons-sponsor-2', sourceLayer: 'sponsor_2', name: 'Sponsor 2', meta: 'Sponsor location set 2', labelPrefix: 'Sponsor', labelProps: ['Sponsor', 'Address'], color: '#f97316', stroke: '#7c2d12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
+        { id: 'htm-icons-sponsor-3', sourceLayer: 'sponsor_3', name: 'Sponsor 3', meta: 'Sponsor location set 3', labelPrefix: 'Sponsor', labelProps: ['Sponsor', 'Address'], color: '#f97316', stroke: '#7c2d12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
+        { id: 'htm-icons-sv-1', sourceLayer: 'sv1', name: 'SV 1', meta: 'SV merchant set 1', labelPrefix: 'SV', labelProps: ['Outlet name', 'Outlet brand', 'Full address'], color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
+        { id: 'htm-icons-sv-2', sourceLayer: 'sv2', name: 'SV 2', meta: 'SV merchant set 2', labelPrefix: 'SV', labelProps: ['Outlet name', 'Outlet brand', 'Full address'], color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
+        { id: 'htm-icons-sv-3', sourceLayer: 'sv3', name: 'SV 3', meta: 'SV merchant set 3', labelPrefix: 'SV', labelProps: ['Outlet name', 'Outlet brand', 'Full address'], color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
+        { id: 'htm-icons-sv-4', sourceLayer: 'sv4', name: 'SV 4', meta: 'SV merchant set 4', labelPrefix: 'SV', labelProps: ['Outlet name', 'Outlet brand', 'Full address'], color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
+        { id: 'htm-icons-sv-5', sourceLayer: 'sv5', name: 'SV 5', meta: 'SV merchant set 5', labelPrefix: 'SV', labelProps: ['Outlet name', 'Outlet brand', 'Full address'], color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] }
       ];
       const brandVersionEl = document.getElementById('brand-version');
       if (brandVersionEl) brandVersionEl.textContent = APP_BUILD_VERSION;
       let powerSavingEnabled = false;
       let htmIconsEnabled = false;
+      let htmIconsShowLabels = false;
+      let htmIconsLayerVisibility = Object.fromEntries(HTM_ICONS_LAYER_DEFS.map((layer) => [layer.id, true]));
 
       const mapgl = new maptilersdk.Map({
         container: 'mapgl',
@@ -1608,10 +1611,37 @@
         if (!powerSavingEnabled && document.visibilityState === 'visible') scheduleGlHeal('watchdog');
       }, 4000);
 
+      const htmIconsLabelLayerId = (layerId) => `${layerId}-label`;
+      const isHtmIconsLayerEnabled = (layerId) => htmIconsLayerVisibility[layerId] !== false;
+
+      function buildHtmIconsLabelExpression(layer) {
+        const labelCandidates = (layer.labelProps || []).map((prop) => ['get', prop]);
+        const baseLabel = ['to-string', ['coalesce', ...labelCandidates, '']];
+        if (!layer.labelPrefix) return baseLabel;
+        return ['case', ['!=', baseLabel, ''], ['concat', `${layer.labelPrefix}: `, baseLabel], ''];
+      }
+
+      function applyHtmIconsOverlayVisibility() {
+        for (const layer of HTM_ICONS_LAYER_DEFS) {
+          const visible = htmIconsEnabled && isHtmIconsLayerEnabled(layer.id);
+          if (mapgl.getLayer(layer.id)) {
+            mapgl.setLayoutProperty(layer.id, 'visibility', visible ? 'visible' : 'none');
+          }
+          const labelId = htmIconsLabelLayerId(layer.id);
+          if (mapgl.getLayer(labelId)) {
+            mapgl.setLayoutProperty(labelId, 'visibility', visible && htmIconsShowLabels ? 'visible' : 'none');
+          }
+        }
+      }
+
       function removeHtmIconsOverlay() {
         for (const layer of HTM_ICONS_LAYER_DEFS) {
           if (mapgl.getLayer(layer.id)) {
             try { mapgl.removeLayer(layer.id); } catch { }
+          }
+          const labelId = htmIconsLabelLayerId(layer.id);
+          if (mapgl.getLayer(labelId)) {
+            try { mapgl.removeLayer(labelId); } catch { }
           }
         }
         if (mapgl.getSource(HTM_ICONS_SOURCE_ID)) {
@@ -1634,26 +1664,58 @@
           }
 
           for (const layer of HTM_ICONS_LAYER_DEFS) {
-            if (mapgl.getLayer(layer.id)) continue;
-            mapgl.addLayer({
-              id: layer.id,
-              type: 'circle',
-              source: HTM_ICONS_SOURCE_ID,
-              'source-layer': layer.sourceLayer,
-              minzoom: layer.minzoom,
-              paint: {
-                'circle-color': layer.color,
-                'circle-radius': [
-                  'interpolate', ['linear'], ['zoom'],
-                  layer.radius[0], layer.radius[1],
-                  layer.radius[2], layer.radius[3]
-                ],
-                'circle-opacity': 0.92,
-                'circle-stroke-color': layer.stroke,
-                'circle-stroke-width': 1.15
-              }
-            });
+            if (!mapgl.getLayer(layer.id)) {
+              mapgl.addLayer({
+                id: layer.id,
+                type: 'circle',
+                source: HTM_ICONS_SOURCE_ID,
+                'source-layer': layer.sourceLayer,
+                minzoom: layer.minzoom,
+                paint: {
+                  'circle-color': layer.color,
+                  'circle-radius': [
+                    'interpolate', ['linear'], ['zoom'],
+                    layer.radius[0], layer.radius[1],
+                    layer.radius[2], layer.radius[3]
+                  ],
+                  'circle-opacity': 0.92,
+                  'circle-stroke-color': layer.stroke,
+                  'circle-stroke-width': 1.15
+                }
+              });
+            }
+
+            const labelId = htmIconsLabelLayerId(layer.id);
+            if (!mapgl.getLayer(labelId)) {
+              mapgl.addLayer({
+                id: labelId,
+                type: 'symbol',
+                source: HTM_ICONS_SOURCE_ID,
+                'source-layer': layer.sourceLayer,
+                minzoom: Math.max(layer.minzoom, 11.5),
+                layout: {
+                  'text-field': buildHtmIconsLabelExpression(layer),
+                  'text-size': [
+                    'interpolate', ['linear'], ['zoom'],
+                    Math.max(layer.minzoom, 11.5), 10,
+                    16, 12
+                  ],
+                  'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+                  'text-offset': [0, 1.1],
+                  'text-anchor': 'top',
+                  'text-max-width': 18,
+                  'text-optional': true
+                },
+                paint: {
+                  'text-color': '#f8fafc',
+                  'text-halo-color': 'rgba(15, 17, 21, 0.92)',
+                  'text-halo-width': 1.35,
+                  'text-halo-blur': 0.2
+                }
+              });
+            }
           }
+          applyHtmIconsOverlayVisibility();
         });
       }
 
@@ -4672,6 +4734,14 @@
       const audioBtn = document.getElementById('audio-toggle');
       const powerSaveBtn = document.getElementById('power-saving-toggle');
       const htmIconsBtn = document.getElementById('htm-icons-toggle');
+      const htmIconsModal = document.getElementById('htm-icons-modal');
+      const htmIconsCloseBtn = document.getElementById('htm-icons-close');
+      const htmIconsMasterBtn = document.getElementById('htm-icons-master-toggle');
+      const htmIconsLabelsBtn = document.getElementById('htm-icons-labels-toggle');
+      const htmIconsAllOnBtn = document.getElementById('htm-icons-all-on');
+      const htmIconsAllOffBtn = document.getElementById('htm-icons-all-off');
+      const htmIconsStatusEl = document.getElementById('htm-icons-status');
+      const htmIconsListEl = document.getElementById('htm-icons-list');
       function setAudioIcon(on) {
         audioBtn.innerHTML = on
           ? `<svg viewBox="0 0 24 24" fill="none" stroke="#e5e7eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>`
@@ -4731,13 +4801,56 @@
         if (powerSavingEnabled) stopNonEssentialEffects();
         else resumeNonEssentialEffects();
       }
+      function saveHtmIconsSettings() {
+        try {
+          localStorage.setItem(HTM_ICONS_SETTINGS_LS_KEY, JSON.stringify({
+            showLabels: htmIconsShowLabels,
+            layers: htmIconsLayerVisibility
+          }));
+        } catch { }
+      }
+      function renderHtmIconsSettingsList() {
+        if (!htmIconsListEl) return;
+        htmIconsListEl.innerHTML = HTM_ICONS_LAYER_DEFS.map((layer) => `
+          <label class="htm-icons-row">
+            <div class="htm-icons-row-main">
+              <span class="htm-icons-swatch" style="background:${layer.color};border-color:${layer.stroke};"></span>
+              <span class="htm-icons-row-copy">
+                <span class="htm-icons-row-title">${escapeHtml(layer.name)}</span>
+                <span class="htm-icons-row-meta">${escapeHtml(layer.meta || layer.sourceLayer)}</span>
+              </span>
+            </div>
+            <input type="checkbox" data-htm-layer-id="${escapeHtml(layer.id)}" ${isHtmIconsLayerEnabled(layer.id) ? 'checked' : ''}>
+          </label>
+        `).join('');
+      }
+      function syncHtmIconsSettingsUi() {
+        const visibleCount = HTM_ICONS_LAYER_DEFS.filter((layer) => isHtmIconsLayerEnabled(layer.id)).length;
+        if (htmIconsMasterBtn) htmIconsMasterBtn.textContent = `Dataset: ${htmIconsEnabled ? 'ON' : 'OFF'}`;
+        if (htmIconsLabelsBtn) htmIconsLabelsBtn.textContent = `Labels: ${htmIconsShowLabels ? 'ON' : 'OFF'}`;
+        if (htmIconsStatusEl) {
+          htmIconsStatusEl.textContent = htmIconsEnabled
+            ? `${visibleCount}/${HTM_ICONS_LAYER_DEFS.length} layer groups enabled${engine !== 'gl' ? ' (switch to a GL basemap to view them)' : ''}.`
+            : `Dataset is off${engine !== 'gl' ? ' and GL basemaps are required to render it.' : '.'}`;
+        }
+        renderHtmIconsSettingsList();
+      }
+      function openHtmIconsSettings() {
+        syncHtmIconsSettingsUi();
+        htmIconsModal?.classList.add('visible');
+        document.getElementById('app')?.classList.add('blocked-by-modal');
+      }
+      function closeHtmIconsSettings() {
+        htmIconsModal?.classList.remove('visible');
+        document.getElementById('app')?.classList.remove('blocked-by-modal');
+      }
       function syncHtmIconsUi() {
         if (!htmIconsBtn) return;
         htmIconsBtn.classList.toggle('off', !htmIconsEnabled);
-        htmIconsBtn.textContent = htmIconsEnabled ? 'HTM Icons: ON' : 'HTM Icons: OFF';
+        htmIconsBtn.textContent = 'HTM Icons';
         htmIconsBtn.title = htmIconsEnabled
-          ? 'HTM Icons overlay on'
-          : 'Toggle HTM Icons overlay (GL basemaps only)';
+          ? 'Open HTM Icons settings (dataset on)'
+          : 'Open HTM Icons settings';
         htmIconsBtn.setAttribute('aria-pressed', htmIconsEnabled ? 'true' : 'false');
       }
       function setHtmIconsEnabled(active, { persist = true } = {}) {
@@ -4749,8 +4862,22 @@
           } catch { }
         }
         syncHtmIconsUi();
+        syncHtmIconsSettingsUi();
         if (htmIconsEnabled) scheduleHtmIconsOverlayRestore();
         else removeHtmIconsOverlay();
+      }
+      function setHtmIconsShowLabels(active, { persist = true } = {}) {
+        htmIconsShowLabels = !!active;
+        if (persist) saveHtmIconsSettings();
+        syncHtmIconsSettingsUi();
+        if (htmIconsEnabled) ensureHtmIconsOverlay();
+      }
+      function setHtmIconsLayerVisibility(layerId, visible, { persist = true } = {}) {
+        if (!layerId) return;
+        htmIconsLayerVisibility[layerId] = !!visible;
+        if (persist) saveHtmIconsSettings();
+        syncHtmIconsSettingsUi();
+        if (htmIconsEnabled) ensureHtmIconsOverlay();
       }
       setAudioIcon(true);
       audioBtn.addEventListener('click', () => {
@@ -4761,11 +4888,48 @@
       });
       try { powerSavingEnabled = localStorage.getItem(POWER_SAVE_LS_KEY) === '1'; } catch { }
       try { htmIconsEnabled = localStorage.getItem(HTM_ICONS_LS_KEY) === '1'; } catch { }
+      try {
+        const raw = localStorage.getItem(HTM_ICONS_SETTINGS_LS_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          htmIconsShowLabels = !!parsed?.showLabels;
+          if (parsed?.layers && typeof parsed.layers === 'object') {
+            htmIconsLayerVisibility = {
+              ...htmIconsLayerVisibility,
+              ...parsed.layers
+            };
+          }
+        }
+      } catch { }
       syncPowerSaveUi();
       syncHtmIconsUi();
+      syncHtmIconsSettingsUi();
       if (powerSavingEnabled) document.getElementById('app')?.classList.add('power-saving');
       powerSaveBtn?.addEventListener('click', () => setPowerSavingMode(!powerSavingEnabled));
-      htmIconsBtn?.addEventListener('click', () => setHtmIconsEnabled(!htmIconsEnabled));
+      htmIconsBtn?.addEventListener('click', openHtmIconsSettings);
+      htmIconsCloseBtn?.addEventListener('click', closeHtmIconsSettings);
+      htmIconsModal?.addEventListener('click', (e) => {
+        if (e.target === htmIconsModal) closeHtmIconsSettings();
+      });
+      htmIconsMasterBtn?.addEventListener('click', () => setHtmIconsEnabled(!htmIconsEnabled));
+      htmIconsLabelsBtn?.addEventListener('click', () => setHtmIconsShowLabels(!htmIconsShowLabels));
+      htmIconsAllOnBtn?.addEventListener('click', () => {
+        htmIconsLayerVisibility = Object.fromEntries(HTM_ICONS_LAYER_DEFS.map((layer) => [layer.id, true]));
+        saveHtmIconsSettings();
+        syncHtmIconsSettingsUi();
+        if (htmIconsEnabled) ensureHtmIconsOverlay();
+      });
+      htmIconsAllOffBtn?.addEventListener('click', () => {
+        htmIconsLayerVisibility = Object.fromEntries(HTM_ICONS_LAYER_DEFS.map((layer) => [layer.id, false]));
+        saveHtmIconsSettings();
+        syncHtmIconsSettingsUi();
+        if (htmIconsEnabled) ensureHtmIconsOverlay();
+      });
+      htmIconsListEl?.addEventListener('change', (e) => {
+        const input = e.target.closest('input[data-htm-layer-id]');
+        if (!input) return;
+        setHtmIconsLayerVisibility(input.dataset.htmLayerId, input.checked);
+      });
       if (powerSavingEnabled) setTimeout(() => stopNonEssentialEffects(), 0);
       if (htmIconsEnabled) setTimeout(() => scheduleHtmIconsOverlayRestore(), 0);
       document.addEventListener('click', (ev) => { if (ev.target.closest('button')) playClick(); }, { capture: true });
