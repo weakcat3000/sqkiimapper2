@@ -1635,12 +1635,15 @@
         nana_and_friends_cafe: 'nana_and_friends',
         project_send_pte_ltd: 'projectsend',
         homm_dessert_at_heart: 'homm',
+        aibi_fitness: 'aibi',
         fareastflora_com: 'fareastflora',
         first_story_cafe: 'firststorycafe',
         nong_geng_ji_hunan_home_style_cuisine: 'nong_geng_ji',
         tiong_hoe_specialty_coffee: 'tionghoespecialtycoffee',
         tuk_tuk_cha: 'tuktukcha',
+        the_sgfr_store: 'sgfr',
         the_braised_house: 'thebraisedhouse',
+        takagi_ramen_express: 'takagi_ramen',
         spin_paint_house: 'spinpainthouse',
         splat_paint_house: 'splatpainthouse',
         canadian_2_for_1_pizza: 'canadian_pizza'
@@ -1730,8 +1733,8 @@
                 for (const attr of (layer.attributes || [])) {
                   if (String(attr?.attribute || '') !== 'Outlet brand') continue;
                   for (const value of (attr.values || [])) {
-                    const brand = String(value || '').trim();
-                    if (brand) brands.add(brand);
+                    const brand = value == null ? '' : String(value);
+                    if (brand.trim()) brands.add(brand);
                   }
                 }
               }
