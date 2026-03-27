@@ -5469,6 +5469,9 @@
       function prepDataset(fc) {
         if (!fc || !Array.isArray(fc.features)) return fc;
 
+        let pointCount = 0;
+        let polygonCount = 0;
+
         for (const f of fc.features) {
           const g = f?.geometry;
           if (!g) continue;
@@ -5483,6 +5486,7 @@
             if (Number.isFinite(lng) && Number.isFinite(lat)) {
               f.__lng = lng;
               f.__lat = lat;
+              pointCount++;
             }
             continue;
           }
@@ -5491,16 +5495,20 @@
           if (g.type === 'Polygon') {
             if (!f.__turfGeom) f.__turfGeom = turf.polygon(g.coordinates);
             if (!f.__bbox) f.__bbox = turf.bbox(f.__turfGeom);
+            polygonCount++;
             continue;
           }
 
           if (g.type === 'MultiPolygon') {
             if (!f.__turfGeom) f.__turfGeom = turf.multiPolygon(g.coordinates);
             if (!f.__bbox) f.__bbox = turf.bbox(f.__turfGeom);
+            polygonCount++;
             continue;
           }
         }
 
+        fc.__pointFeatureCount = pointCount;
+        fc.__polygonFeatureCount = polygonCount;
         return fc;
       }
 
@@ -5806,13 +5814,25 @@
         let lampData;
         try {
           lampData = prepDataset(await getExactAnalysisCached(DATASET_IDS.LAMP_POST, 'Lamp Post'));
+          ensurePointIndex(lampData);
         } catch (error) {
           console.error('[Lamp Search] Failed to load lamp post data:', error);
           throw new Error('Could not load the lamp post dataset.');
         }
 
         const matches = [];
-        for (const feature of lampData?.features || []) {
+        const candidateBounds = turf.bbox(turf.circle(center, radiusMeters, { steps: 16, units: 'meters' }));
+        const candidateItems = lampData?.__pointRbush
+          ? lampData.__pointRbush.search({
+            minX: candidateBounds[0],
+            minY: candidateBounds[1],
+            maxX: candidateBounds[2],
+            maxY: candidateBounds[3]
+          })
+          : (lampData?.features || []).map((feature) => ({ f: feature }));
+
+        for (const item of candidateItems) {
+          const feature = item.f || item;
           if (feature?.geometry?.type !== 'Point') continue;
           const lng = Number(feature.__lng ?? feature.geometry?.coordinates?.[0]);
           const lat = Number(feature.__lat ?? feature.geometry?.coordinates?.[1]);
@@ -6001,11 +6021,15 @@
           ]);
 
           lampData = prepDataset(lampData);
+          ensurePointIndex(lampData);
           hdbData = prepDataset(hdbData);
           ensureHdbIndex(hdbData);
           aedData = prepDataset(aedData);
+          ensurePointIndex(aedData);
           busData = prepDataset(busData);
+          ensurePointIndex(busData);
           trafficData = prepDataset(trafficData);
+          ensurePointIndex(trafficData, { categorizeTraffic: true });
 
           // Build recon search circle + adaptive precision
           const searchCircle = turf.circle(
@@ -6248,6 +6272,19 @@
         if (!dataset || !Array.isArray(dataset.features)) return 0;
 
         let count = 0;
+        let pointCandidates = null;
+
+        if (dataset.__pointRbush) {
+          const [minX, minY, maxX, maxY] = turf.bbox(circle);
+          pointCandidates = dataset.__pointRbush.search({ minX, minY, maxX, maxY });
+          for (const item of pointCandidates) {
+            const lng = Number.isFinite(item.f.__lng) ? item.f.__lng : Number(item.f.geometry?.coordinates?.[0]);
+            const lat = Number.isFinite(item.f.__lat) ? item.f.__lat : Number(item.f.geometry?.coordinates?.[1]);
+            if (Number.isFinite(lng) && Number.isFinite(lat) && turf.booleanPointInPolygon([lng, lat], circle)) {
+              count++;
+            }
+          }
+        }
 
         for (const f of dataset.features) {
           const geom = f.geometry;
@@ -6256,6 +6293,7 @@
           try {
             // For Points: check if inside circle
             if (geom.type === 'Point') {
+              if (pointCandidates) continue;
               // ✅ use cached numeric coords if prepDataset() ran
               const lng = Number.isFinite(f.__lng) ? f.__lng : Number(geom.coordinates?.[0]);
               const lat = Number.isFinite(f.__lat) ? f.__lat : Number(geom.coordinates?.[1]);
@@ -6293,6 +6331,20 @@
         if (!dataset || !Array.isArray(dataset.features)) return 0;
 
         let count = 0;
+        const categoryTree = dataset.__pointRbushByCategory?.[category];
+
+        if (categoryTree) {
+          const [minX, minY, maxX, maxY] = turf.bbox(circle);
+          const candidates = categoryTree.search({ minX, minY, maxX, maxY });
+          for (const item of candidates) {
+            const lng = Number.isFinite(item.f.__lng) ? item.f.__lng : Number(item.f.geometry?.coordinates?.[0]);
+            const lat = Number.isFinite(item.f.__lat) ? item.f.__lat : Number(item.f.geometry?.coordinates?.[1]);
+            if (Number.isFinite(lng) && Number.isFinite(lat) && turf.booleanPointInPolygon([lng, lat], circle)) {
+              count++;
+            }
+          }
+          return count;
+        }
 
         for (const f of dataset.features) {
           if (f.geometry?.type !== 'Point') continue;
@@ -6311,6 +6363,42 @@
         }
 
         return count;
+      }
+
+      function ensurePointIndex(dataset, { categorizeTraffic = false } = {}) {
+        if (!dataset?.features || typeof rbush !== 'function') return;
+        if (dataset.__pointRbush && (!categorizeTraffic || dataset.__pointRbushByCategory)) return;
+
+        const items = [];
+        const byCategory = categorizeTraffic ? { NO_ENTRY: [], SLOW: [], STOP: [] } : null;
+
+        for (const f of dataset.features) {
+          if (f?.geometry?.type !== 'Point') continue;
+          const lng = Number.isFinite(f.__lng) ? f.__lng : Number(f.geometry?.coordinates?.[0]);
+          const lat = Number.isFinite(f.__lat) ? f.__lat : Number(f.geometry?.coordinates?.[1]);
+          if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+
+          const item = { minX: lng, minY: lat, maxX: lng, maxY: lat, f };
+          items.push(item);
+
+          if (byCategory) {
+            const category = f.__cat || (f.__cat = extractTrafficSignCategory(f));
+            if (category && byCategory[category]) byCategory[category].push(item);
+          }
+        }
+
+        const tree = new rbush();
+        tree.load(items);
+        dataset.__pointRbush = tree;
+
+        if (byCategory) {
+          dataset.__pointRbushByCategory = {};
+          for (const [category, categoryItems] of Object.entries(byCategory)) {
+            const categoryTree = new rbush();
+            categoryTree.load(categoryItems);
+            dataset.__pointRbushByCategory[category] = categoryTree;
+          }
+        }
       }
 
 
