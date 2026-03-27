@@ -1438,6 +1438,9 @@
       const HTM_ICONS_TILE_URL = 'https://worldwidemaps.sqkii.com/api/tiles/htm_icons/{z}/{x}/{y}';
       const HTM_ICONS_SV_ICON_NAME = 'htm-sv-ticket';
       const HTM_ICONS_SV_ICON_URL = `${BASE_URL}voucher.png`;
+      const HTM_ICONS_SV_BRAND_IMAGE_PREFIX = 'htm-sv-brand-';
+      const HTM_ICONS_SV_SPRITE_JSON_URL = 'https://worldwidemaps.sqkii.com/api/maps/shopback_htm_icons/sprite@2x.json';
+      const HTM_ICONS_SV_SPRITE_PNG_URL = 'https://worldwidemaps.sqkii.com/api/maps/shopback_htm_icons/sprite@2x.png';
       const HTM_ICONS_LAYER_DEFS = [
         { id: 'htm-icons-lamp', sourceLayer: 'LTALampPostSilm', name: 'Lamp Posts', meta: 'Singapore lamp post markers', labelPrefix: 'Lamp', labelProps: ['Name'], color: '#f59e0b', stroke: '#7c2d12', minzoom: 13, radius: [13, 1.8, 16, 3.4] },
         { id: 'htm-icons-aed', sourceLayer: 'aed', name: 'AED', meta: 'Defibrillator locations', labelPrefix: 'AED', labelProps: ['BUILDING_NAME', 'AED_LOCATION_DESCRIPTION', 'ROAD_NAME'], color: '#22c55e', stroke: '#14532d', minzoom: 11, radius: [11, 3.2, 16, 5.3] },
@@ -1616,10 +1619,166 @@
       const htmIconsLabelLayerId = (layerId) => `${layerId}-label`;
       const htmIconsGlowLayerId = (layerId) => `${layerId}-glow`;
       const isHtmIconsLayerEnabled = (layerId) => htmIconsLayerVisibility[layerId] !== false;
+      const HTM_SV_SPRITE_ALIAS_BY_NORMALIZED_BRAND = {
+        cheers_fpx: 'cheers',
+        em_cheers: 'cheers',
+        em_fpx: 'fairprice_xpress',
+        go_unique_by_go_noodle_house: 'go_unique',
+        sf_fruits_and_juices: 'sf',
+        sf_farm_mart: 'sf',
+        seoul_garden_hotpot_and_cafe: 'seoul_garden_hotpot_cafe',
+        tonkotsu_kazan: 'kazan',
+        kith_cafe: 'kithcafe',
+        kopi_and_tarts: 'kopi&tarts',
+        nana_and_friends_cafe: 'nana_and_friends',
+        project_send_pte_ltd: 'projectsend',
+        homm_dessert_at_heart: 'homm',
+        fareastflora_com: 'fareastflora',
+        first_story_cafe: 'firststorycafe',
+        nong_geng_ji_hunan_home_style_cuisine: 'nong_geng_ji',
+        tiong_hoe_specialty_coffee: 'tionghoespecialtycoffee',
+        tuk_tuk_cha: 'tuktukcha',
+        the_braised_house: 'thebraisedhouse',
+        spin_paint_house: 'spinpainthouse',
+        splat_paint_house: 'splatpainthouse',
+        canadian_2_for_1_pizza: 'canadian_pizza'
+      };
+      let htmSvSpriteManifestPromise = null;
+      let htmSvSpriteSheetPromise = null;
+      let htmSvSpriteNormalizedKeysPromise = null;
+      const htmSvSpriteCropCache = new Map();
 
       async function ensureHtmSvIcon() {
         if (mapgl.hasImage?.(HTM_ICONS_SV_ICON_NAME)) return;
         await addImageToGL(HTM_ICONS_SV_ICON_NAME, HTM_ICONS_SV_ICON_URL);
+      }
+
+      function normalizeHtmSvSpriteToken(value) {
+        return String(value || '')
+          .normalize('NFKD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/&/g, ' and ')
+          .replace(/['’]/g, '')
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '')
+          .replace(/_+/g, '_');
+      }
+
+      function htmSvBrandImageId(value) {
+        return `${HTM_ICONS_SV_BRAND_IMAGE_PREFIX}${String(value || '')}`;
+      }
+
+      function loadImageElement(url) {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.referrerPolicy = 'no-referrer';
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
+          img.src = url;
+        });
+      }
+
+      async function fetchHtmSvSpriteManifest() {
+        if (!htmSvSpriteManifestPromise) {
+          htmSvSpriteManifestPromise = fetch(HTM_ICONS_SV_SPRITE_JSON_URL)
+            .then((resp) => {
+              if (!resp.ok) throw new Error(`Sprite JSON ${resp.status}`);
+              return resp.json();
+            });
+        }
+        return htmSvSpriteManifestPromise;
+      }
+
+      async function fetchHtmSvSpriteSheet() {
+        if (!htmSvSpriteSheetPromise) {
+          htmSvSpriteSheetPromise = loadImageElement(HTM_ICONS_SV_SPRITE_PNG_URL);
+        }
+        return htmSvSpriteSheetPromise;
+      }
+
+      async function fetchHtmSvNormalizedSpriteKeys() {
+        if (!htmSvSpriteNormalizedKeysPromise) {
+          htmSvSpriteNormalizedKeysPromise = fetchHtmSvSpriteManifest().then((manifest) => {
+            const normalized = new Map();
+            Object.keys(manifest || {}).forEach((key) => {
+              normalized.set(normalizeHtmSvSpriteToken(key), key);
+            });
+            return normalized;
+          });
+        }
+        return htmSvSpriteNormalizedKeysPromise;
+      }
+
+      async function resolveHtmSvSpriteKey(brand) {
+        const manifest = await fetchHtmSvSpriteManifest();
+        const normalizedKeys = await fetchHtmSvNormalizedSpriteKeys();
+        const normalizedBrand = normalizeHtmSvSpriteToken(brand);
+        const candidates = [
+          normalizedBrand,
+          HTM_SV_SPRITE_ALIAS_BY_NORMALIZED_BRAND[normalizedBrand],
+          normalizedBrand.replace(/_and_/g, '_'),
+          normalizedBrand.replace(/_and_/g, ''),
+          normalizedBrand.replace(/_/g, '')
+        ].filter(Boolean);
+
+        for (const candidate of candidates) {
+          if (manifest[candidate]) return candidate;
+          const normalizedHit = normalizedKeys.get(candidate);
+          if (normalizedHit && manifest[normalizedHit]) return normalizedHit;
+        }
+        return null;
+      }
+
+      async function cropHtmSvSprite(spriteKey) {
+        if (htmSvSpriteCropCache.has(spriteKey)) return htmSvSpriteCropCache.get(spriteKey);
+        const [manifest, sheet] = await Promise.all([
+          fetchHtmSvSpriteManifest(),
+          fetchHtmSvSpriteSheet()
+        ]);
+        const meta = manifest?.[spriteKey];
+        if (!meta) return null;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = Number(meta.width) || 0;
+        canvas.height = Number(meta.height) || 0;
+        const ctx = canvas.getContext('2d');
+        if (!ctx || !canvas.width || !canvas.height) return null;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(
+          sheet,
+          Number(meta.x) || 0,
+          Number(meta.y) || 0,
+          canvas.width,
+          canvas.height,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+        const cropped = {
+          imageData: ctx.getImageData(0, 0, canvas.width, canvas.height),
+          pixelRatio: Number(meta.pixelRatio) || 1
+        };
+        htmSvSpriteCropCache.set(spriteKey, cropped);
+        return cropped;
+      }
+
+      async function ensureHtmSvBrandIcon(brand) {
+        const imageId = htmSvBrandImageId(brand);
+        if (!brand || mapgl.hasImage?.(imageId)) return imageId;
+        const spriteKey = await resolveHtmSvSpriteKey(brand);
+        if (!spriteKey) return null;
+        const cropped = await cropHtmSvSprite(spriteKey);
+        if (!cropped || mapgl.hasImage?.(imageId)) return imageId;
+        try {
+          mapgl.addImage(imageId, cropped.imageData, { pixelRatio: cropped.pixelRatio });
+          return imageId;
+        } catch (error) {
+          console.warn('Failed to add HTM SV sprite image', brand, spriteKey, error);
+          return null;
+        }
       }
 
       function buildHtmIconsLabelExpression(layer) {
@@ -1714,11 +1873,15 @@
                     'source-layer': layer.sourceLayer,
                     minzoom: layer.minzoom,
                     layout: {
-                      'icon-image': HTM_ICONS_SV_ICON_NAME,
+                      'icon-image': [
+                        'coalesce',
+                        ['image', ['concat', HTM_ICONS_SV_BRAND_IMAGE_PREFIX, ['to-string', ['coalesce', ['get', 'Outlet brand'], '']]]],
+                        ['image', HTM_ICONS_SV_ICON_NAME]
+                      ],
                       'icon-size': [
                         'interpolate', ['linear'], ['zoom'],
-                        layer.minzoom, 0.5,
-                        16, 0.72
+                        layer.minzoom, 0.34,
+                        16, 0.5
                       ],
                       'icon-allow-overlap': true,
                       'icon-ignore-placement': true
@@ -1883,7 +2046,17 @@
       async function ensureDollarIcon() { if (mapgl.hasImage && mapgl.hasImage(DOLLAR_ICON_NAME)) return; await addImageToGL(DOLLAR_ICON_NAME, 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(dollarSvg(64))); }
       function registerIconUrl(url) { if (!url) return DOLLAR_ICON_NAME; if (urlToName.has(url)) return urlToName.get(url); const name = 'icon-' + (iconSeq++); urlToName.set(url, name); nameToUrl.set(name, url); if (mapgl.isStyleLoaded && mapgl.isStyleLoaded()) addImageToGL(name, url); else mapgl.once('load', () => addImageToGL(name, url)); return name; }
       async function ensureAllIconsOnCurrentStyle() { await ensureDollarIcon(); for (const [url, name] of urlToName.entries()) if (!mapgl.hasImage(name)) await addImageToGL(name, url); }
-      mapgl.on('styleimagemissing', e => { const url = nameToUrl.get(e.id); if (url) addImageToGL(e.id, url); });
+      mapgl.on('styleimagemissing', (e) => {
+        const url = nameToUrl.get(e.id);
+        if (url) {
+          addImageToGL(e.id, url);
+          return;
+        }
+        if (String(e.id || '').startsWith(HTM_ICONS_SV_BRAND_IMAGE_PREFIX)) {
+          const brand = String(e.id).slice(HTM_ICONS_SV_BRAND_IMAGE_PREFIX.length);
+          void ensureHtmSvBrandIcon(brand);
+        }
+      });
 
       function readdAllGroupsAfterGLStyleChange() {
         let done = false;
