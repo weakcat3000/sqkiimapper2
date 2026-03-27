@@ -1134,6 +1134,11 @@
       align-items: center;
     }
 
+    .coin-db-toolbar > input {
+      width: 100%;
+      min-width: 0;
+    }
+
     .coin-db-status {
       min-height: 18px;
     }
@@ -2223,6 +2228,29 @@
 
       .coin-db-toolbar {
         grid-template-columns: 1fr;
+      }
+
+      .coin-db-dropdown-header {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: start;
+      }
+
+      .coin-db-dropdown-left {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+      }
+
+      .coin-db-dropdown-title {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        word-break: break-word;
+      }
+
+      .coin-db-dropdown-date {
+        white-space: normal;
       }
 
       .coin-db-entry-head {
