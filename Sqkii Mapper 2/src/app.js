@@ -1927,8 +1927,9 @@
                       ],
                       'icon-size': [
                         'interpolate', ['linear'], ['zoom'],
-                        layer.minzoom, 0.34,
-                        16, 0.5
+                        layer.minzoom, 0.08,
+                        13, 0.11,
+                        16, 0.18
                       ],
                       'icon-allow-overlap': true,
                       'icon-ignore-placement': true
