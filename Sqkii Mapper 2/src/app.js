@@ -1489,44 +1489,49 @@
       const _glReadyQueue = [];
       let _glDrainScheduled = false;
 
-      function glIsTrulyReady() {
+      function glHasUsableStyle() {
         try {
           return mapgl &&
+            typeof mapgl.getStyle === 'function' &&
+            !!mapgl.getStyle() &&
             typeof mapgl.isStyleLoaded === 'function' &&
-            mapgl.isStyleLoaded() &&
-            typeof mapgl.areTilesLoaded === 'function' &&
-            mapgl.areTilesLoaded();
+            mapgl.isStyleLoaded();
         } catch { return false; }
       }
 
-      function drainGlQueueIfReady() {
-        if (!glIsTrulyReady()) return;
+      function drainGlQueueIfReady(force = false) {
+        if (!force && !glHasUsableStyle()) return false;
+        if (force && !glHasUsableStyle() && !(mapgl && typeof mapgl.getStyle === 'function' && mapgl.getStyle())) {
+          return false;
+        }
         const q = _glReadyQueue.splice(0, _glReadyQueue.length);
         _glDrainScheduled = false;
         for (const fn of q) {
           try { fn(); } catch (e) { console.warn('glReady callback error:', e); }
         }
+        return q.length > 0;
       }
 
-      // Schedule a drain attempt on the next true-idle frame.
+      // Schedule a drain attempt on the next usable-style frame.
       function scheduleGlDrain() {
         if (_glDrainScheduled) return;
         _glDrainScheduled = true;
 
         const tryDrain = () => {
-          // If ready now, drain immediately.
-          if (glIsTrulyReady()) {
+          if (glHasUsableStyle()) {
             drainGlQueueIfReady();
             return;
           }
-          // Not ready yet: wait for the next idle.
           mapgl.once('idle', () => {
-            // Small micro-delay helps after setStyle() churn.
-            requestAnimationFrame(drainGlQueueIfReady);
+            requestAnimationFrame(() => {
+              if (!drainGlQueueIfReady()) {
+                _glDrainScheduled = false;
+                if (_glReadyQueue.length) scheduleGlDrain();
+              }
+            });
           });
         };
 
-        // If map already loaded, try now; else wait for load.
         if (mapgl && mapgl.loaded && mapgl.loaded()) {
           tryDrain();
         } else {
@@ -1535,7 +1540,7 @@
       }
 
       function glReady(fn) {
-        if (glIsTrulyReady()) {
+        if (glHasUsableStyle()) {
           // Already ready—run immediately.
           try { fn(); } catch (e) { console.warn('glReady callback error:', e); }
           return;
@@ -1553,13 +1558,20 @@
       mapgl.on('load', drainGlQueueIfReady);
       mapgl.on('styledata', drainGlQueueIfReady);
       mapgl.on('idle', drainGlQueueIfReady);
+      mapgl.on('load', () => scheduleGlHeal('load'));
+      mapgl.on('styledata', () => scheduleGlHeal('styledata'));
+      mapgl.on('idle', () => scheduleGlHeal('idle'));
 
       setTimeout(() => {
         if (_glReadyQueue.length > 0) {
-          console.warn('glReady timeout, force-executing queue');
-          drainGlQueueIfReady();
+          console.warn('glReady timeout, force-draining queued GL work');
+          drainGlQueueIfReady(true);
         }
       }, 2000);
+
+      setInterval(() => {
+        if (document.visibilityState === 'visible') scheduleGlHeal('watchdog');
+      }, 4000);
 
 
       // Allow smoother fractional zoom (optional but feels nicer)
@@ -1624,6 +1636,7 @@
         mapgl.resize();
         mapgl.jumpTo({ center: [c.lng, c.lat], zoom: z });
         engine = 'gl';
+        scheduleGlHeal('show-gl');
         if (typeof scheduleCompassRender === 'function') scheduleCompassRender();
       }
       function showLeaf() {
@@ -1937,6 +1950,42 @@
         }
         return false;
       }
+      function hasHealthyGlBinding(entry) {
+        if (!entry || entry._deletedLayer || !hasLiveFeatures(entry)) return true;
+        if (!entry.glSourceId || !mapgl.getSource(entry.glSourceId)) return false;
+        for (const lid of (entry.glLayerIds || [])) {
+          if (!mapgl.getLayer(lid)) return false;
+        }
+        return true;
+      }
+      let glHealScheduled = false;
+      function healMissingGlBindings(reason = '') {
+        glReady(() => {
+          if (!mapgl?.getStyle?.()) return;
+          let healedAny = false;
+          for (const entry of layerList) {
+            if (hasHealthyGlBinding(entry)) continue;
+            console.warn('[GL Heal] Rebuilding layer binding:', entry.name, reason ? `(${reason})` : '');
+            createGroupOnGL(entry, true);
+            refreshGroupGL(entry);
+            applyVisibility(entry);
+            healedAny = true;
+          }
+          if (healedAny) {
+            renderGroupsVisibility();
+            renderLayers();
+            if (typeof scheduleCompassRender === 'function') scheduleCompassRender();
+          }
+        });
+      }
+      function scheduleGlHeal(reason = '') {
+        if (glHealScheduled) return;
+        glHealScheduled = true;
+        requestAnimationFrame(() => {
+          glHealScheduled = false;
+          healMissingGlBindings(reason);
+        });
+      }
 
       /* ========== KMZ helpers ========== */
       function blobToDataUrl(blob) { return new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); }); }
@@ -1966,11 +2015,16 @@
 
       /* ================= MapLibre overlay ================= */
       function createGroupOnGL(entry, clearIfExists) {
+        const buildToken = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        entry._glBuildToken = buildToken;
         glReady(async () => {
+          if (entry._deletedLayer || entry._glBuildToken !== buildToken) return;
           // Ensure the style is actually loaded
-          if (!mapgl.isStyleLoaded() || !mapgl.loaded()) {
+          if (!mapgl.isStyleLoaded()) {
             console.warn('Style not ready, requeueing layer creation for', entry.name);
-            setTimeout(() => createGroupOnGL(entry, clearIfExists), 100);
+            setTimeout(() => {
+              if (entry._glBuildToken === buildToken) createGroupOnGL(entry, clearIfExists);
+            }, 100);
             return;
           }
 
@@ -2082,6 +2136,9 @@
           // Ensure fresh data binds and visibility is respected (prevents ghost layers)
           refreshGroupGL(entry);
           applyVisibility(entry);
+          if (!verifyLayerOnGL(entry)) {
+            setTimeout(() => scheduleGlHeal(`post-create:${entry.name}`), 0);
+          }
         });
       }
       function refreshGroupGL(entry) { const src = mapgl.getSource(entry.glSourceId); if (src) src.setData(filteredFeatureCollection(entry)); }
@@ -3619,6 +3676,7 @@
 
         renderGroupsVisibility();
         renderLayers();
+        scheduleGlHeal('apply-state');
       } function getOrCreateLayerByName(name) {
         // First check if there's a non-deleted layer with this name
         let entry = layerList.find(l => l.name === name && !l._deletedLayer);
