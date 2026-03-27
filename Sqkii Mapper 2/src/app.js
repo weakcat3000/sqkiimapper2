@@ -1435,7 +1435,7 @@
       const HTM_ICONS_LS_KEY = 'sqkii-htm-icons';
       const HTM_ICONS_SETTINGS_LS_KEY = 'sqkii-htm-icons-settings';
       const HTM_ICONS_SOURCE_ID = 'htm-icons-src';
-      const HTM_ICONS_TILE_URL = `${BASE_URL}worldwidemaps/tiles/htm_icons/{z}/{x}/{y}.pbf`;
+      const HTM_ICONS_TILEJSON_URL = `${BASE_URL}worldwidemaps/tiles/htm_icons/tiles.json`;
       const HTM_ICONS_SV_ICON_NAME = 'htm-sv-ticket';
       const HTM_ICONS_SV_ICON_URL = `${BASE_URL}voucher.png`;
       const HTM_ICONS_SV_BRAND_IMAGE_PREFIX = 'htm-sv-brand-';
@@ -1832,10 +1832,7 @@
             if (!mapgl.getSource(HTM_ICONS_SOURCE_ID)) {
               mapgl.addSource(HTM_ICONS_SOURCE_ID, {
                 type: 'vector',
-                tiles: [HTM_ICONS_TILE_URL],
-                minzoom: 0,
-                maxzoom: 14,
-                scheme: 'xyz'
+                url: HTM_ICONS_TILEJSON_URL
               });
             }
 
@@ -4152,32 +4149,20 @@
         return 'Unknown';
       }
 
-      // Fetch IP and location info
-      async function fetchUserInfo() {
-        try {
-          const response = await fetch('https://ipapi.co/json/');
-          const data = await response.json();
-
-          userInfo = {
-            ip: data.ip || 'Unknown',
-            city: data.city || 'Unknown',
-            country: data.country_name || 'Unknown',
-            countryCode: data.country_code || '',
-            device: detectDevice(),
-            browser: detectBrowser()
-          };
-
-          updateConnectionIndicator();
-        } catch (e) {
-          console.warn('Failed to fetch user info:', e);
-          userInfo.device = detectDevice();
-          userInfo.browser = detectBrowser();
-          updateConnectionIndicator();
-        }
+      function initializeUserInfo() {
+        userInfo = {
+          ...userInfo,
+          ip: 'Unknown',
+          city: 'Unknown',
+          country: 'Unknown',
+          countryCode: '',
+          device: detectDevice(),
+          browser: detectBrowser()
+        };
+        updateConnectionIndicator();
       }
 
-      // Call on page load
-      fetchUserInfo();
+      initializeUserInfo();
 
       const ROOM_PRESENCE_TABLE = 'room_presence';
       const ROOM_PRESENCE_HEARTBEAT_MS = 15000;

@@ -11739,6 +11739,6 @@
   "scheme": "xyz",
   "tilejson": "2.2.0",
   "tiles": [
-    "https://worldwidemaps.sqkii.com/api/tiles/htm_icons/{z}/{x}/{y}"
+    "./{z}/{x}/{y}.pbf"
   ]
 }

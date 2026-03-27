@@ -47,6 +47,7 @@ def lat2y(lat: float, z: int) -> int:
 def mirror_tiles() -> None:
     TILES_DIR.mkdir(parents=True, exist_ok=True)
     tiles_json = json.loads(fetch_bytes(TILES_JSON_URL).decode("utf-8"))
+    tiles_json["tiles"] = ["./{z}/{x}/{y}.pbf"]
     (TILES_DIR / "tiles.json").write_text(json.dumps(tiles_json, indent=2), encoding="utf-8")
 
     west, south, east, north = tiles_json["bounds"]
