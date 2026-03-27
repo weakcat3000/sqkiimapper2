@@ -8488,8 +8488,8 @@
 
           if (ok) matches.push(center);
 
-          // progress update every ~100 points
-          if (i % 100 === 0) postMessage({ type: 'PROGRESS', requestId, done: i, total: testPoints.length, matches: matches.length });
+          // progress update after each tested point
+          postMessage({ type: 'PROGRESS', requestId, done: i + 1, total: testPoints.length, matches: matches.length });
         }
 
         postMessage({ type: 'DONE', requestId, matches });
