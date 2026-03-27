@@ -6088,7 +6088,7 @@
           );
 
           const matchingPoints = [];
-          const timeSliceMs = 24;
+          const timeSliceMs = 50;
 
           for (let i = 0; i < testPoints.length;) {
             const sliceStart = performance.now();
