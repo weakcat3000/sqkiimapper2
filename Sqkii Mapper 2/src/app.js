@@ -1422,6 +1422,7 @@
       const IS_TOUCH_DEVICE = (navigator.maxTouchPoints || 0) > 0 || !!window.matchMedia?.('(pointer: coarse)')?.matches;
       const IS_LOCALHOST = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
       const BASE_URL = import.meta.env.BASE_URL || '/';
+      const ABS_BASE_URL = new URL(BASE_URL, window.location.href).href;
       if (IS_IOS_DEVICE) document.documentElement.classList.add('ios-device');
       if (IS_TOUCH_DEVICE) document.documentElement.classList.add('touch-device');
       maptilersdk.config.apiKey = 'f9B8Wv0ythtbvpcK0QEw';
@@ -1435,12 +1436,12 @@
       const HTM_ICONS_LS_KEY = 'sqkii-htm-icons';
       const HTM_ICONS_SETTINGS_LS_KEY = 'sqkii-htm-icons-settings';
       const HTM_ICONS_SOURCE_ID = 'htm-icons-src';
-      const HTM_ICONS_TILE_URL = `${BASE_URL}worldwidemaps/tiles/htm_icons/{z}/{x}/{y}.pbf`;
+      const HTM_ICONS_TILE_URL = `${ABS_BASE_URL}worldwidemaps/tiles/htm_icons/{z}/{x}/{y}.pbf`;
       const HTM_ICONS_SV_ICON_NAME = 'htm-sv-ticket';
-      const HTM_ICONS_SV_ICON_URL = `${BASE_URL}voucher.png`;
+      const HTM_ICONS_SV_ICON_URL = `${ABS_BASE_URL}voucher.png`;
       const HTM_ICONS_SV_BRAND_IMAGE_PREFIX = 'htm-sv-brand-';
-      const HTM_ICONS_SV_SPRITE_JSON_URL = `${BASE_URL}worldwidemaps/maps/shopback_htm_icons/sprite@2x.json`;
-      const HTM_ICONS_SV_SPRITE_PNG_URL = `${BASE_URL}worldwidemaps/maps/shopback_htm_icons/sprite@2x.png`;
+      const HTM_ICONS_SV_SPRITE_JSON_URL = `${ABS_BASE_URL}worldwidemaps/maps/shopback_htm_icons/sprite@2x.json`;
+      const HTM_ICONS_SV_SPRITE_PNG_URL = `${ABS_BASE_URL}worldwidemaps/maps/shopback_htm_icons/sprite@2x.png`;
       const HTM_ICONS_LAYER_DEFS = [
         { id: 'htm-icons-lamp', sourceLayer: 'LTALampPostSilm', name: 'Lamp Posts', meta: 'Singapore lamp post markers', labelPrefix: 'Lamp', labelProps: ['Name'], color: '#f59e0b', stroke: '#7c2d12', minzoom: 13, radius: [13, 1.8, 16, 3.4] },
         { id: 'htm-icons-aed', sourceLayer: 'aed', name: 'AED', meta: 'Defibrillator locations', labelPrefix: 'AED', labelProps: ['BUILDING_NAME', 'AED_LOCATION_DESCRIPTION', 'ROAD_NAME'], color: '#22c55e', stroke: '#14532d', minzoom: 11, radius: [11, 3.2, 16, 5.3] },
@@ -2042,7 +2043,7 @@
       const DOLLAR_ICON_NAME = 'dollar-pin'; let iconSeq = 1;
       const urlToName = new Map(), nameToUrl = new Map();
       function dollarSvg(size) { const s = size || 64; return `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="#111" stroke="white" stroke-width="1.5"/><text x="16" y="21" text-anchor="middle" font-family="system-ui,Segoe UI,Arial" font-size="16" font-weight="800" fill="white">$</text></svg>`; }
-      function addImageToGL(name, url) { return new Promise(res => { const img = new Image(); img.crossOrigin = 'anonymous'; img.referrerPolicy = 'no-referrer'; img.onload = () => { try { mapgl.addImage(name, img, { pixelRatio: 2 }); } catch { } res(); }; img.onerror = () => res(); img.src = url; }); }
+      function addImageToGL(name, url) { return new Promise(res => { const img = new Image(); img.crossOrigin = 'anonymous'; img.referrerPolicy = 'no-referrer'; img.onload = () => { try { if (!mapgl.hasImage?.(name)) mapgl.addImage(name, img, { pixelRatio: 2 }); } catch { } res(); }; img.onerror = () => res(); img.src = url; }); }
       async function ensureDollarIcon() { if (mapgl.hasImage && mapgl.hasImage(DOLLAR_ICON_NAME)) return; await addImageToGL(DOLLAR_ICON_NAME, 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(dollarSvg(64))); }
       function registerIconUrl(url) { if (!url) return DOLLAR_ICON_NAME; if (urlToName.has(url)) return urlToName.get(url); const name = 'icon-' + (iconSeq++); urlToName.set(url, name); nameToUrl.set(name, url); if (mapgl.isStyleLoaded && mapgl.isStyleLoaded()) addImageToGL(name, url); else mapgl.once('load', () => addImageToGL(name, url)); return name; }
       async function ensureAllIconsOnCurrentStyle() { await ensureDollarIcon(); for (const [url, name] of urlToName.entries()) if (!mapgl.hasImage(name)) await addImageToGL(name, url); }
