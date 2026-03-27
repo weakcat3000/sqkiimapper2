@@ -235,6 +235,7 @@
       background: linear-gradient(180deg, rgba(15, 17, 21, 0.82), rgba(11, 12, 17, 0.9));
       border-right: 1px solid var(--border);
       overflow: auto;
+      scrollbar-gutter: stable;
       width: var(--side);
       transition: width .28s ease;
       isolation: isolate
@@ -676,6 +677,10 @@
       font-weight: 700;
       box-shadow: 0 2px 14px rgba(0, 0, 0, .35);
       color: var(--text)
+    }
+
+    .ui-hide {
+      margin-right: 8px;
     }
 
     #edit-toggle.off,

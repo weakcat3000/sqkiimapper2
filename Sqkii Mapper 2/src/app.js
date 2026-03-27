@@ -1042,7 +1042,7 @@
         const appEl = document.getElementById('app');
 
         const c = document.getElementById('pg-canvas');
-        if (!openBtn || !modal || !closeBtn || !appEl || !c) {
+        if (!modal || !closeBtn || !appEl || !c) {
           console.warn('Pixel Grid modal markup is missing; skipping Pixel Grid init.');
           return;
         }
