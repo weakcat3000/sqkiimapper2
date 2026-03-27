@@ -1432,9 +1432,39 @@
         : Math.min(baseDevicePixelRatio * 1.25, 3);
       const APP_BUILD_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
       const POWER_SAVE_LS_KEY = 'sqkii-power-saving';
+      const HTM_ICONS_LS_KEY = 'sqkii-htm-icons';
+      const HTM_ICONS_SOURCE_ID = 'htm-icons-src';
+      const HTM_ICONS_TILE_URL = 'https://worldwidemaps.sqkii.com/api/tiles/htm_icons/{z}/{x}/{y}';
+      const HTM_ICONS_LAYER_DEFS = [
+        { id: 'htm-icons-lamp', sourceLayer: 'LTALampPostSilm', color: '#f59e0b', stroke: '#7c2d12', minzoom: 13, radius: [13, 1.8, 16, 3.4] },
+        { id: 'htm-icons-aed', sourceLayer: 'aed', color: '#22c55e', stroke: '#14532d', minzoom: 11, radius: [11, 3.2, 16, 5.3] },
+        { id: 'htm-icons-bike', sourceLayer: 'bicycle_parking', color: '#38bdf8', stroke: '#0f3b52', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
+        { id: 'htm-icons-cc', sourceLayer: 'communityclubs', color: '#60a5fa', stroke: '#1e3a8a', minzoom: 11, radius: [11, 3.2, 16, 5.2] },
+        { id: 'htm-icons-hawker', sourceLayer: 'hawker', color: '#fb923c', stroke: '#7c2d12', minzoom: 11, radius: [11, 3.3, 16, 5.4] },
+        { id: 'htm-icons-huntingstop', sourceLayer: 'huntingstop1', color: '#f472b6', stroke: '#831843', minzoom: 11, radius: [11, 3.1, 16, 5.1] },
+        { id: 'htm-icons-landmark', sourceLayer: 'landmark1', color: '#c084fc', stroke: '#581c87', minzoom: 11, radius: [11, 3.1, 16, 5.1] },
+        { id: 'htm-icons-megastop', sourceLayer: 'megastop1', color: '#a78bfa', stroke: '#4c1d95', minzoom: 11, radius: [11, 3.2, 16, 5.2] },
+        { id: 'htm-icons-ccl', sourceLayer: 'ccl', color: '#fde047', stroke: '#713f12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
+        { id: 'htm-icons-ewl', sourceLayer: 'ewl', color: '#facc15', stroke: '#713f12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
+        { id: 'htm-icons-nsl', sourceLayer: 'nsl', color: '#eab308', stroke: '#713f12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
+        { id: 'htm-icons-rmi-1', sourceLayer: 'rmi_m_1', color: '#34d399', stroke: '#065f46', minzoom: 11, radius: [11, 2.7, 16, 4.5] },
+        { id: 'htm-icons-rmi-2', sourceLayer: 'rmi_m_2', color: '#34d399', stroke: '#065f46', minzoom: 11, radius: [11, 2.7, 16, 4.5] },
+        { id: 'htm-icons-rmi-3', sourceLayer: 'rmi_m_3', color: '#34d399', stroke: '#065f46', minzoom: 11, radius: [11, 2.7, 16, 4.5] },
+        { id: 'htm-icons-rmi-4', sourceLayer: 'rmi_m_4', color: '#34d399', stroke: '#065f46', minzoom: 11, radius: [11, 2.7, 16, 4.5] },
+        { id: 'htm-icons-rmi-5', sourceLayer: 'rmi_m_5', color: '#34d399', stroke: '#065f46', minzoom: 11, radius: [11, 2.7, 16, 4.5] },
+        { id: 'htm-icons-sponsor-1', sourceLayer: 'sponsor_1', color: '#f97316', stroke: '#7c2d12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
+        { id: 'htm-icons-sponsor-2', sourceLayer: 'sponsor_2', color: '#f97316', stroke: '#7c2d12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
+        { id: 'htm-icons-sponsor-3', sourceLayer: 'sponsor_3', color: '#f97316', stroke: '#7c2d12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
+        { id: 'htm-icons-sv-1', sourceLayer: 'sv1', color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
+        { id: 'htm-icons-sv-2', sourceLayer: 'sv2', color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
+        { id: 'htm-icons-sv-3', sourceLayer: 'sv3', color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
+        { id: 'htm-icons-sv-4', sourceLayer: 'sv4', color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] },
+        { id: 'htm-icons-sv-5', sourceLayer: 'sv5', color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7] }
+      ];
       const brandVersionEl = document.getElementById('brand-version');
       if (brandVersionEl) brandVersionEl.textContent = APP_BUILD_VERSION;
       let powerSavingEnabled = false;
+      let htmIconsEnabled = false;
 
       const mapgl = new maptilersdk.Map({
         container: 'mapgl',
@@ -1578,6 +1608,63 @@
         if (!powerSavingEnabled && document.visibilityState === 'visible') scheduleGlHeal('watchdog');
       }, 4000);
 
+      function removeHtmIconsOverlay() {
+        for (const layer of HTM_ICONS_LAYER_DEFS) {
+          if (mapgl.getLayer(layer.id)) {
+            try { mapgl.removeLayer(layer.id); } catch { }
+          }
+        }
+        if (mapgl.getSource(HTM_ICONS_SOURCE_ID)) {
+          try { mapgl.removeSource(HTM_ICONS_SOURCE_ID); } catch { }
+        }
+      }
+
+      function ensureHtmIconsOverlay() {
+        if (!htmIconsEnabled || engine !== 'gl') return;
+        glReady(() => {
+          if (!htmIconsEnabled || engine !== 'gl') return;
+          if (!mapgl.getSource(HTM_ICONS_SOURCE_ID)) {
+            mapgl.addSource(HTM_ICONS_SOURCE_ID, {
+              type: 'vector',
+              tiles: [HTM_ICONS_TILE_URL],
+              minzoom: 0,
+              maxzoom: 14,
+              scheme: 'xyz'
+            });
+          }
+
+          for (const layer of HTM_ICONS_LAYER_DEFS) {
+            if (mapgl.getLayer(layer.id)) continue;
+            mapgl.addLayer({
+              id: layer.id,
+              type: 'circle',
+              source: HTM_ICONS_SOURCE_ID,
+              'source-layer': layer.sourceLayer,
+              minzoom: layer.minzoom,
+              paint: {
+                'circle-color': layer.color,
+                'circle-radius': [
+                  'interpolate', ['linear'], ['zoom'],
+                  layer.radius[0], layer.radius[1],
+                  layer.radius[2], layer.radius[3]
+                ],
+                'circle-opacity': 0.92,
+                'circle-stroke-color': layer.stroke,
+                'circle-stroke-width': 1.15
+              }
+            });
+          }
+        });
+      }
+
+      function scheduleHtmIconsOverlayRestore() {
+        if (!htmIconsEnabled || engine !== 'gl') return;
+        ensureHtmIconsOverlay();
+      }
+
+      mapgl.on('load', scheduleHtmIconsOverlayRestore);
+      mapgl.on('styledata', scheduleHtmIconsOverlayRestore);
+
 
       // Allow smoother fractional zoom (optional but feels nicer)
       const mapleaf = L.map('mapleaf', {
@@ -1642,6 +1729,7 @@
         mapgl.jumpTo({ center: [c.lng, c.lat], zoom: z });
         engine = 'gl';
         scheduleGlHeal('show-gl');
+        scheduleHtmIconsOverlayRestore();
         if (typeof scheduleCompassRender === 'function') scheduleCompassRender();
       }
       function showLeaf() {
@@ -4583,6 +4671,7 @@
 
       const audioBtn = document.getElementById('audio-toggle');
       const powerSaveBtn = document.getElementById('power-saving-toggle');
+      const htmIconsBtn = document.getElementById('htm-icons-toggle');
       function setAudioIcon(on) {
         audioBtn.innerHTML = on
           ? `<svg viewBox="0 0 24 24" fill="none" stroke="#e5e7eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>`
@@ -4642,6 +4731,27 @@
         if (powerSavingEnabled) stopNonEssentialEffects();
         else resumeNonEssentialEffects();
       }
+      function syncHtmIconsUi() {
+        if (!htmIconsBtn) return;
+        htmIconsBtn.classList.toggle('off', !htmIconsEnabled);
+        htmIconsBtn.textContent = htmIconsEnabled ? 'HTM Icons: ON' : 'HTM Icons: OFF';
+        htmIconsBtn.title = htmIconsEnabled
+          ? 'HTM Icons overlay on'
+          : 'Toggle HTM Icons overlay (GL basemaps only)';
+        htmIconsBtn.setAttribute('aria-pressed', htmIconsEnabled ? 'true' : 'false');
+      }
+      function setHtmIconsEnabled(active, { persist = true } = {}) {
+        htmIconsEnabled = !!active;
+        if (persist) {
+          try {
+            if (htmIconsEnabled) localStorage.setItem(HTM_ICONS_LS_KEY, '1');
+            else localStorage.removeItem(HTM_ICONS_LS_KEY);
+          } catch { }
+        }
+        syncHtmIconsUi();
+        if (htmIconsEnabled) scheduleHtmIconsOverlayRestore();
+        else removeHtmIconsOverlay();
+      }
       setAudioIcon(true);
       audioBtn.addEventListener('click', () => {
         audioEnabled = !audioEnabled;
@@ -4650,10 +4760,14 @@
         else unlockAudioFromUserGesture();
       });
       try { powerSavingEnabled = localStorage.getItem(POWER_SAVE_LS_KEY) === '1'; } catch { }
+      try { htmIconsEnabled = localStorage.getItem(HTM_ICONS_LS_KEY) === '1'; } catch { }
       syncPowerSaveUi();
+      syncHtmIconsUi();
       if (powerSavingEnabled) document.getElementById('app')?.classList.add('power-saving');
       powerSaveBtn?.addEventListener('click', () => setPowerSavingMode(!powerSavingEnabled));
+      htmIconsBtn?.addEventListener('click', () => setHtmIconsEnabled(!htmIconsEnabled));
       if (powerSavingEnabled) setTimeout(() => stopNonEssentialEffects(), 0);
+      if (htmIconsEnabled) setTimeout(() => scheduleHtmIconsOverlayRestore(), 0);
       document.addEventListener('click', (ev) => { if (ev.target.closest('button')) playClick(); }, { capture: true });
 
       const sonarSfx = new Audio(SCANNING_SOUND_URL);

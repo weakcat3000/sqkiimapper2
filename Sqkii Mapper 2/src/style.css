@@ -679,7 +679,8 @@
     }
 
     #edit-toggle.off,
-    #delete-toggle.off {
+    #delete-toggle.off,
+    #htm-icons-toggle.off {
       opacity: .6
     }
 
@@ -691,6 +692,18 @@
 
     #delete-toggle {
       white-space: nowrap
+    }
+
+    #htm-icons-toggle {
+      white-space: nowrap;
+      transition: background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease, opacity .18s ease;
+    }
+
+    #htm-icons-toggle:not(.off) {
+      border-color: rgba(56, 189, 248, 0.55);
+      background: rgba(8, 47, 73, 0.42);
+      color: #d7f4ff;
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.08) inset, 0 4px 18px rgba(14, 116, 144, 0.16);
     }
 
     a {
