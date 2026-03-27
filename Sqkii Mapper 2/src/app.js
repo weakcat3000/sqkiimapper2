@@ -6944,6 +6944,14 @@
         return Number.isFinite(n) ? n.toFixed(6) : 'n/a';
       }
 
+      function coinDbGetExactCoords(entry) {
+        const lat = Number(entry?.exact_lat);
+        const lng = Number(entry?.exact_lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        if (Math.abs(lat) < 1e-9 && Math.abs(lng) < 1e-9) return null;
+        return { lat, lng };
+      }
+
       function coinDbFormatRadius(value) {
         const n = Number(value);
         return Number.isFinite(n) ? `${Math.round(n * 100) / 100} m` : 'n/a';
@@ -7221,8 +7229,9 @@
         coinDbList.innerHTML = coinDbEntriesCache.map((entry) => {
           const steps = Array.isArray(entry.lifecycle) ? entry.lifecycle : [];
           const displayLabel = coinDbCanonicalLabel(entry.coin_label || 'Unnamed coin') || 'Unnamed coin';
-          const exactSpot = (Number.isFinite(Number(entry.exact_lat)) && Number.isFinite(Number(entry.exact_lng)))
-            ? `${coinDbFormatCoord(entry.exact_lat)}, ${coinDbFormatCoord(entry.exact_lng)}`
+          const exactCoords = coinDbGetExactCoords(entry);
+          const exactSpot = exactCoords
+            ? `${coinDbFormatCoord(exactCoords.lat)}, ${coinDbFormatCoord(exactCoords.lng)}`
             : '';
 
           const statusBadge = entry.status === 'active'
@@ -7542,16 +7551,15 @@
           }
         } : null;
 
-        const exactLat = Number(entry?.exact_lat);
-        const exactLng = Number(entry?.exact_lng);
-        const exactFeature = Number.isFinite(exactLat) && Number.isFinite(exactLng) ? {
+        const exactCoords = coinDbGetExactCoords(entry);
+        const exactFeature = exactCoords ? {
           type: 'Feature',
           properties: {
             note: entry?.exact_note || ''
           },
           geometry: {
             type: 'Point',
-            coordinates: [exactLng, exactLat]
+            coordinates: [exactCoords.lng, exactCoords.lat]
           }
         } : null;
 
@@ -7593,7 +7601,7 @@
             const west = turf.destination(origin, maxDistanceMeters / 1000, 270, { units: 'kilometers' }).geometry.coordinates;
             return [west[0], south[1], east[0], north[1]];
           })(),
-          exactSpot: exactFeature ? `${coinDbFormatCoord(exactLat)}, ${coinDbFormatCoord(exactLng)}` : '',
+          exactSpot: exactFeature ? `${coinDbFormatCoord(exactCoords.lat)}, ${coinDbFormatCoord(exactCoords.lng)}` : '',
           note: String(entry?.exact_note || ''),
           createdAt: coinDbFormatDate(entry?.created_at),
           apiKey: String(maptilersdk?.config?.apiKey || ''),
