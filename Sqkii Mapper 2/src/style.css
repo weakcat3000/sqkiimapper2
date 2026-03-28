@@ -1842,70 +1842,222 @@
       background-position: center;
     }
 
-    .sheets-btn {
+    .tool-rail {
       position: fixed;
       left: calc(var(--side) + 16px);
       bottom: 16px;
-      z-index: 900;
-      width: 56px;
-      height: 56px;
-      padding: 0;
-      border: 0;
-      background: transparent;
-      box-shadow: none;
-      cursor: pointer;
-      display: grid;
-      place-items: center;
-      transition: left .28s ease
-    }
-
-    /* Floating Pixel Grid button (stacked above Sheets) */
-    #pixelgrid-fab {
-      position: fixed;
-      left: calc(var(--side) + 16px);
-      /* align with Sheets */
-      bottom: calc(16px + 56px + 12px);
-      /* sit above Sheets (56px height + 12px gap) */
-      z-index: 950;
-      /* above Sheets’ 900 */
-      width: 56px;
-      height: 56px;
-      border-radius: 12px;
-      background: #0e1420;
-      border: 1px solid var(--border);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
-      cursor: pointer;
-      display: grid;
-      place-items: center;
+      z-index: 980;
+      display: flex;
+      align-items: center;
+      gap: 12px;
       transition: left .28s ease;
     }
 
-    .app.ui-collapsed #pixelgrid-fab {
+    .app.ui-collapsed .tool-rail {
       left: 16px;
     }
 
-    .app:not(.ui-collapsed) #pixelgrid-fab {
+    .app:not(.ui-collapsed) .tool-rail {
       left: calc(var(--side) + 16px);
     }
 
-    #pixelgrid-fab img {
-      width: 44px;
-      height: 44px;
+    .tool-rail-toggle,
+    .tool-rail-btn {
+      width: 56px;
+      height: 56px;
+      padding: 0;
+      border-radius: 16px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      transition:
+        transform .24s ease,
+        box-shadow .24s ease,
+        border-color .24s ease,
+        background .24s ease,
+        opacity .24s ease;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .tool-rail-toggle:hover,
+    .tool-rail-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .tool-rail-toggle {
+      border: 1px solid rgba(234, 179, 8, 0.34);
+      background:
+        radial-gradient(circle at 28% 26%, rgba(255, 244, 191, 0.38), transparent 38%),
+        radial-gradient(circle at 78% 78%, rgba(217, 119, 6, 0.26), transparent 46%),
+        linear-gradient(180deg, rgba(58, 31, 12, 0.96), rgba(26, 14, 8, 0.98));
+      box-shadow:
+        0 0 0 1px rgba(250, 204, 21, 0.08),
+        0 12px 28px rgba(82, 39, 8, 0.34),
+        0 0 18px rgba(250, 204, 21, 0.18);
+    }
+
+    .tool-rail-toggle-shell {
+      position: relative;
+      width: 100%;
+      height: 100%;
       display: block;
-      user-select: none;
+    }
+
+    .tool-rail-toggle-coin {
+      width: 34px;
+      height: 34px;
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%) rotate(-8deg);
+      object-fit: contain;
       pointer-events: none;
+      user-select: none;
+      filter:
+        drop-shadow(0 8px 18px rgba(245, 158, 11, 0.26))
+        drop-shadow(0 0 10px rgba(250, 204, 21, 0.28));
+      transition: transform .28s ease, filter .28s ease;
+    }
+
+    .tool-rail-toggle-arrow {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 248, 220, 0.14);
+      border: 1px solid rgba(255, 236, 179, 0.22);
+      box-shadow: 0 0 10px rgba(250, 204, 21, 0.15);
+      transition: transform .28s ease, background .28s ease, box-shadow .28s ease;
+    }
+
+    .tool-rail-toggle-arrow svg {
+      width: 11px;
+      height: 11px;
+      display: block;
+    }
+
+    .tool-rail-toggle-arrow path {
+      fill: none;
+      stroke: rgba(255, 243, 212, 0.98);
+      stroke-width: 2.3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .tool-rail.open .tool-rail-toggle {
+      box-shadow:
+        0 0 0 1px rgba(250, 204, 21, 0.14),
+        0 14px 30px rgba(82, 39, 8, 0.38),
+        0 0 22px rgba(250, 204, 21, 0.28);
+    }
+
+    .tool-rail.open .tool-rail-toggle-coin {
+      transform: translateY(-50%) rotate(-2deg) scale(1.04);
+      filter:
+        drop-shadow(0 10px 20px rgba(245, 158, 11, 0.32))
+        drop-shadow(0 0 12px rgba(250, 204, 21, 0.34));
+    }
+
+    .tool-rail.open .tool-rail-toggle-arrow {
+      transform: translateY(-50%) translateX(1px);
+      background: rgba(255, 248, 220, 0.2);
+      box-shadow: 0 0 14px rgba(250, 204, 21, 0.22);
+    }
+
+    .tool-rail-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 0;
+      opacity: 0;
+      overflow: hidden;
+      pointer-events: none;
+      transition: width .36s cubic-bezier(.22, 1, .36, 1), opacity .2s ease;
+    }
+
+    .tool-rail.open .tool-rail-actions {
+      width: 192px;
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .tool-rail-btn {
+      flex: 0 0 auto;
+      border: 1px solid rgba(116, 132, 161, 0.26);
+      background:
+        radial-gradient(circle at 50% 22%, rgba(137, 92, 255, 0.18), transparent 48%),
+        linear-gradient(180deg, rgba(17, 23, 37, 0.96), rgba(10, 13, 21, 0.96));
+      box-shadow:
+        0 10px 26px rgba(0, 0, 0, 0.32),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      transform: translateX(-18px) scale(.84);
+      transform-origin: left center;
+      opacity: 0;
+    }
+
+    .tool-rail.open .tool-rail-btn {
+      transform: translateX(0) scale(1);
+      opacity: 1;
+    }
+
+    .tool-rail.open .tool-rail-btn:nth-child(1) {
+      transition-delay: .04s;
+    }
+
+    .tool-rail.open .tool-rail-btn:nth-child(2) {
+      transition-delay: .08s;
+    }
+
+    .tool-rail.open .tool-rail-btn:nth-child(3) {
+      transition-delay: .12s;
+    }
+
+    .tool-rail-btn img,
+    .tool-rail-btn svg {
+      display: block;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .tool-rail-btn-geohash {
+      border-color: rgba(192, 38, 211, 0.22);
+      background:
+        radial-gradient(circle at 32% 28%, rgba(236, 72, 153, 0.18), transparent 40%),
+        linear-gradient(180deg, rgba(24, 16, 34, 0.96), rgba(11, 13, 20, 0.98));
+    }
+
+    .tool-rail-btn-geohash img {
+      width: 28px;
+      height: 28px;
+      object-fit: contain;
+      filter:
+        drop-shadow(0 6px 14px rgba(236, 72, 153, 0.22))
+        drop-shadow(0 0 10px rgba(251, 113, 133, 0.18));
+    }
+
+    .tool-rail-btn-pixel img {
+      width: 34px;
+      height: 34px;
+      object-fit: contain;
       filter: drop-shadow(0 8px 16px rgba(0, 0, 0, .32));
     }
 
-    .app.ui-collapsed .sheets-btn {
-      left: 16px
+    .tool-rail-btn-sheets {
+      background:
+        radial-gradient(circle at 50% 22%, rgba(34, 197, 94, 0.16), transparent 46%),
+        linear-gradient(180deg, rgba(12, 26, 18, 0.96), rgba(8, 16, 12, 0.98));
+      border-color: rgba(34, 197, 94, 0.24);
     }
 
-    .app:not(.ui-collapsed) .sheets-btn {
-      left: calc(var(--side) + 16px)
-    }
-
-    .sheets-btn svg {
+    .tool-rail-btn-sheets svg {
       width: 28px;
       height: 28px;
     }
@@ -2312,8 +2464,8 @@
 
       .map-edit-fab,
       .compass-btn,
-      .sheets-btn,
-      #pixelgrid-fab,
+      .tool-rail-toggle,
+      .tool-rail-btn,
       .sonar-btn {
         width: 47.6px;
         height: 47.6px;
@@ -2321,10 +2473,30 @@
 
       .map-edit-fab img,
       .compass-btn svg,
-      .sheets-btn svg,
-      #pixelgrid-fab img {
+      .tool-rail-btn svg,
+      .tool-rail-btn img,
+      .tool-rail-toggle-coin {
         width: 23.8px;
         height: 23.8px;
+      }
+
+      .tool-rail-actions {
+        gap: 10px;
+      }
+
+      .tool-rail.open .tool-rail-actions {
+        width: 163px;
+      }
+
+      .tool-rail-toggle-arrow {
+        width: 16px;
+        height: 16px;
+        right: 5px;
+      }
+
+      .tool-rail-toggle-arrow svg {
+        width: 10px;
+        height: 10px;
       }
 
       .project-title > .icon-btn,
@@ -2416,6 +2588,8 @@
 
       html.ios-device .map-edit-fab,
       html.ios-device .compass-btn,
+      html.ios-device .tool-rail-toggle,
+      html.ios-device .tool-rail-btn,
       html.ios-device #connection-indicator,
       html.ios-device #connection-dropdown {
         backdrop-filter: none;

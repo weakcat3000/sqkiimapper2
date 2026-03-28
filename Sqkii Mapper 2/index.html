@@ -101,9 +101,6 @@
         <div class="toolbar">
           <button id="delete-toggle" class="btn small off" title="Toggle delete mode">Delete: OFF</button>
 
-          <!-- Geohashes button (move it here so it's visible in the header) -->
-          <button id="geohash-open" class="btn small" title="Open Geohashes Editor">Geohashes</button>
-
           <button id="coin-db-open" class="btn small" title="Open archived coin database">Coin DB</button>
 
           <button id="htm-icons-toggle" class="btn small off" title="Toggle HTM Icons overlay (GL basemaps only)">HTM Icons: OFF</button>
@@ -284,20 +281,43 @@
     <!-- Floating Sonar Button -->
     <button id="sonar-btn" class="sonar-btn disabled" title="Turn on GPS to use Sonar"></button>
 
-    <!-- Sheets Button -->
-    <button id="sheets-btn" class="sheets-btn" title="Open Google Sheets">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path fill="#0f9d58" d="M6.25 2h8.9l4.6 4.6V19a3 3 0 0 1-3 3H6.25a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3z"></path>
-        <path fill="#33c481" d="M15.15 2v3.45a1.15 1.15 0 0 0 1.15 1.15h3.45z"></path>
-        <path fill="#ffffff" d="M7.1 9.4h9.8v7.8H7.1z"></path>
-        <path fill="#0f9d58" d="M8.35 10.7h3v2h-3zm4.3 0h3v2h-3zm-4.3 3h3v2h-3zm4.3 3h3v-2h-3zm-4.3 0h3v-2h-3z"></path>
-      </svg>
-    </button>
+    <div id="tool-rail" class="tool-rail" aria-label="Quick tools">
+      <button
+        id="tool-rail-toggle"
+        class="tool-rail-toggle"
+        type="button"
+        title="Open quick tools"
+        aria-label="Open quick tools"
+        aria-expanded="false">
+        <span class="tool-rail-toggle-shell">
+          <img class="tool-rail-toggle-coin" src="golden-coin.png" alt="" />
+          <span class="tool-rail-toggle-arrow" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M8 5.5 15.5 12 8 18.5"></path>
+            </svg>
+          </span>
+        </span>
+      </button>
 
+      <div class="tool-rail-actions" aria-hidden="true">
+        <button id="geohash-open" class="tool-rail-btn tool-rail-btn-geohash" title="Open Geohashes Editor" aria-label="Open Geohashes Editor">
+          <img src="geohash-fab-icon.png" alt="" />
+        </button>
 
-    <button id="pixelgrid-fab" title="Open Pixel Grid" aria-label="Open Pixel Grid">
-      <img src="pixel-grid-icon.png" alt="" />
-    </button>
+        <button id="pixelgrid-fab" class="tool-rail-btn tool-rail-btn-pixel" title="Open Pixel Grid" aria-label="Open Pixel Grid">
+          <img src="pixel-grid-icon.png" alt="" />
+        </button>
+
+        <button id="sheets-btn" class="tool-rail-btn tool-rail-btn-sheets" title="Open Google Sheets" aria-label="Open Google Sheets">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="#0f9d58" d="M6.25 2h8.9l4.6 4.6V19a3 3 0 0 1-3 3H6.25a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3z"></path>
+            <path fill="#33c481" d="M15.15 2v3.45a1.15 1.15 0 0 0 1.15 1.15h3.45z"></path>
+            <path fill="#ffffff" d="M7.1 9.4h9.8v7.8H7.1z"></path>
+            <path fill="#0f9d58" d="M8.35 10.7h3v2h-3zm4.3 0h3v2h-3zm-4.3 3h3v2h-3zm4.3 3h3v-2h-3zm-4.3 0h3v-2h-3z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
 
 
     <!-- Sheets View -->

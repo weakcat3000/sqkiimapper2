@@ -3359,6 +3359,56 @@
       btnHide.addEventListener('click', collapseUI); btnReopen.addEventListener('click', expandUI);
       sidebarEl.addEventListener('transitionend', e => { if (e.propertyName === 'width') { if (engine === 'gl') mapgl.resize(); else mapleaf.invalidateSize(true); } });
 
+      (() => {
+        const toolRail = document.getElementById('tool-rail');
+        const toggleBtn = document.getElementById('tool-rail-toggle');
+        const actions = toolRail?.querySelector('.tool-rail-actions');
+        if (!toolRail || !toggleBtn || !actions) return;
+
+        let isOpen = false;
+        const actionButtons = Array.from(actions.querySelectorAll('button'));
+
+        const renderRail = () => {
+          toolRail.classList.toggle('open', isOpen);
+          toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+          toggleBtn.setAttribute('aria-label', isOpen ? 'Hide quick tools' : 'Open quick tools');
+          toggleBtn.title = isOpen ? 'Hide quick tools' : 'Open quick tools';
+          actions.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+          actionButtons.forEach((button) => {
+            button.tabIndex = isOpen ? 0 : -1;
+          });
+        };
+
+        const closeRail = () => {
+          if (!isOpen) return;
+          isOpen = false;
+          renderRail();
+        };
+
+        toggleBtn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          isOpen = !isOpen;
+          renderRail();
+        });
+
+        actionButtons.forEach((button) => {
+          button.addEventListener('click', () => {
+            closeRail();
+          });
+        });
+
+        document.addEventListener('click', (event) => {
+          if (!isOpen || toolRail.contains(event.target)) return;
+          closeRail();
+        });
+
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') closeRail();
+        });
+
+        renderRail();
+      })();
+
       /* ===== Basemap switching ===== */
       document.getElementById('basemap').addEventListener('change', (e) => {
         const val = e.target.value;
