@@ -26,3 +26,30 @@ Thumbs.db
 # Node / Vite
 node_modules/
 dist/
+
+# Local/backend tooling not used by the website build
+.great_gold_hunt_profile/
+Other_Alerts.py
+ai_assistant.py
+circles.kml
+config.py
+excel_logger.py
+great_gold_hunt_cookies.json
+great_gold_hunt_titles.json
+main.py
+map_renderer.py
+mapper_sync.py
+other_alerts_state.json
+scheduled_announcements.py
+scraper.py
+send_oneoff_broadcast.py
+sg_mrt_stations.csv
+shrink_target.json
+state.py
+stitch_dashboard.html
+telegram_bot.py
+test_*.py
+utils.py
+warmup_great_gold_hunt.py
+workers/
+wrangler.toml
