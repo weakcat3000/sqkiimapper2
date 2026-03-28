@@ -2075,10 +2075,10 @@
     }
 
     .tool-rail-toggle-coin {
-      width: 34px;
-      height: 34px;
+      width: 42px;
+      height: 42px;
       position: absolute;
-      left: 10px;
+      left: 5px;
       top: 50%;
       transform: translateY(-50%) rotate(-8deg);
       object-fit: contain;
@@ -2131,7 +2131,7 @@
     }
 
     .tool-rail.open .tool-rail-toggle-coin {
-      transform: translateY(-50%) rotate(-2deg) scale(1.04);
+      transform: translateY(-50%) rotate(-2deg) scale(1.07);
       filter:
         drop-shadow(0 10px 20px rgba(245, 158, 11, 0.32))
         drop-shadow(0 0 12px rgba(250, 204, 21, 0.34));
@@ -2649,8 +2649,8 @@
       .tool-rail-btn svg,
       .tool-rail-btn img,
       .tool-rail-toggle-coin {
-        width: 23.8px;
-        height: 23.8px;
+        width: 28px;
+        height: 28px;
       }
 
       .tool-rail-actions {
