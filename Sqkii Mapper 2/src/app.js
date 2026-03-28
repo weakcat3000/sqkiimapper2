@@ -4249,6 +4249,29 @@
         return 'Unknown';
       }
 
+      async function fetchGeoIpProfile() {
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), 5000) : 0;
+        try {
+          const res = await fetch('https://api.ip.sb/geoip', {
+            method: 'GET',
+            mode: 'cors',
+            cache: 'no-store',
+            signal: controller?.signal
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          return {
+            ip: String(data?.ip || '').trim() || 'Unknown',
+            city: String(data?.city || '').trim() || 'Unknown',
+            country: String(data?.country || '').trim() || 'Unknown',
+            countryCode: String(data?.country_code || '').trim() || ''
+          };
+        } finally {
+          if (timeoutId) clearTimeout(timeoutId);
+        }
+      }
+
       function initializeUserInfo() {
         userInfo = {
           ...userInfo,
@@ -4260,6 +4283,23 @@
           browser: detectBrowser()
         };
         updateConnectionIndicator();
+
+        fetchGeoIpProfile()
+          .then((geo) => {
+            userInfo = {
+              ...userInfo,
+              ...geo
+            };
+            updateConnectionIndicator();
+            if (currentRoomCode) {
+              upsertRoomPresence()
+                .then(() => refreshRoomPresence())
+                .catch((e) => console.warn('User geo refresh failed:', e));
+            }
+          })
+          .catch((e) => {
+            console.warn('User geo lookup failed:', e);
+          });
       }
 
       const ROOM_PRESENCE_TABLE = 'room_presence';
