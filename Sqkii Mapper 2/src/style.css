@@ -1838,19 +1838,37 @@
     }
 
     #pixelgrid-modal .pg-bulk-actions {
-      display: flex;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
       margin-top: 8px;
-      flex-wrap: wrap;
       align-items: center;
     }
 
+    #pixelgrid-modal .pg-clear-btn,
+    #pixelgrid-modal #pg-msg {
+      grid-column: 1 / -1;
+    }
+
     #pixelgrid-modal .pg-bulk-actions .btn {
-      flex: 0 0 auto;
+      width: 100%;
     }
 
     #pixelgrid-modal #pg-msg {
       min-height: 1.2em;
+    }
+
+    #pixelgrid-modal .pg-floating-close {
+      position: fixed;
+      right: 20px;
+      bottom: calc(18px + var(--safe-bottom));
+      z-index: 2105;
+      min-width: 92px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.34);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
 
     #pixelgrid-modal .pg-canvas-hint {
@@ -2857,6 +2875,13 @@
       #pixelgrid-modal .pg-add-row > .btn,
       #pixelgrid-modal #pg-filters-reset {
         width: 100%;
+      }
+
+      #pixelgrid-modal .pg-floating-close {
+        right: 14px;
+        bottom: calc(14px + var(--safe-bottom));
+        min-width: 84px;
+        padding: 9px 14px;
       }
 
       #pixelgrid-modal .pg-canvas-wrap {

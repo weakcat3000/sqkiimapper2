@@ -1218,11 +1218,7 @@
         clearBtn.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-
-          // Hold Shift/Ctrl/Cmd to skip the prompt
-          const ok = (e.shiftKey || e.ctrlKey || e.metaKey)
-            ? true
-            : window.confirm('Clear all pixels from this grid?');
+          const ok = window.confirm('Clear all pixels from this grid? This cannot be undone.');
 
           if (!ok) return;
 
