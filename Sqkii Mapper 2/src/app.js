@@ -1182,9 +1182,6 @@
 
         // Modal
         function openModal() {
-          if (!hintInp.value.trim()) {
-            hintInp.value = '(30,17,#949A9B),(22,24,#6F7378),(25,17,#909799),(25,31,#2E3023)';
-          }
           modal.classList.add('visible'); appEl.classList.add('blocked-by-modal');
           drawGrid();
         }
