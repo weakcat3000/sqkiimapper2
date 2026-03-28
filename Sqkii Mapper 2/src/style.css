@@ -1671,6 +1671,7 @@
     #pixelgrid-modal .pg-left {
       display: grid;
       gap: 10px;
+      min-width: 0;
     }
 
     #pixelgrid-modal .pg-row {
@@ -1697,6 +1698,11 @@
       min-width: 64px;
     }
 
+    #pixelgrid-modal .pg-row > div,
+    #pixelgrid-modal .pg-photo > div {
+      min-width: 0;
+    }
+
     /* canvas container: big view but contained */
     #pixelgrid-modal .pg-right {
       display: flex;
@@ -1705,6 +1711,7 @@
       justify-content: center;
       gap: 16px;
       width: 100%;
+      min-width: 0;
     }
 
     #pixelgrid-modal .pg-canvas-wrap {
@@ -1715,6 +1722,11 @@
       max-height: 78vh;
       max-width: 80vw;
       background: #111;
+    }
+
+    #pixelgrid-modal #pg-canvas {
+      max-width: min(100%, 512px);
+      height: auto;
     }
 
     /* Pixel Grid: keep the filter message from shifting inputs */
@@ -2621,32 +2633,92 @@
 
     /* Pixel Grid Mobile Fixes */
     @media (max-width: 768px) {
+      #pixelgrid-modal {
+        align-items: stretch;
+        padding: 0;
+      }
+
       #pixelgrid-modal .pg-modal-card {
         display: flex !important;
         flex-direction: column;
+        width: 100% !important;
+        max-width: none !important;
+        min-height: 100dvh;
+        max-height: 100dvh;
+        border-radius: 0;
         overflow-y: auto !important;
-        padding: 16px !important;
+        padding: 16px 14px calc(18px + var(--safe-bottom)) !important;
       }
+
       #pixelgrid-modal .pg-controls {
         grid-template-columns: 1fr !important;
+        gap: 14px;
       }
-      #pixelgrid-modal .pg-row,
-      #pixelgrid-modal .pg-photo {
-        display: flex !important;
-        flex-wrap: wrap;
+
+      #pixelgrid-modal .pg-size-row,
+      #pixelgrid-modal .pg-add-row {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
       }
-      #pixelgrid-modal .pg-row > div,
-      #pixelgrid-modal .pg-photo > div {
-        flex: 1 1 auto;
+
+      #pixelgrid-modal .pg-filters-row {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
       }
-      #pixelgrid-modal .pg-row > button,
-      #pixelgrid-modal .pg-photo > button {
-        flex: 1 1 100%;
-        margin-top: 4px;
+
+      #pixelgrid-modal .pg-zoom-field,
+      #pixelgrid-modal .pg-hint-field,
+      #pixelgrid-modal #pg-filters-reset,
+      #pixelgrid-modal #pg-filters-msg {
+        grid-column: 1 / -1 !important;
       }
+
+      #pixelgrid-modal .pg-size-row > button,
+      #pixelgrid-modal .pg-add-row > button {
+        width: 100%;
+      }
+
+      #pixelgrid-modal .pg-bulk-actions,
+      #pixelgrid-modal .pg-modal-actions {
+        display: grid !important;
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      #pixelgrid-modal .pg-bulk-actions > .btn,
+      #pixelgrid-modal .pg-modal-actions > .btn {
+        width: 100%;
+      }
+
+      #pixelgrid-modal input[type="number"],
+      #pixelgrid-modal input[type="text"],
+      #pixelgrid-modal textarea,
+      #pixelgrid-modal input[type="range"] {
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      #pixelgrid-modal #pg-msg,
+      #pixelgrid-modal #pg-filters-msg {
+        justify-self: start;
+        text-align: left;
+        white-space: normal;
+      }
+
       #pixelgrid-modal .pg-canvas-wrap {
         max-width: 100% !important;
         width: 100%;
+        max-height: min(42vh, 360px);
+      }
+
+      #pixelgrid-modal #pg-canvas {
+        width: min(100%, 512px);
+      }
+
+      #pixelgrid-modal .pg-right {
+        gap: 10px;
       }
     }
 

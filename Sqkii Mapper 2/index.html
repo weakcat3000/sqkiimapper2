@@ -540,7 +540,7 @@
         <div class="pg-controls">
           <div class="pg-left">
             <!-- Size & zoom -->
-            <div class="pg-row">
+            <div class="pg-row pg-size-row">
               <div>
                 <div class="hint">Width</div>
                 <input id="pg-w" type="number" min="1" value="32">
@@ -549,7 +549,7 @@
                 <div class="hint">Height</div>
                 <input id="pg-h" type="number" min="1" value="32">
               </div>
-              <div style="grid-column:span 2;">
+              <div class="pg-zoom-field" style="grid-column:span 2;">
                 <div class="hint">Zoom (cell px)</div>
                 <input id="pg-zoom" type="range" min="6" max="48" step="1" value="16">
               </div>
@@ -558,7 +558,7 @@
             </div>
 
             <!-- Photo settings -->
-            <div class="pg-photo">
+            <div class="pg-photo pg-filters-row">
               <div>
                 <div class="hint">Blur (px)</div>
                 <input id="pg-blur" type="number" min="0" max="40" step="1" value="0" />
@@ -580,7 +580,7 @@
             </div>
 
             <!-- Single add + quick hint -->
-            <div class="pg-row">
+            <div class="pg-row pg-add-row">
               <div>
                 <div class="hint">x</div>
                 <input id="pg-x" type="number" min="0" value="0">
@@ -594,7 +594,7 @@
                 <input id="pg-color" type="text" value="#000000" placeholder="#RRGGBB">
               </div>
               <button id="pg-add" class="btn small">Add pixel</button>
-              <div style="grid-column:span 2;">
+              <div class="pg-hint-field" style="grid-column:span 2;">
                 <div class="hint">Quick Hint paste</div>
                 <input id="pg-hint" type="text"
                   placeholder='(30,17,#949A9B),(22,24,#6F7378),(25,17,#909799),(25,31,#2E3023)' />
@@ -606,7 +606,7 @@
               <div class="hint" style="margin-bottom:4px;">Bulk paste (comma/space/newline separated)</div>
               <textarea id="pg-bulk" placeholder="(x,y,#hex), (x,y,#hex) …"
                 style="width:100%;min-height:90px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--panel-2);color:var(--text);font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;"></textarea>
-              <div style="display:flex;gap:8px;margin-top:8px;">
+              <div class="pg-bulk-actions" style="display:flex;gap:8px;margin-top:8px;">
                 <button id="pg-parse" class="btn small">Parse & Plot</button>
                 <button id="pg-export" class="btn small">Export PNG</button>
                 <span class="hint" id="pg-msg" style="align-self:center;"></span>
@@ -623,7 +623,7 @@
           </div>
         </div>
 
-        <div style="display:flex;justify-content:flex-end;margin-top:12px;gap:8px;">
+        <div class="pg-modal-actions" style="display:flex;justify-content:flex-end;margin-top:12px;gap:8px;">
           <button id="pixelgrid-close" class="btn small">Close</button>
         </div>
       </div>
