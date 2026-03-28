@@ -1674,23 +1674,81 @@
       min-width: 0;
     }
 
+    #pixelgrid-modal .pg-panel {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      border-radius: 14px;
+      background:
+        linear-gradient(180deg, rgba(17, 20, 30, 0.94), rgba(12, 14, 22, 0.98));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      min-width: 0;
+    }
+
+    #pixelgrid-modal .pg-panel-title {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: rgba(226, 232, 240, 0.86);
+    }
+
+    #pixelgrid-modal .pg-field {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
     #pixelgrid-modal .pg-row {
       display: grid;
-      grid-template-columns: repeat(6, auto);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
       align-items: end;
     }
 
     #pixelgrid-modal .pg-photo {
       display: grid;
-      grid-template-columns: repeat(8, auto);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
       align-items: end;
+    }
+
+    #pixelgrid-modal .pg-zoom-field,
+    #pixelgrid-modal .pg-hint-field,
+    #pixelgrid-modal #pg-filters-reset,
+    #pixelgrid-modal #pg-filters-msg {
+      grid-column: 1 / -1;
+    }
+
+    #pixelgrid-modal .pg-zoom-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    #pixelgrid-modal .pg-zoom-value {
+      flex: 0 0 auto;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(59, 130, 246, 0.14);
+      border: 1px solid rgba(96, 165, 250, 0.22);
+      color: #bfdbfe;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
     }
 
     /* make the range & number inputs breathe */
     #pixelgrid-modal input[type="range"] {
       width: 100%;
+      margin: 0;
+      appearance: none;
+      -webkit-appearance: none;
+      height: 22px;
+      background: transparent;
     }
 
     #pixelgrid-modal input[type="number"],
@@ -1708,20 +1766,23 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      gap: 16px;
+      justify-content: flex-start;
+      gap: 12px;
       width: 100%;
       min-width: 0;
     }
 
     #pixelgrid-modal .pg-canvas-wrap {
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 14px;
       overflow: auto;
       /* prevents “floating” beyond modal */
       max-height: 78vh;
       max-width: 80vw;
       background: #111;
+      padding: 10px;
+      box-sizing: border-box;
+      width: 100%;
     }
 
     #pixelgrid-modal #pg-canvas {
@@ -1753,6 +1814,57 @@
       /* tidy baseline */
       margin-top: 2px;
       /* tiny gap from controls */
+    }
+
+    #pixelgrid-modal .pg-bulk-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    #pixelgrid-modal .pg-bulk-actions .btn {
+      flex: 0 0 auto;
+    }
+
+    #pixelgrid-modal #pg-msg {
+      min-height: 1.2em;
+    }
+
+    #pixelgrid-modal #pg-zoom::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(59, 130, 246, 0.82), rgba(147, 197, 253, 0.92));
+      box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.16);
+    }
+
+    #pixelgrid-modal #pg-zoom::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      margin-top: -6px;
+      background: #f8fafc;
+      border: 2px solid #1d4ed8;
+      box-shadow: 0 4px 12px rgba(29, 78, 216, 0.34);
+    }
+
+    #pixelgrid-modal #pg-zoom::-moz-range-track {
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(59, 130, 246, 0.82), rgba(147, 197, 253, 0.92));
+      border: none;
+    }
+
+    #pixelgrid-modal #pg-zoom::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: #f8fafc;
+      border: 2px solid #1d4ed8;
+      box-shadow: 0 4px 12px rgba(29, 78, 216, 0.34);
     }
 
     /* Sonar */
@@ -2651,45 +2763,44 @@
       }
 
       #pixelgrid-modal .pg-controls {
-        grid-template-columns: 1fr !important;
-        gap: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
       }
 
-      #pixelgrid-modal .pg-size-row,
-      #pixelgrid-modal .pg-add-row {
-        display: grid !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+      #pixelgrid-modal .pg-right {
+        order: -1;
+        gap: 8px;
+      }
+
+      #pixelgrid-modal .pg-left {
+        gap: 12px;
+      }
+
+      #pixelgrid-modal .pg-panel {
+        padding: 12px 10px;
         gap: 10px;
       }
 
-      #pixelgrid-modal .pg-filters-row {
-        display: grid !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+      #pixelgrid-modal .pg-size-row,
+      #pixelgrid-modal .pg-filters-row,
+      #pixelgrid-modal .pg-add-row {
+        grid-template-columns: 1fr;
         gap: 10px;
       }
 
       #pixelgrid-modal .pg-zoom-field,
       #pixelgrid-modal .pg-hint-field,
       #pixelgrid-modal #pg-filters-reset,
-      #pixelgrid-modal #pg-filters-msg {
-        grid-column: 1 / -1 !important;
+      #pixelgrid-modal #pg-filters-msg,
+      #pixelgrid-modal .pg-color-field,
+      #pixelgrid-modal #pg-add {
+        grid-column: auto;
       }
 
-      #pixelgrid-modal .pg-size-row > button,
-      #pixelgrid-modal .pg-add-row > button {
-        width: 100%;
-      }
-
-      #pixelgrid-modal .pg-bulk-actions,
-      #pixelgrid-modal .pg-modal-actions {
-        display: grid !important;
-        grid-template-columns: 1fr;
-        gap: 8px;
-      }
-
-      #pixelgrid-modal .pg-bulk-actions > .btn,
-      #pixelgrid-modal .pg-modal-actions > .btn {
-        width: 100%;
+      #pixelgrid-modal .pg-zoom-field,
+      #pixelgrid-modal .pg-hint-field {
+        grid-column: 1 / -1;
       }
 
       #pixelgrid-modal input[type="number"],
@@ -2702,23 +2813,36 @@
 
       #pixelgrid-modal #pg-msg,
       #pixelgrid-modal #pg-filters-msg {
-        justify-self: start;
+        justify-self: stretch;
         text-align: left;
         white-space: normal;
+      }
+
+      #pixelgrid-modal .pg-bulk-actions,
+      #pixelgrid-modal .pg-modal-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      #pixelgrid-modal .pg-bulk-actions .btn,
+      #pixelgrid-modal .pg-modal-actions .btn,
+      #pixelgrid-modal .pg-size-row > .btn,
+      #pixelgrid-modal .pg-add-row > .btn,
+      #pixelgrid-modal #pg-filters-reset {
+        width: 100%;
       }
 
       #pixelgrid-modal .pg-canvas-wrap {
         max-width: 100% !important;
         width: 100%;
-        max-height: min(42vh, 360px);
+        max-height: none;
+        padding: 8px;
       }
 
       #pixelgrid-modal #pg-canvas {
-        width: min(100%, 512px);
-      }
-
-      #pixelgrid-modal .pg-right {
-        gap: 10px;
+        width: 100%;
+        max-width: 100%;
       }
     }
 

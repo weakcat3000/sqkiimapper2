@@ -539,79 +539,88 @@
 
         <div class="pg-controls">
           <div class="pg-left">
-            <!-- Size & zoom -->
-            <div class="pg-row pg-size-row">
-              <div>
-                <div class="hint">Width</div>
-                <input id="pg-w" type="number" min="1" value="32">
+            <section class="pg-panel pg-panel-size">
+              <div class="pg-panel-title">Grid Size</div>
+              <div class="pg-row pg-size-row">
+                <label class="pg-field">
+                  <div class="hint">Width</div>
+                  <input id="pg-w" type="number" min="1" value="32">
+                </label>
+                <label class="pg-field">
+                  <div class="hint">Height</div>
+                  <input id="pg-h" type="number" min="1" value="32">
+                </label>
+                <div class="pg-zoom-field">
+                  <div class="pg-zoom-head">
+                    <span class="hint">Zoom (cell px)</span>
+                    <span id="pg-zoom-value" class="pg-zoom-value">16 px</span>
+                  </div>
+                  <input id="pg-zoom" type="range" min="6" max="48" step="1" value="16">
+                </div>
+                <button id="pg-apply-size" class="btn small">Apply Size</button>
+                <button id="pg-clear" class="btn small danger" title="Clear all pixels">Clear</button>
               </div>
-              <div>
-                <div class="hint">Height</div>
-                <input id="pg-h" type="number" min="1" value="32">
-              </div>
-              <div class="pg-zoom-field" style="grid-column:span 2;">
-                <div class="hint">Zoom (cell px)</div>
-                <input id="pg-zoom" type="range" min="6" max="48" step="1" value="16">
-              </div>
-              <button id="pg-apply-size" class="btn small">Apply Size</button>
-              <button id="pg-clear" class="btn small danger" title="Clear all pixels">Clear</button>
-            </div>
+            </section>
 
-            <!-- Photo settings -->
-            <div class="pg-photo pg-filters-row">
-              <div>
-                <div class="hint">Blur (px)</div>
-                <input id="pg-blur" type="number" min="0" max="40" step="1" value="0" />
+            <section class="pg-panel pg-panel-filters">
+              <div class="pg-panel-title">Preview Filters</div>
+              <div class="pg-photo pg-filters-row">
+                <label class="pg-field">
+                  <div class="hint">Blur (px)</div>
+                  <input id="pg-blur" type="number" min="0" max="40" step="1" value="0" />
+                </label>
+                <label class="pg-field">
+                  <div class="hint">Saturation (%)</div>
+                  <input id="pg-sat" type="number" min="0" max="300" step="1" value="100" />
+                </label>
+                <label class="pg-field">
+                  <div class="hint">Contrast (%)</div>
+                  <input id="pg-con" type="number" min="0" max="300" step="1" value="100" />
+                </label>
+                <label class="pg-field">
+                  <div class="hint">Brightness (%)</div>
+                  <input id="pg-bri" type="number" min="0" max="300" step="1" value="100" />
+                </label>
+                <button id="pg-filters-reset" class="btn small">Reset Filters</button>
+                <span class="hint" id="pg-filters-msg"></span>
               </div>
-              <div>
-                <div class="hint">Saturation (%)</div>
-                <input id="pg-sat" type="number" min="0" max="300" step="1" value="100" />
-              </div>
-              <div>
-                <div class="hint">Contrast (%)</div>
-                <input id="pg-con" type="number" min="0" max="300" step="1" value="100" />
-              </div>
-              <div>
-                <div class="hint">Brightness (%)</div>
-                <input id="pg-bri" type="number" min="0" max="300" step="1" value="100" />
-              </div>
-              <button id="pg-filters-reset" class="btn small">Reset Filters</button>
-              <span class="hint" id="pg-filters-msg" style="grid-column:span 3;"></span>
-            </div>
+            </section>
 
-            <!-- Single add + quick hint -->
-            <div class="pg-row pg-add-row">
-              <div>
-                <div class="hint">x</div>
-                <input id="pg-x" type="number" min="0" value="0">
+            <section class="pg-panel pg-panel-add">
+              <div class="pg-panel-title">Single Pixel</div>
+              <div class="pg-row pg-add-row">
+                <label class="pg-field">
+                  <div class="hint">x</div>
+                  <input id="pg-x" type="number" min="0" value="0">
+                </label>
+                <label class="pg-field">
+                  <div class="hint">y</div>
+                  <input id="pg-y" type="number" min="0" value="0">
+                </label>
+                <label class="pg-field pg-color-field">
+                  <div class="hint">Color</div>
+                  <input id="pg-color" type="text" value="#000000" placeholder="#RRGGBB">
+                </label>
+                <button id="pg-add" class="btn small">Add pixel</button>
+                <label class="pg-field pg-hint-field">
+                  <div class="hint">Quick Hint paste</div>
+                  <input id="pg-hint" type="text"
+                    placeholder='(30,17,#949A9B),(22,24,#6F7378),(25,17,#909799),(25,31,#2E3023)' />
+                </label>
               </div>
-              <div>
-                <div class="hint">y</div>
-                <input id="pg-y" type="number" min="0" value="0">
-              </div>
-              <div>
-                <div class="hint">Color</div>
-                <input id="pg-color" type="text" value="#000000" placeholder="#RRGGBB">
-              </div>
-              <button id="pg-add" class="btn small">Add pixel</button>
-              <div class="pg-hint-field" style="grid-column:span 2;">
-                <div class="hint">Quick Hint paste</div>
-                <input id="pg-hint" type="text"
-                  placeholder='(30,17,#949A9B),(22,24,#6F7378),(25,17,#909799),(25,31,#2E3023)' />
-              </div>
-            </div>
+            </section>
 
-            <!-- Bulk -->
-            <div>
+            <section class="pg-panel pg-panel-bulk">
+              <div class="pg-panel-title">Bulk Plot</div>
               <div class="hint" style="margin-bottom:4px;">Bulk paste (comma/space/newline separated)</div>
               <textarea id="pg-bulk" placeholder="(x,y,#hex), (x,y,#hex) …"
                 style="width:100%;min-height:90px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--panel-2);color:var(--text);font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;"></textarea>
-              <div class="pg-bulk-actions" style="display:flex;gap:8px;margin-top:8px;">
+              <div class="pg-bulk-actions">
                 <button id="pg-parse" class="btn small">Parse & Plot</button>
                 <button id="pg-export" class="btn small">Export PNG</button>
-                <span class="hint" id="pg-msg" style="align-self:center;"></span>
+                <span class="hint" id="pg-msg"></span>
               </div>
-            </div>
+            </section>
           </div>
 
           <div class="pg-right">
@@ -619,7 +628,7 @@
               <canvas id="pg-canvas" width="512" height="512"
                 style="display:block;image-rendering:pixelated;cursor:zoom-in;"></canvas>
             </div>
-            <small class="hint">Scroll to zoom • Click cell to pick coordinates • Grid autosaves & syncs.</small>
+            <small class="hint pg-canvas-hint">Scroll to zoom • Click cell to pick coordinates • Grid autosaves & syncs.</small>
           </div>
         </div>
 

@@ -1051,6 +1051,7 @@
         const wInput = document.getElementById('pg-w');
         const hInput = document.getElementById('pg-h');
         const zoomRange = document.getElementById('pg-zoom');
+        const zoomValue = document.getElementById('pg-zoom-value');
         const applySize = document.getElementById('pg-apply-size');
         const clearBtn = document.getElementById('pg-clear');
 
@@ -1172,6 +1173,7 @@
 
         function refreshInputs() {
           wInput.value = W; hInput.value = H; zoomRange.value = CELL;
+          if (zoomValue) zoomValue.textContent = `${CELL} px`;
           blurInp.value = filters.blur; satInp.value = filters.sat; conInp.value = filters.con; briInp.value = filters.bri;
           drawGrid();
           saveLocal();
