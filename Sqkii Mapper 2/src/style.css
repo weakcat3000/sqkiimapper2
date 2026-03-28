@@ -1897,6 +1897,7 @@
         0 0 0 1px rgba(250, 204, 21, 0.08),
         0 12px 28px rgba(82, 39, 8, 0.34),
         0 0 18px rgba(250, 204, 21, 0.18);
+      overflow: visible;
     }
 
     .tool-rail-toggle-shell {
@@ -1924,30 +1925,33 @@
 
     .tool-rail-toggle-arrow {
       position: absolute;
-      right: 6px;
+      right: -8px;
       top: 50%;
       transform: translateY(-50%);
-      width: 18px;
-      height: 18px;
+      width: 24px;
+      height: 24px;
       border-radius: 999px;
       display: grid;
       place-items: center;
-      background: rgba(255, 248, 220, 0.14);
-      border: 1px solid rgba(255, 236, 179, 0.22);
-      box-shadow: 0 0 10px rgba(250, 204, 21, 0.15);
+      z-index: 2;
+      background: linear-gradient(180deg, rgba(255, 246, 214, 0.96), rgba(251, 191, 36, 0.92));
+      border: 1px solid rgba(120, 53, 15, 0.7);
+      box-shadow:
+        0 4px 14px rgba(0, 0, 0, 0.34),
+        0 0 12px rgba(250, 204, 21, 0.28);
       transition: transform .28s ease, background .28s ease, box-shadow .28s ease;
     }
 
     .tool-rail-toggle-arrow svg {
-      width: 11px;
-      height: 11px;
+      width: 13px;
+      height: 13px;
       display: block;
     }
 
     .tool-rail-toggle-arrow path {
       fill: none;
-      stroke: rgba(255, 243, 212, 0.98);
-      stroke-width: 2.3;
+      stroke: rgba(120, 53, 15, 0.96);
+      stroke-width: 2.7;
       stroke-linecap: round;
       stroke-linejoin: round;
     }
@@ -1967,9 +1971,11 @@
     }
 
     .tool-rail.open .tool-rail-toggle-arrow {
-      transform: translateY(-50%) translateX(1px);
-      background: rgba(255, 248, 220, 0.2);
-      box-shadow: 0 0 14px rgba(250, 204, 21, 0.22);
+      transform: translateY(-50%) translateX(2px) scale(1.04);
+      background: linear-gradient(180deg, rgba(255, 250, 230, 0.98), rgba(245, 158, 11, 0.96));
+      box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.38),
+        0 0 16px rgba(250, 204, 21, 0.34);
     }
 
     .tool-rail-actions {
@@ -2489,14 +2495,14 @@
       }
 
       .tool-rail-toggle-arrow {
-        width: 16px;
-        height: 16px;
-        right: 5px;
+        width: 20px;
+        height: 20px;
+        right: -6px;
       }
 
       .tool-rail-toggle-arrow svg {
-        width: 10px;
-        height: 10px;
+        width: 11px;
+        height: 11px;
       }
 
       .project-title > .icon-btn,
