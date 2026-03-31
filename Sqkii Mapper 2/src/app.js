@@ -1442,6 +1442,12 @@
       const HTM_ICONS_SV_BRAND_IMAGE_PREFIX = 'htm-sv-brand-';
       const HTM_ICONS_SV_SPRITE_JSON_URL = `${ABS_BASE_URL}worldwidemaps/maps/shopback_htm_icons/sprite@2x.json`;
       const HTM_ICONS_SV_SPRITE_PNG_URL = `${ABS_BASE_URL}worldwidemaps/maps/shopback_htm_icons/sprite@2x.png`;
+      const HTM_ICONS_SILVER_DATE_FORMATTER = new Intl.DateTimeFormat('en-SG', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        timeZone: 'Asia/Singapore'
+      });
       const HTM_ICONS_LAYER_DEFS = [
         { id: 'htm-icons-lamp', sourceLayer: 'LTALampPostSilm', name: 'Lamp Posts', meta: 'Singapore lamp post markers', labelPrefix: 'Lamp', labelProps: ['Name'], color: '#f59e0b', stroke: '#7c2d12', minzoom: 13, radius: [13, 1.8, 16, 3.4] },
         { id: 'htm-icons-aed', sourceLayer: 'aed', name: 'AED', meta: 'Defibrillator locations', labelPrefix: 'AED', labelProps: ['BUILDING_NAME', 'AED_LOCATION_DESCRIPTION', 'ROAD_NAME'], color: '#22c55e', stroke: '#14532d', minzoom: 11, radius: [11, 3.2, 16, 5.3] },
@@ -1475,6 +1481,9 @@
       let htmIconsEnabled = false;
       let htmIconsShowLabels = false;
       let htmIconsLayerVisibility = Object.fromEntries(HTM_ICONS_LAYER_DEFS.map((layer) => [layer.id, true]));
+      let htmSilverLabelHandlersBound = false;
+      let htmSilverLabelUpdateQueued = false;
+      const htmSilverLabelMarkers = new Map();
 
       const mapgl = new maptilersdk.Map({
         container: 'mapgl',
@@ -1880,6 +1889,92 @@
         return ['case', ['!=', baseLabel, ''], ['concat', `${layer.labelPrefix}: `, baseLabel], ''];
       }
 
+      function clearHtmSilverDateLabels() {
+        for (const marker of htmSilverLabelMarkers.values()) marker.remove();
+        htmSilverLabelMarkers.clear();
+      }
+
+      function getHtmSilverFoundDate(daysRaw) {
+        const days = Number(daysRaw);
+        if (!Number.isFinite(days) || days < 0) return '';
+        const foundDate = new Date();
+        foundDate.setHours(12, 0, 0, 0);
+        foundDate.setDate(foundDate.getDate() - Math.round(days));
+        return HTM_ICONS_SILVER_DATE_FORMATTER.format(foundDate);
+      }
+
+      function getHtmSilverLabelKey(feature) {
+        const coords = feature?.geometry?.coordinates;
+        const coordsKey = Array.isArray(coords) ? `${Number(coords[0]).toFixed(6)},${Number(coords[1]).toFixed(6)}` : '0,0';
+        const rawId = feature?.properties?._id ?? feature?.id ?? feature?.properties?.id ?? coordsKey;
+        return String(rawId);
+      }
+
+      function shouldShowHtmSilverDateLabels() {
+        return htmIconsEnabled
+          && htmIconsShowLabels
+          && engine === 'gl'
+          && isHtmIconsLayerEnabled('htm-icons-silver')
+          && !!mapgl?.getSource?.(HTM_ICONS_SOURCE_ID)
+          && !!mapgl?.getLayer?.('htm-icons-silver');
+      }
+
+      function syncHtmSilverDateLabels() {
+        htmSilverLabelUpdateQueued = false;
+        if (!shouldShowHtmSilverDateLabels()) {
+          clearHtmSilverDateLabels();
+          return;
+        }
+        let features = [];
+        try {
+          features = mapgl.queryRenderedFeatures({ layers: ['htm-icons-silver'] }) || [];
+        } catch {
+          clearHtmSilverDateLabels();
+          return;
+        }
+        const nextKeys = new Set();
+        for (const feature of features) {
+          const coords = feature?.geometry?.coordinates;
+          if (!Array.isArray(coords) || coords.length < 2) continue;
+          const foundDate = getHtmSilverFoundDate(feature?.properties?.days);
+          if (!foundDate) continue;
+          const key = getHtmSilverLabelKey(feature);
+          nextKeys.add(key);
+          let marker = htmSilverLabelMarkers.get(key);
+          if (!marker) {
+            const el = document.createElement('div');
+            el.className = 'htm-silver-date-label';
+            marker = new maptilersdk.Marker({ element: el, anchor: 'top', offset: [0, 18] })
+              .setLngLat(coords)
+              .addTo(mapgl);
+            htmSilverLabelMarkers.set(key, marker);
+          }
+          marker.getElement().textContent = foundDate;
+          marker.setLngLat(coords);
+        }
+        for (const [key, marker] of [...htmSilverLabelMarkers.entries()]) {
+          if (nextKeys.has(key)) continue;
+          marker.remove();
+          htmSilverLabelMarkers.delete(key);
+        }
+      }
+
+      function scheduleHtmSilverDateLabels() {
+        if (htmSilverLabelUpdateQueued) return;
+        htmSilverLabelUpdateQueued = true;
+        requestAnimationFrame(() => {
+          syncHtmSilverDateLabels();
+        });
+      }
+
+      function bindHtmSilverDateLabelHandlers() {
+        if (htmSilverLabelHandlersBound) return;
+        htmSilverLabelHandlersBound = true;
+        ['moveend', 'zoomend', 'resize', 'idle', 'styledata'].forEach((eventName) => {
+          mapgl.on(eventName, scheduleHtmSilverDateLabels);
+        });
+      }
+
       function applyHtmIconsOverlayVisibility() {
         for (const layer of HTM_ICONS_LAYER_DEFS) {
           const visible = htmIconsEnabled && isHtmIconsLayerEnabled(layer.id);
@@ -1895,9 +1990,11 @@
             mapgl.setLayoutProperty(labelId, 'visibility', visible && htmIconsShowLabels ? 'visible' : 'none');
           }
         }
+        scheduleHtmSilverDateLabels();
       }
 
       function removeHtmIconsOverlay() {
+        clearHtmSilverDateLabels();
         for (const layer of HTM_ICONS_LAYER_DEFS) {
           const glowId = htmIconsGlowLayerId(layer.id);
           if (mapgl.getLayer(glowId)) {
@@ -1938,6 +2035,7 @@
             if (HTM_ICONS_LAYER_DEFS.some((layer) => layer.markerKind === 'silver-flag')) {
               await ensureHtmSilverFlagIcon();
             }
+            bindHtmSilverDateLabelHandlers();
 
             for (const layer of HTM_ICONS_LAYER_DEFS) {
               if (layer.markerKind === 'sv-ticket') {
@@ -2030,6 +2128,12 @@
               }
 
               const labelId = htmIconsLabelLayerId(layer.id);
+              if (layer.markerKind === 'silver-flag') {
+                if (mapgl.getLayer(labelId)) {
+                  try { mapgl.removeLayer(labelId); } catch { }
+                }
+                continue;
+              }
               if (!mapgl.getLayer(labelId)) {
                 mapgl.addLayer({
                   id: labelId,
@@ -2060,6 +2164,7 @@
               }
             }
             applyHtmIconsOverlayVisibility();
+            scheduleHtmSilverDateLabels();
           })();
         });
       }
