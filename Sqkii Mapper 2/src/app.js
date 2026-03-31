@@ -1433,6 +1433,10 @@
       const HTM_ICONS_SOURCE_ID = 'htm-icons-src';
       const HTM_ICONS_TILE_URL = `${ABS_BASE_URL}worldwidemaps/tiles/htm_icons/{z}/{x}/{y}.pbf`;
       const HTM_ICONS_TILEJSON_URL = `${ABS_BASE_URL}worldwidemaps/tiles/htm_icons/tiles.json`;
+      const HTM_ICONS_SILVER_ICON_NAME = 'htm-silver-flag';
+      const HTM_ICONS_SILVER_SPRITE_KEY = 'silver flag';
+      const HTM_ICONS_SILVER_SPRITE_JSON_URL = `${ABS_BASE_URL}worldwidemaps/maps/htm_icons/sprite@2x.json`;
+      const HTM_ICONS_SILVER_SPRITE_PNG_URL = `${ABS_BASE_URL}worldwidemaps/maps/htm_icons/sprite@2x.png`;
       const HTM_ICONS_SV_ICON_NAME = 'htm-sv-ticket';
       const HTM_ICONS_SV_ICON_URL = `${ABS_BASE_URL}voucher.png`;
       const HTM_ICONS_SV_BRAND_IMAGE_PREFIX = 'htm-sv-brand-';
@@ -1458,6 +1462,7 @@
         { id: 'htm-icons-sponsor-1', sourceLayer: 'sponsor_1', name: 'Sponsor 1', meta: 'Sponsor location set 1', labelPrefix: 'Sponsor', labelProps: ['Sponsor', 'Address'], color: '#f97316', stroke: '#7c2d12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
         { id: 'htm-icons-sponsor-2', sourceLayer: 'sponsor_2', name: 'Sponsor 2', meta: 'Sponsor location set 2', labelPrefix: 'Sponsor', labelProps: ['Sponsor', 'Address'], color: '#f97316', stroke: '#7c2d12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
         { id: 'htm-icons-sponsor-3', sourceLayer: 'sponsor_3', name: 'Sponsor 3', meta: 'Sponsor location set 3', labelPrefix: 'Sponsor', labelProps: ['Sponsor', 'Address'], color: '#f97316', stroke: '#7c2d12', minzoom: 11, radius: [11, 2.9, 16, 4.8] },
+        { id: 'htm-icons-silver', sourceLayer: 'silver_flag', name: 'Silver Coins', meta: 'Silver coin flag markers from the HTM tileset', labelPrefix: 'Silver', labelProps: [], color: '#cbd5e1', stroke: '#475569', minzoom: 13, radius: [13, 2.8, 16, 4.8], markerKind: 'silver-flag' },
         { id: 'htm-icons-sv-1', sourceLayer: 'sv1', name: 'SV 1', meta: 'SV merchant set 1', labelPrefix: 'SV', labelProps: ['Outlet brand', 'Outlet name', 'Full address'], color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7], markerKind: 'sv-ticket' },
         { id: 'htm-icons-sv-2', sourceLayer: 'sv2', name: 'SV 2', meta: 'SV merchant set 2', labelPrefix: 'SV', labelProps: ['Outlet brand', 'Outlet name', 'Full address'], color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7], markerKind: 'sv-ticket' },
         { id: 'htm-icons-sv-3', sourceLayer: 'sv3', name: 'SV 3', meta: 'SV merchant set 3', labelPrefix: 'SV', labelProps: ['Outlet brand', 'Outlet name', 'Full address'], color: '#22d3ee', stroke: '#164e63', minzoom: 11, radius: [11, 2.8, 16, 4.7], markerKind: 'sv-ticket' },
@@ -1649,6 +1654,9 @@
       let htmSvKnownBrandsPromise = null;
       let htmSvBrandPreloadPromise = null;
       const htmSvSpriteCropCache = new Map();
+      let htmSilverSpriteManifestPromise = null;
+      let htmSilverSpriteSheetPromise = null;
+      const htmSilverSpriteCropCache = new Map();
 
       async function ensureHtmSvIcon() {
         if (mapgl.hasImage?.(HTM_ICONS_SV_ICON_NAME)) return;
@@ -1682,6 +1690,37 @@
         });
       }
 
+      async function cropSpriteFromSheet(spriteKey, manifestPromise, sheetPromise, cache) {
+        if (cache.has(spriteKey)) return cache.get(spriteKey);
+        const [manifest, sheet] = await Promise.all([manifestPromise, sheetPromise]);
+        const meta = manifest?.[spriteKey];
+        if (!meta) return null;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = Number(meta.width) || 0;
+        canvas.height = Number(meta.height) || 0;
+        const ctx = canvas.getContext('2d');
+        if (!ctx || !canvas.width || !canvas.height) return null;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(
+          sheet,
+          Number(meta.x) || 0,
+          Number(meta.y) || 0,
+          canvas.width,
+          canvas.height,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+        const cropped = {
+          imageData: ctx.getImageData(0, 0, canvas.width, canvas.height),
+          pixelRatio: Number(meta.pixelRatio) || 1
+        };
+        cache.set(spriteKey, cropped);
+        return cropped;
+      }
+
       async function fetchHtmSvSpriteManifest() {
         if (!htmSvSpriteManifestPromise) {
           htmSvSpriteManifestPromise = fetch(HTM_ICONS_SV_SPRITE_JSON_URL)
@@ -1698,6 +1737,40 @@
           htmSvSpriteSheetPromise = loadImageElement(HTM_ICONS_SV_SPRITE_PNG_URL);
         }
         return htmSvSpriteSheetPromise;
+      }
+
+      async function fetchHtmSilverSpriteManifest() {
+        if (!htmSilverSpriteManifestPromise) {
+          htmSilverSpriteManifestPromise = fetch(HTM_ICONS_SILVER_SPRITE_JSON_URL)
+            .then((resp) => {
+              if (!resp.ok) throw new Error(`Silver sprite JSON ${resp.status}`);
+              return resp.json();
+            });
+        }
+        return htmSilverSpriteManifestPromise;
+      }
+
+      async function fetchHtmSilverSpriteSheet() {
+        if (!htmSilverSpriteSheetPromise) {
+          htmSilverSpriteSheetPromise = loadImageElement(HTM_ICONS_SILVER_SPRITE_PNG_URL);
+        }
+        return htmSilverSpriteSheetPromise;
+      }
+
+      async function ensureHtmSilverFlagIcon() {
+        if (mapgl.hasImage?.(HTM_ICONS_SILVER_ICON_NAME)) return;
+        const cropped = await cropSpriteFromSheet(
+          HTM_ICONS_SILVER_SPRITE_KEY,
+          fetchHtmSilverSpriteManifest(),
+          fetchHtmSilverSpriteSheet(),
+          htmSilverSpriteCropCache
+        );
+        if (!cropped || mapgl.hasImage?.(HTM_ICONS_SILVER_ICON_NAME)) return;
+        try {
+          mapgl.addImage(HTM_ICONS_SILVER_ICON_NAME, cropped.imageData, { pixelRatio: cropped.pixelRatio });
+        } catch (error) {
+          console.warn('Failed to add HTM silver flag icon', error);
+        }
       }
 
       async function fetchHtmSvNormalizedSpriteKeys() {
@@ -1764,37 +1837,12 @@
       }
 
       async function cropHtmSvSprite(spriteKey) {
-        if (htmSvSpriteCropCache.has(spriteKey)) return htmSvSpriteCropCache.get(spriteKey);
-        const [manifest, sheet] = await Promise.all([
+        return cropSpriteFromSheet(
+          spriteKey,
           fetchHtmSvSpriteManifest(),
-          fetchHtmSvSpriteSheet()
-        ]);
-        const meta = manifest?.[spriteKey];
-        if (!meta) return null;
-
-        const canvas = document.createElement('canvas');
-        canvas.width = Number(meta.width) || 0;
-        canvas.height = Number(meta.height) || 0;
-        const ctx = canvas.getContext('2d');
-        if (!ctx || !canvas.width || !canvas.height) return null;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(
-          sheet,
-          Number(meta.x) || 0,
-          Number(meta.y) || 0,
-          canvas.width,
-          canvas.height,
-          0,
-          0,
-          canvas.width,
-          canvas.height
+          fetchHtmSvSpriteSheet(),
+          htmSvSpriteCropCache
         );
-        const cropped = {
-          imageData: ctx.getImageData(0, 0, canvas.width, canvas.height),
-          pixelRatio: Number(meta.pixelRatio) || 1
-        };
-        htmSvSpriteCropCache.set(spriteKey, cropped);
-        return cropped;
       }
 
       async function ensureHtmSvBrandIcon(brand) {
@@ -1887,6 +1935,9 @@
               await ensureHtmSvIcon();
               await preloadHtmSvBrandIcons();
             }
+            if (HTM_ICONS_LAYER_DEFS.some((layer) => layer.markerKind === 'silver-flag')) {
+              await ensureHtmSilverFlagIcon();
+            }
 
             for (const layer of HTM_ICONS_LAYER_DEFS) {
               if (layer.markerKind === 'sv-ticket') {
@@ -1935,6 +1986,28 @@
                     }
                   });
                 }
+              } else if (layer.markerKind === 'silver-flag') {
+                if (!mapgl.getLayer(layer.id)) {
+                  mapgl.addLayer({
+                    id: layer.id,
+                    type: 'symbol',
+                    source: HTM_ICONS_SOURCE_ID,
+                    'source-layer': layer.sourceLayer,
+                    minzoom: layer.minzoom,
+                    layout: {
+                      'icon-image': HTM_ICONS_SILVER_ICON_NAME,
+                      'icon-size': [
+                        'interpolate', ['linear'], ['zoom'],
+                        layer.minzoom, 0.26,
+                        16, 0.38,
+                        18, 0.5
+                      ],
+                      'icon-anchor': 'bottom',
+                      'icon-allow-overlap': true,
+                      'icon-ignore-placement': true
+                    }
+                  });
+                }
               } else if (!mapgl.getLayer(layer.id)) {
                 mapgl.addLayer({
                   id: layer.id,
@@ -1972,7 +2045,7 @@
                       16, 12
                     ],
                     'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
-                    'text-offset': layer.markerKind === 'sv-ticket' ? [0, 1.45] : [0, 1.1],
+                    'text-offset': ['sv-ticket', 'silver-flag'].includes(layer.markerKind) ? [0, 1.45] : [0, 1.1],
                     'text-anchor': 'top',
                     'text-max-width': 18,
                     'text-optional': true

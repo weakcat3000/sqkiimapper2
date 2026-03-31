@@ -1,0 +1,3633 @@
+{
+  "version": 8,
+  "name": "htm_icons",
+  "metadata": {
+    "maptiler:copyright": "This style was generated on MapTiler Cloud. Usage outside of MapTiler Cloud or MapTiler Server requires valid MapTiler Data package: https://www.maptiler.com/data/ -- please contact us.",
+    "maputnik:renderer": "mlgljs"
+  },
+  "center": [
+    103.95373749100236,
+    1.351804435068786
+  ],
+  "zoom": 15.056226807351626,
+  "bearing": 0,
+  "pitch": 0,
+  "sources": {
+    "openmaptiles": {
+      "url": "https://worldwidemaps.sqkii.com/api/tiles/maptiler-osm-planet/tiles.json",
+      "type": "vector"
+    },
+    "htm_icons": {
+      "type": "vector",
+      "url": "../../tiles/htm_icons/tiles.json",
+      "reparseOverscaled": true
+    }
+  },
+  "sprite": "./sprite",
+  "glyphs": "https://worldwidemaps.sqkii.com/api/fonts/{fontstack}/{range}.pbf",
+  "layers": [
+    {
+      "id": "donottouch_background",
+      "type": "background",
+      "layout": {
+        "visibility": "visible"
+      },
+      "paint": {
+        "background-color": {
+          "stops": [
+            [
+              6,
+              "hsl(253, 62%, 16%)"
+            ],
+            [
+              20,
+              "hsl(253, 63%, 17%)"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "donottouch_residential",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "landuse",
+      "maxzoom": 14,
+      "filter": [
+        "all",
+        [
+          "in",
+          "class",
+          "residential",
+          "suburb",
+          "neighbourhood"
+        ]
+      ],
+      "layout": {
+        "visibility": "visible"
+      },
+      "paint": {
+        "fill-color": {
+          "stops": [
+            [
+              2,
+              "hsl(253, 63%, 15%)"
+            ],
+            [
+              14,
+              "hsl(253, 62%, 16%)"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "donottouch_landcover",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "landcover",
+      "minzoom": 8,
+      "filter": [
+        "all"
+      ],
+      "layout": {
+        "visibility": "visible"
+      },
+      "paint": {
+        "fill-color": [
+          "match",
+          [
+            "get",
+            "class"
+          ],
+          "wood",
+          "hsla(262, 57%, 16%, 0.8)",
+          "grass",
+          "hsla(260, 57%, 17%, 0.8)",
+          "sand",
+          "hsla(225, 86%, 12%, 0.3)",
+          "ice",
+          "hsl(231, 31%, 21%)",
+          "hsla(231, 42%, 19%, 0)"
+        ],
+        "fill-opacity": {
+          "stops": [
+            [
+              7,
+              0.7
+            ],
+            [
+              12,
+              1
+            ]
+          ]
+        },
+        "fill-antialias": false
+      }
+    },
+    {
+      "id": "donottouch_water",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "water",
+      "filter": [
+        "all",
+        [
+          "!=",
+          "brunnel",
+          "tunnel"
+        ]
+      ],
+      "layout": {
+        "visibility": "visible"
+      },
+      "paint": {
+        "fill-color": "hsl(252, 90%, 8%)",
+        "fill-opacity": [
+          "match",
+          [
+            "get",
+            "intermittent"
+          ],
+          1,
+          0.7,
+          1
+        ]
+      }
+    },
+    {
+      "id": "donottouch_waterway",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "waterway",
+      "filter": [
+        "all",
+        [
+          "!=",
+          "intermittent",
+          1
+        ]
+      ],
+      "layout": {
+        "visibility": "visible"
+      },
+      "paint": {
+        "line-color": "hsl(252, 90%, 8%)",
+        "line-width": {
+          "stops": [
+            [
+              9,
+              1
+            ],
+            [
+              18,
+              3
+            ]
+          ]
+        },
+        "line-opacity": [
+          "match",
+          [
+            "get",
+            "brunnel"
+          ],
+          "tunnel",
+          0.7,
+          1
+        ]
+      }
+    },
+    {
+      "id": "donottouch_waterway_intermittent",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "waterway",
+      "filter": [
+        "all",
+        [
+          "==",
+          "intermittent",
+          1
+        ]
+      ],
+      "layout": {
+        "visibility": "visible"
+      },
+      "paint": {
+        "line-color": "hsl(252, 90%, 8%)",
+        "line-width": {
+          "stops": [
+            [
+              9,
+              1
+            ],
+            [
+              18,
+              3
+            ]
+          ]
+        },
+        "line-opacity": 1,
+        "line-dasharray": [
+          2,
+          1
+        ]
+      }
+    },
+    {
+      "id": "donottouch_railway_transit_tunnel",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "minzoom": 0,
+      "filter": [
+        "all",
+        [
+          "==",
+          "brunnel",
+          "tunnel"
+        ],
+        [
+          "==",
+          "class",
+          "transit"
+        ]
+      ],
+      "layout": {
+        "line-cap": "butt",
+        "line-join": "miter",
+        "visibility": "visible"
+      },
+      "paint": {
+        "line-color": "hsl(292, 54%, 17%)",
+        "line-width": {
+          "stops": [
+            [
+              14,
+              0.5
+            ],
+            [
+              16,
+              1.2
+            ],
+            [
+              18,
+              2
+            ]
+          ]
+        },
+        "line-opacity": 0.5,
+        "line-dasharray": [
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "id": "donottouch_road_bridge",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "filter": [
+        "all",
+        [
+          "==",
+          "$type",
+          "Polygon"
+        ],
+        [
+          "==",
+          "brunnel",
+          "bridge"
+        ]
+      ],
+      "layout": {
+        "visibility": "visible"
+      },
+      "paint": {
+        "fill-color": "hsl(240, 64%, 17%)",
+        "fill-opacity": 0.7
+      }
+    },
+    {
+      "id": "donottouch_road_pier",
+      "type": "fill",
+      "metadata": {},
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "filter": [
+        "all",
+        [
+          "==",
+          "$type",
+          "Polygon"
+        ],
+        [
+          "==",
+          "class",
+          "pier"
+        ]
+      ],
+      "layout": {
+        "visibility": "visible"
+      },
+      "paint": {
+        "fill-color": "hsl(253, 63%, 17%)",
+        "fill-opacity": 1,
+        "fill-antialias": true
+      }
+    },
+    {
+      "id": "donottouch_road_network",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "minzoom": 4,
+      "filter": [
+        "all",
+        [
+          "!in",
+          "class",
+          "bridge",
+          "ferry",
+          "path",
+          "rail",
+          "transit"
+        ]
+      ],
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round",
+        "visibility": "visible"
+      },
+      "paint": {
+        "line-color": "hsl(258, 48%, 26%)",
+        "line-width": [
+          "interpolate",
+          [
+            "linear",
+            2
+          ],
+          [
+            "zoom"
+          ],
+          4,
+          0.5,
+          5,
+          0.75,
+          6,
+          1,
+          10,
+          [
+            "match",
+            [
+              "get",
+              "class"
+            ],
+            [
+              "motorway"
+            ],
+            [
+              "match",
+              [
+                "get",
+                "brunnel"
+              ],
+              [
+                "bridge"
+              ],
+              0,
+              2.5
+            ],
+            [
+              "trunk"
+            ],
+            1.5,
+            1
+          ],
+          12,
+          [
+            "match",
+            [
+              "get",
+              "class"
+            ],
+            [
+              "motorway"
+            ],
+            [
+              "match",
+              [
+                "get",
+                "ramp"
+              ],
+              1,
+              1,
+              4
+            ],
+            [
+              "trunk"
+            ],
+            2,
+            [
+              "primary"
+            ],
+            2.5,
+            [
+              "secondary",
+              "tertiary"
+            ],
+            2,
+            [
+              "minor"
+            ],
+            1,
+            [
+              "pier",
+              "service",
+              "track"
+            ],
+            0.5,
+            0.5
+          ],
+          14,
+          [
+            "match",
+            [
+              "get",
+              "class"
+            ],
+            [
+              "motorway"
+            ],
+            [
+              "match",
+              [
+                "get",
+                "ramp"
+              ],
+              1,
+              5,
+              6
+            ],
+            [
+              "trunk"
+            ],
+            3,
+            [
+              "primary"
+            ],
+            5,
+            [
+              "secondary"
+            ],
+            4,
+            [
+              "tertiary"
+            ],
+            3,
+            [
+              "minor"
+            ],
+            2,
+            [
+              "pier",
+              "service",
+              "track"
+            ],
+            1,
+            2
+          ],
+          16,
+          [
+            "match",
+            [
+              "get",
+              "class"
+            ],
+            [
+              "motorway",
+              "trunk",
+              "primary"
+            ],
+            8,
+            [
+              "secondary"
+            ],
+            7,
+            [
+              "tertiary"
+            ],
+            6,
+            [
+              "minor"
+            ],
+            4,
+            [
+              "pier",
+              "service",
+              "track"
+            ],
+            2,
+            4
+          ],
+          20,
+          [
+            "match",
+            [
+              "get",
+              "class"
+            ],
+            [
+              "motorway",
+              "trunk",
+              "primary"
+            ],
+            28,
+            [
+              "secondary"
+            ],
+            24,
+            [
+              "tertiary"
+            ],
+            20,
+            [
+              "minor",
+              "service",
+              "track",
+              "pier"
+            ],
+            16,
+            16
+          ]
+        ],
+        "line-offset": 0,
+        "line-opacity": [
+          "match",
+          [
+            "get",
+            "brunnel"
+          ],
+          "tunnel",
+          0.5,
+          1
+        ]
+      }
+    },
+    {
+      "id": "donottouch_road_path",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "minzoom": 15,
+      "filter": [
+        "any",
+        [
+          "in",
+          "class",
+          "path"
+        ]
+      ],
+      "layout": {
+        "line-cap": "square",
+        "line-join": "bevel",
+        "visibility": "visible"
+      },
+      "paint": {
+        "line-color": "rgba(51, 34, 104, 1)",
+        "line-width": {
+          "base": 1.55,
+          "stops": [
+            [
+              15,
+              0.5
+            ],
+            [
+              16,
+              1.5
+            ],
+            [
+              18,
+              3
+            ],
+            [
+              20,
+              8
+            ],
+            [
+              22,
+              8
+            ]
+          ]
+        },
+        "line-dasharray": [
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "id": "donottouch_building",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "building",
+      "layout": {
+        "visibility": "visible"
+      },
+      "paint": {
+        "fill-color": {
+          "stops": [
+            [
+              13,
+              "hsl(254, 58%, 15%)"
+            ],
+            [
+              16,
+              "rgba(25, 14, 58, 1)"
+            ]
+          ]
+        },
+        "fill-opacity": 1,
+        "fill-antialias": true,
+        "fill-outline-color": {
+          "stops": [
+            [
+              15,
+              "rgba(56, 36, 114, 1)"
+            ],
+            [
+              22,
+              "rgba(56, 36, 114, 1)"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "donottouch_railway",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "minzoom": 9,
+      "filter": [
+        "==",
+        "class",
+        "rail"
+      ],
+      "layout": {
+        "visibility": "visible"
+      },
+      "paint": {
+        "line-color": [
+          "match",
+          [
+            "get",
+            "service"
+          ],
+          [
+            "yard",
+            "spur"
+          ],
+          "hsla(291, 54%, 17%, 0.5)",
+          "hsla(291, 54%, 17%, 0.8)"
+        ],
+        "line-width": {
+          "stops": [
+            [
+              9,
+              0.5
+            ],
+            [
+              12,
+              0.6
+            ],
+            [
+              16,
+              2
+            ],
+            [
+              22,
+              3
+            ]
+          ]
+        },
+        "line-opacity": [
+          "match",
+          [
+            "get",
+            "brunnel"
+          ],
+          "tunnel",
+          0.25,
+          1
+        ]
+      }
+    },
+    {
+      "id": "donottouch_railway_transit",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "filter": [
+        "all",
+        [
+          "==",
+          "class",
+          "transit"
+        ],
+        [
+          "!=",
+          "brunnel",
+          "tunnel"
+        ]
+      ],
+      "layout": {
+        "visibility": "visible"
+      },
+      "paint": {
+        "line-color": "hsl(292, 54%, 17%)",
+        "line-width": {
+          "stops": [
+            [
+              14,
+              0.5
+            ],
+            [
+              16,
+              1.2
+            ],
+            [
+              18,
+              2
+            ]
+          ]
+        },
+        "line-opacity": 0.5
+      }
+    },
+    {
+      "id": "donottouch_aeroway",
+      "type": "line",
+      "metadata": {
+        "mapbox:group": "1444849345966.4436"
+      },
+      "source": "openmaptiles",
+      "source-layer": "aeroway",
+      "minzoom": 4,
+      "filter": [
+        "all"
+      ],
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round",
+        "visibility": "visible"
+      },
+      "paint": {
+        "line-color": "hsl(258, 48%, 26%)",
+        "line-width": [
+          "interpolate",
+          [
+            "linear",
+            2
+          ],
+          [
+            "zoom"
+          ],
+          10,
+          [
+            "match",
+            [
+              "get",
+              "class"
+            ],
+            [
+              "runway"
+            ],
+            1,
+            [
+              "taxiway"
+            ],
+            0.5,
+            0
+          ],
+          14,
+          [
+            "match",
+            [
+              "get",
+              "class"
+            ],
+            [
+              "runway"
+            ],
+            3,
+            [
+              "taxiway"
+            ],
+            2,
+            0
+          ],
+          16,
+          [
+            "match",
+            [
+              "get",
+              "class"
+            ],
+            [
+              "runway"
+            ],
+            10,
+            [
+              "taxiway"
+            ],
+            6,
+            0
+          ]
+        ],
+        "line-opacity": 1
+      }
+    },
+    {
+      "id": "donottouch_airport",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "aerodrome_label",
+      "minzoom": 11,
+      "filter": [
+        "all",
+        [
+          "has",
+          "iata"
+        ]
+      ],
+      "layout": {
+        "icon-size": 1,
+        "text-font": [
+          "Lato Semi Bold"
+        ],
+        "text-size": {
+          "stops": [
+            [
+              10,
+              10
+            ],
+            [
+              14,
+              12
+            ],
+            [
+              16,
+              14
+            ]
+          ]
+        },
+        "text-field": "{name:latin}",
+        "visibility": "visible",
+        "text-anchor": "top",
+        "text-offset": [
+          0,
+          0.5
+        ],
+        "text-max-width": 8
+      },
+      "paint": {
+        "text-color": "rgba(129, 124, 149, 1)",
+        "text-halo-blur": 1,
+        "text-halo-color": "hsl(258, 48%, 26%)",
+        "text-halo-width": 1.4
+      }
+    },
+    {
+      "id": "donottouch_station",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "poi",
+      "minzoom": 13,
+      "filter": [
+        "all",
+        [
+          "==",
+          "class",
+          "railway"
+        ],
+        [
+          "==",
+          "subclass",
+          "station"
+        ]
+      ],
+      "layout": {
+        "icon-size": 1,
+        "text-font": [
+          "Lato Semi Bold"
+        ],
+        "text-size": {
+          "stops": [
+            [
+              10,
+              10
+            ],
+            [
+              14,
+              12
+            ],
+            [
+              16,
+              14
+            ]
+          ]
+        },
+        "text-field": "{name:latin}",
+        "visibility": "visible",
+        "text-anchor": "top",
+        "text-offset": [
+          0,
+          0.5
+        ],
+        "text-max-width": 8
+      },
+      "paint": {
+        "text-color": "rgba(129, 124, 149, 1)",
+        "text-halo-blur": 1,
+        "text-halo-color": "hsl(258, 48%, 26%)",
+        "text-halo-width": 1.4
+      }
+    },
+    {
+      "id": "donottouch_road",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "transportation_name",
+      "minzoom": 14,
+      "filter": [
+        "all",
+        [
+          "==",
+          "$type",
+          "LineString"
+        ],
+        [
+          "!=",
+          "subclass",
+          "ferry"
+        ],
+        [
+          "!in",
+          "class",
+          "service",
+          "path"
+        ]
+      ],
+      "layout": {
+        "text-font": [
+          "Lato Semi Bold"
+        ],
+        "text-size": {
+          "base": 1.4,
+          "stops": [
+            [
+              14,
+              8
+            ],
+            [
+              17,
+              10
+            ],
+            [
+              20,
+              12
+            ]
+          ]
+        },
+        "text-field": "{name:latin}",
+        "visibility": "visible",
+        "symbol-spacing": {
+          "stops": [
+            [
+              13,
+              250
+            ],
+            [
+              20,
+              350
+            ]
+          ]
+        },
+        "text-transform": "uppercase",
+        "symbol-placement": "line",
+        "text-letter-spacing": 0.1,
+        "text-rotation-alignment": "map"
+      },
+      "paint": {
+        "text-color": "rgba(176, 176, 176, 1)",
+        "text-halo-color": "hsl(258, 48%, 26%)",
+        "text-halo-width": 2
+      }
+    },
+    {
+      "id": "donottouch_border_other",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "boundary",
+      "minzoom": 3,
+      "maxzoom": 13,
+      "filter": [
+        "all",
+        [
+          ">=",
+          "admin_level",
+          3
+        ],
+        [
+          "<",
+          "admin_level",
+          10
+        ],
+        [
+          "==",
+          "maritime",
+          0
+        ]
+      ],
+      "layout": {
+        "visibility": "visible"
+      },
+      "paint": {
+        "line-color": [
+          "match",
+          [
+            "get",
+            "maritime"
+          ],
+          1,
+          "hsla(103, 81%, 16%, 0)",
+          "hsla(253, 61%, 15%, 0.65)"
+        ],
+        "line-width": {
+          "stops": [
+            [
+              4,
+              1.25
+            ],
+            [
+              11,
+              1.75
+            ],
+            [
+              18,
+              3
+            ]
+          ]
+        },
+        "line-dasharray": [
+          2,
+          1
+        ]
+      }
+    },
+    {
+      "id": "donottouch_border_disputed",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "boundary",
+      "minzoom": 0,
+      "filter": [
+        "all",
+        [
+          "<=",
+          "admin_level",
+          2
+        ],
+        [
+          "==",
+          "$type",
+          "LineString"
+        ],
+        [
+          "==",
+          "disputed",
+          1
+        ]
+      ],
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round",
+        "visibility": "visible"
+      },
+      "paint": {
+        "line-color": [
+          "match",
+          [
+            "get",
+            "maritime"
+          ],
+          1,
+          "hsla(103, 81%, 16%, 0)",
+          "hsl(253, 61%, 16%)"
+        ],
+        "line-width": 1,
+        "line-dasharray": [
+          2,
+          2
+        ]
+      }
+    },
+    {
+      "id": "donottouch_border_country",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "boundary",
+      "minzoom": 0,
+      "filter": [
+        "all",
+        [
+          "<=",
+          "admin_level",
+          2
+        ],
+        [
+          "==",
+          "$type",
+          "LineString"
+        ],
+        [
+          "!has",
+          "claimed_by"
+        ],
+        [
+          "==",
+          "disputed",
+          0
+        ]
+      ],
+      "layout": {
+        "line-cap": "round",
+        "line-join": "round",
+        "visibility": "visible"
+      },
+      "paint": {
+        "line-blur": {
+          "stops": [
+            [
+              4,
+              0.5
+            ],
+            [
+              10,
+              0
+            ]
+          ]
+        },
+        "line-color": [
+          "match",
+          [
+            "get",
+            "maritime"
+          ],
+          1,
+          "hsla(103, 81%, 16%, 0)",
+          "hsl(253, 61%, 16%)"
+        ],
+        "line-width": {
+          "stops": [
+            [
+              1,
+              1
+            ],
+            [
+              5,
+              1.5
+            ],
+            [
+              10,
+              2
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "donottouch_place",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "place",
+      "maxzoom": 16,
+      "filter": [
+        "all",
+        [
+          "!in",
+          "class",
+          "state",
+          "country",
+          "continent",
+          "island"
+        ]
+      ],
+      "layout": {
+        "text-font": [
+          "Lato Semi Bold"
+        ],
+        "text-size": [
+          "interpolate",
+          [
+            "linear",
+            1
+          ],
+          [
+            "zoom"
+          ],
+          3,
+          11,
+          8,
+          [
+            "match",
+            [
+              "get",
+              "class"
+            ],
+            "city",
+            15,
+            13
+          ],
+          11,
+          [
+            "match",
+            [
+              "get",
+              "class"
+            ],
+            "city",
+            16,
+            [
+              "suburb",
+              "neighbourhood",
+              "quarter",
+              "hamlet",
+              "isolated_dwelling"
+            ],
+            10,
+            13
+          ],
+          16,
+          [
+            "match",
+            [
+              "get",
+              "class"
+            ],
+            "city",
+            21,
+            [
+              "suburb",
+              "neighbourhood",
+              "quarter",
+              "hamlet",
+              "isolated_dwelling"
+            ],
+            14,
+            16
+          ]
+        ],
+        "text-field": "{name:latin}",
+        "visibility": "visible",
+        "text-max-width": 10
+      },
+      "paint": {
+        "text-color": "hsl(253, 61%, 97%)",
+        "text-halo-blur": 0,
+        "text-halo-color": "rgba(31, 15, 62, 1)",
+        "text-halo-width": 2
+      }
+    },
+    {
+      "id": "donottouch_country",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "place",
+      "minzoom": 1,
+      "maxzoom": 12,
+      "filter": [
+        "all",
+        [
+          "==",
+          "$type",
+          "Point"
+        ],
+        [
+          "==",
+          "class",
+          "country"
+        ]
+      ],
+      "layout": {
+        "text-font": [
+          "Lato Semi Bold"
+        ],
+        "text-size": [
+          "interpolate",
+          [
+            "linear",
+            1
+          ],
+          [
+            "zoom"
+          ],
+          0,
+          8,
+          1,
+          10,
+          4,
+          [
+            "case",
+            [
+              ">",
+              [
+                "get",
+                "rank"
+              ],
+              2
+            ],
+            13,
+            15
+          ],
+          8,
+          [
+            "case",
+            [
+              ">",
+              [
+                "get",
+                "rank"
+              ],
+              2
+            ],
+            18,
+            22
+          ]
+        ],
+        "text-field": "{name:latin}",
+        "visibility": "visible",
+        "text-padding": {
+          "stops": [
+            [
+              1,
+              0
+            ],
+            [
+              4,
+              2
+            ]
+          ]
+        },
+        "text-max-width": 8
+      },
+      "paint": {
+        "text-color": "hsl(253, 61%, 84%)",
+        "text-halo-blur": 1,
+        "text-halo-color": "hsla(253, 61%, 0%, 0.75)",
+        "text-halo-width": 2
+      }
+    },
+    {
+      "id": "donottouch_continent",
+      "type": "symbol",
+      "metadata": {},
+      "source": "openmaptiles",
+      "source-layer": "place",
+      "maxzoom": 1,
+      "filter": [
+        "all",
+        [
+          "==",
+          "class",
+          "continent"
+        ]
+      ],
+      "layout": {
+        "text-font": [
+          "Lato Semi Bold"
+        ],
+        "text-size": {
+          "stops": [
+            [
+              0,
+              12
+            ],
+            [
+              2,
+              13
+            ]
+          ]
+        },
+        "text-field": "{name:latin}",
+        "visibility": "visible",
+        "text-justify": "center",
+        "text-transform": "uppercase"
+      },
+      "paint": {
+        "text-color": "hsl(253, 61%, 84%)",
+        "text-halo-blur": 1,
+        "text-halo-color": "hsla(253, 61%, 0%, 0.75)",
+        "text-halo-width": 2
+      }
+    },
+    {
+      "id": "customize_hawker",
+      "type": "symbol",
+      "source": "htm_icons",
+      "source-layer": "hawker",
+      "minzoom": 16,
+      "layout": {
+        "icon-size": {
+          "stops": [
+            [
+              16,
+              0
+            ],
+            [
+              17,
+              1
+            ],
+            [
+              22,
+              1.5
+            ]
+          ]
+        },
+        "icon-allow-overlap": false,
+        "visibility": "visible",
+        "icon-ignore-placement": true,
+        "icon-anchor": "bottom",
+        "icon-image": "hawkers",
+        "text-anchor": "center",
+        "text-field": "",
+        "text-justify": "center",
+        "text-radial-offset": 0,
+        "text-keep-upright": false,
+        "text-ignore-placement": true,
+        "text-offset": [
+          4,
+          0
+        ]
+      },
+      "paint": {
+        "icon-opacity": {
+          "stops": [
+            [
+              14.5,
+              0
+            ],
+            [
+              15,
+              1
+            ]
+          ]
+        },
+        "text-color": "rgba(255, 255, 255, 1)"
+      }
+    },
+    {
+      "id": "customize_communityclub",
+      "type": "symbol",
+      "source": "htm_icons",
+      "source-layer": "communityclubs",
+      "minzoom": 16,
+      "layout": {
+        "icon-size": {
+          "stops": [
+            [
+              16,
+              0
+            ],
+            [
+              17,
+              1
+            ],
+            [
+              22,
+              2
+            ]
+          ]
+        },
+        "icon-allow-overlap": false,
+        "visibility": "visible",
+        "icon-ignore-placement": true,
+        "icon-anchor": "bottom",
+        "icon-image": "cc",
+        "text-anchor": "bottom"
+      },
+      "paint": {
+        "icon-opacity": {
+          "stops": [
+            [
+              14.5,
+              0
+            ],
+            [
+              15,
+              1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "customize_aed",
+      "type": "symbol",
+      "source": "htm_icons",
+      "source-layer": "aed",
+      "minzoom": 16,
+      "layout": {
+        "icon-size": {
+          "stops": [
+            [
+              16,
+              0
+            ],
+            [
+              17,
+              0.5
+            ],
+            [
+              22,
+              1
+            ]
+          ]
+        },
+        "icon-allow-overlap": false,
+        "visibility": "visible",
+        "icon-ignore-placement": true,
+        "icon-anchor": "bottom",
+        "icon-image": "aed",
+        "text-anchor": "bottom"
+      },
+      "paint": {
+        "icon-opacity": {
+          "stops": [
+            [
+              14.5,
+              0
+            ],
+            [
+              15,
+              1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "customize_lamppost",
+      "type": "symbol",
+      "source": "htm_icons",
+      "source-layer": "LTALampPostSilm",
+      "minzoom": 16,
+      "layout": {
+        "icon-size": {
+          "stops": [
+            [
+              16,
+              0
+            ],
+            [
+              17,
+              0.5
+            ],
+            [
+              22,
+              1
+            ]
+          ]
+        },
+        "icon-allow-overlap": false,
+        "visibility": "visible",
+        "icon-ignore-placement": true,
+        "icon-anchor": "bottom",
+        "icon-image": "lamppost",
+        "text-anchor": "bottom"
+      },
+      "paint": {
+        "icon-opacity": {
+          "stops": [
+            [
+              14.5,
+              0
+            ],
+            [
+              15,
+              1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "customize_huntingstop1",
+      "type": "symbol",
+      "source": "htm_icons",
+      "source-layer": "huntingstop1",
+      "minzoom": 14,
+      "layout": {
+        "icon-image": [
+          "match",
+          [
+            "get",
+            "Brand"
+          ],
+          "Sqkii",
+          "Huntingstop",
+          "greentree"
+        ],
+        "icon-size": {
+          "stops": [
+            [
+              15,
+              0.2
+            ],
+            [
+              18,
+              0.5
+            ]
+          ]
+        },
+        "icon-allow-overlap": false,
+        "visibility": "visible",
+        "icon-ignore-placement": true,
+        "icon-anchor": "bottom"
+      },
+      "paint": {
+        "icon-opacity": {
+          "stops": [
+            [
+              14.5,
+              0
+            ],
+            [
+              15,
+              1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "customize_landmark1",
+      "type": "symbol",
+      "source": "htm_icons",
+      "source-layer": "landmark1",
+      "minzoom": 14,
+      "maxzoom": 24,
+      "layout": {
+        "icon-size": {
+          "stops": [
+            [
+              13,
+              0.3
+            ],
+            [
+              15,
+              0.5
+            ],
+            [
+              16,
+              0.75
+            ]
+          ]
+        },
+        "icon-allow-overlap": {
+          "stops": [
+            [
+              10,
+              false
+            ],
+            [
+              12.5,
+              true
+            ]
+          ]
+        },
+        "visibility": "visible",
+        "icon-anchor": "bottom",
+        "text-allow-overlap": false,
+        "icon-ignore-placement": false,
+        "icon-optional": false,
+        "icon-image": [
+          "match",
+          [
+            "get",
+            "Name"
+          ],
+          "Haw Par Villa",
+          "Haw Par Villa",
+          "Fort Canning Park",
+          "Fort Canning Park",
+          "Singapore Botanic Gardens",
+          "Singapore Botanic Gardens",
+          "Merlion Park",
+          "Merlion Park",
+          "Yishun Dam",
+          "Yishun Dam",
+          "Marina Bay Sands",
+          "Marina Bay Sands",
+          "National Library Singapore",
+          "National Library Singapore",
+          "Fort Canning Tree Tunnel",
+          "Fort Canning Tree Tunnel",
+          "The Istana and Sri Temasek",
+          "The Istana and Sri Temasek",
+          "Hajjah Fatimah Mosque",
+          "Hajjah Fatimah Mosque",
+          "Former Cathay Building",
+          "Former Cathay Building",
+          "Former Hill Street Police Station",
+          "Former Hill Street Police Station",
+          "Former Thong Chai Medical Institution",
+          "Former Thong Chai Medical Institution",
+          "Civilian War Memorial",
+          "Civilian War Memorial",
+          "Former Tanjong Pagar Railway Station",
+          "Former Tanjong Pagar Railway Station",
+          "Former Telok Ayer Market",
+          "Former Telok Ayer Market",
+          "Raffles Hotel",
+          "Raffles Hotel",
+          "Fuk Tak Chi Museum and Temple",
+          "Fuk Tak Chi Museum and Temple",
+          "Woodbridge Museum",
+          "Woodbridge Museum",
+          "Kampong Lorong Buangkok",
+          "Kampong Lorong Buangkok",
+          "Clarke Quay",
+          "Clarke Quay",
+          "CHIJMES",
+          "CHIJMES",
+          "Seletar Airfield",
+          "Seletar Airfield",
+          "Sarimbun Beach Landing",
+          "Sarimbun Beach Landing",
+          "Central Fire Station",
+          "Central Fire Station",
+          "Reflections at Bukit Chandu",
+          "Reflections at Bukit Chandu",
+          "Sri Veeramakaliamman Temple",
+          "Sri Veeramakaliamman Temple",
+          "Bishan-Ang Mo Kio Park",
+          "Bishan-Ang Mo Kio Park",
+          "Former Bukit Timah Railway Station",
+          "Former Bukit Timah Railway Station",
+          "Dragon Playground",
+          "Dragon Playground",
+          "Chinese Garden",
+          "Chinese Garden",
+          "Geylang Serai",
+          "Geylang Serai",
+          "Kranji War Memorial",
+          "Kranji War Memorial",
+          "Fort Siloso",
+          "Fort Siloso",
+          "Katong & Joo Chiat Shophouses",
+          "Katong & Joo Chiat Shophouses",
+          "National Stadium",
+          "National Stadium",
+          "Jurong Brickworks Industry and Dragon Kilns",
+          "Jurong Brickworks Industry and Dragon Kilns",
+          "Tuas Lamp Post 1",
+          "Tuas Lamp Post 1",
+          "Loyang Tua Pek Kong Temple",
+          "Loyang Tua Pek Kong Temple",
+          "Kranji Marshes",
+          "Kranji Marshes",
+          "greentree"
+        ],
+        "text-field": [
+          "get",
+          "Name"
+        ],
+        "text-transform": "none",
+        "text-font": [
+          "Open Sans Bold",
+          "Arial Unicode MS Regular"
+        ],
+        "text-size": 11,
+        "text-anchor": "top",
+        "text-justify": "auto",
+        "text-offset": [
+          0,
+          0.5
+        ],
+        "text-line-height": 1.2,
+        "text-max-width": 10,
+        "text-ignore-placement": false,
+        "text-keep-upright": false,
+        "text-optional": false,
+        "text-padding": 2
+      },
+      "paint": {
+        "text-color": "rgba(177, 186, 255, 1)",
+        "text-halo-color": "rgba(0, 0, 0, 1)",
+        "text-halo-width": 1,
+        "text-opacity": {
+          "stops": [
+            [
+              14,
+              0
+            ],
+            [
+              15,
+              1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "customize_megastops1",
+      "type": "symbol",
+      "source": "htm_icons",
+      "source-layer": "megastop_shopback",
+      "minzoom": 9.5,
+      "layout": {
+        "icon-image": [
+          "match",
+          [
+            "get",
+            "type"
+          ],
+          "shopback",
+          "Megastop",
+          "greentree"
+        ],
+        "icon-size": {
+          "stops": [
+            [
+              11,
+              0
+            ],
+            [
+              12,
+              0.1
+            ],
+            [
+              15,
+              1
+            ],
+            [
+              17,
+              1.5
+            ]
+          ]
+        },
+        "icon-allow-overlap": false,
+        "visibility": "none",
+        "icon-ignore-placement": true,
+        "icon-anchor": "bottom"
+      },
+      "paint": {
+        "icon-opacity": {
+          "stops": [
+            [
+              9,
+              0
+            ],
+            [
+              9.6,
+              1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "customize_shopback",
+      "type": "symbol",
+      "source": "htm_icons",
+      "source-layer": "shoppingmall__shopback",
+      "minzoom": 10,
+      "layout": {
+        "icon-image": [
+          "match",
+          [
+            "get",
+            "brand_unique_ids"
+          ],
+          "shopback",
+          "shopback",
+          "greentree"
+        ],
+        "icon-size": {
+          "stops": [
+            [
+              8,
+              0
+            ],
+            [
+              10,
+              0.25
+            ],
+            [
+              17,
+              0.4
+            ]
+          ]
+        },
+        "icon-allow-overlap": {
+          "stops": [
+            [
+              12,
+              false
+            ],
+            [
+              14,
+              true
+            ]
+          ]
+        },
+        "text-offset": {
+          "stops": [
+            [
+              10.7,
+              [
+                0,
+                0
+              ]
+            ],
+            [
+              18,
+              [
+                0,
+                0
+              ]
+            ]
+          ]
+        },
+        "visibility": "none",
+        "text-allow-overlap": false
+      },
+      "paint": {
+        "icon-opacity": 1
+      }
+    },
+    {
+      "id": "customize_sv1",
+      "type": "symbol",
+      "source": "htm_icons",
+      "source-layer": "sv1",
+      "minzoom": 13,
+      "layout": {
+        "icon-image": [
+          "match",
+          [
+            "get",
+            "Outlet brand"
+          ],
+          "Mr Onigiri",
+          "mronigiri",
+          "SaladStop!",
+          "saladstop",
+          "GOPIZZA",
+          "gopizza",
+          "Kith Caf\u00e9",
+          "kithcafe",
+          "Kind Kones",
+          "kindkones",
+          "Eater's Market",
+          "eatersmarket",
+          "The Fragment Room",
+          "thefragmentroom",
+          "Tuk Tuk Cha",
+          "tuktukcha",
+          "Kakurega",
+          "kakurega",
+          "COCA",
+          "coca",
+          "Happy Cup",
+          "happycup",
+          "Splat Paint House",
+          "splatpainthouse",
+          "Spin Paint House",
+          "spinpainthouse",
+          "The Eyes Inc",
+          "theeyesinc",
+          "Project Send Pte Ltd",
+          "projectsend",
+          "Foreword Coffee",
+          "forewordcoffee",
+          "First Story Caf\u00e9",
+          "firststorycafe",
+          "Mega Adventure",
+          "megaadventure",
+          "Bliss Nest Capsules",
+          "bnc",
+          "Onya Food",
+          "onyafood",
+          "Tonkotsu Kazan",
+          "kazan",
+          "Belle-Ville",
+          "belle-ville",
+          "Rollney",
+          "rollney",
+          "At Tea",
+          "attea",
+          "Chou Niang Jiu Niang",
+          "chouniangjiuniang",
+          "Tiong Hoe Specialty Coffee",
+          "tionghoespecialtycoffee",
+          "Chimichanga",
+          "chimichanga",
+          "Chimi's",
+          "chimi's",
+          "IRVINS",
+          "irvins",
+          "Avocadoria",
+          "avocadoria",
+          "The Braised House",
+          "thebraisedhouse",
+          "I Love Taimei",
+          "ilovetaimei",
+          "Mixue",
+          "mixue",
+          "FUR: A Vetreska Pet Store",
+          "vetreska",
+          "Tracy\u2019s Sarawak Kitchen",
+          "tracys_sarawak_kitchen",
+          "Kopi & Tarts",
+          "kopi&tarts",
+          "Shake Shack",
+          "shake_shack",
+          "Bali Thai",
+          "bali_thai",
+          "Daily Chicken",
+          "daily_chicken",
+          "So Pho",
+          "so_pho",
+          "Streats",
+          "streats",
+          "Sanchos Taqueria",
+          "sanchos_taqueria",
+          "Rico Rico",
+          "rico_rico",
+          "Tomo Tokyo",
+          "tomo_tokyo",
+          "Daily Beer",
+          "daily_beer",
+          "Famous Amos",
+          "famous_amos",
+          "Fried Chicken Master",
+          "fried_chicken_master",
+          "Telur Thai",
+          "telur_thai",
+          "Egg Thai",
+          "egg_thai",
+          "CHEERS",
+          "cheers",
+          "EM CHEERS",
+          "cheers",
+          "CHEERS FPX",
+          "fairprice_xpress",
+          "EM FPX",
+          "fairprice_xpress",
+          "TANYU",
+          "tanyu",
+          "Nong Geng Ji Hunan Home-Style Cuisine",
+          "nong_geng_ji",
+          "Momolato",
+          "momolato",
+          "High Bar Society",
+          "high_bar_society",
+          "The Planet Traveller",
+          "the_planet_traveller",
+          "Boarding Gate",
+          "boarding_gate",
+          "The Wallet Shop",
+          "the_wallet_shop",
+          "OK Chicken Rice & Humfull Laksa",
+          "ok_chicken_rice_humfull_laksa",
+          "AH HUAT HOKKIEN PRAWN MEE",
+          "ah_huat_hokkien_prawn_mee",
+          "Shiok Burger",
+          "shiok_burger",
+          "First Bowl Rice Kitchen",
+          "first_bowl_rice_kitchen",
+          "Delibowl Rice Kitchen",
+          "delibowl_rice_kitchen",
+          "Takagi Ramen",
+          "takagi_ramen",
+          "Takagi Ramen Express",
+          "takagi_ramen",
+          "ONOSHI",
+          "onoshi",
+          "Makisan",
+          "makisan",
+          "The SGFR Store",
+          "sgfr",
+          "UnaUna",
+          "unauna",
+          "Twyst",
+          "twyst",
+          "Trapo",
+          "trapo",
+          "BEUTEA",
+          "beutea",
+          "Ramen Champion",
+          "ramen_champion",
+          "Duke Bakery",
+          "duke_bakery",
+          "SF Fruits & Juices",
+          "sf",
+          "SF Farm Mart",
+          "sf",
+          "Ketojiak",
+          "ketojiak",
+          "Elixir Esports",
+          "elixir_esports",
+          "PappaRich",
+          "papparich",
+          "GO Noodle House",
+          "go_noodle_house",
+          "Homm Dessert at Heart",
+          "homm",
+          "Daydream Desserts",
+          "daydream_desserts",
+          "The Fat Sparrow",
+          "the_fat_sparrow",
+          "Canadian 2 For 1 Pizza",
+          "canadian_pizza",
+          "Niu Dian Beef Noodles",
+          "niu_dian_beef_noodles",
+          "Two Men Bagel House",
+          "two_men_bagel_house",
+          "Seoul Garden",
+          "seoul_garden",
+          "Seoul Garden HOTPOT",
+          "seoul_garden_hotpot",
+          "Seoul Garden HOTPOT & Caf\u00e9",
+          "seoul_garden_hotpot_cafe",
+          "Rounding",
+          "rounding",
+          "Papa Ayam",
+          "papa_ayam",
+          "August Society",
+          "august_society",
+          "Nana and Friends Caf\u00e9",
+          "nana_and_friends",
+          "DamnMeats",
+          "damnmeats",
+          "Candlescape",
+          "candlescape",
+          "FarEastFlora.com",
+          "fareastflora",
+          "AIBI Fitness",
+          "aibi",
+          "Colorfull Store",
+          "colorfull_store",
+          "Melvados",
+          "melvados",
+          "Churn",
+          "churn",
+          "Bratpack",
+          "bratpack",
+          "Timbuk2",
+          "timbuk2",
+          "Herschel",
+          "herschel",
+          "Allbirds",
+          "allbirds",
+          "Toms",
+          "toms",
+          "Hydro Flask",
+          "hydro_flask",
+          "% Arabica",
+          "arabica",
+          "Island Run Club",
+          "island_run_club",
+          "Carl's Jr",
+          "carls_jr",
+          "Organic Hair Regrowth Solutions",
+          "organic_hair_regrowth_solutions",
+          "Organic Express Hair Color Lab",
+          "organic_express_hair_color_lab",
+          "Sparkle Please",
+          "sparkle_please",
+          "CUCKOO",
+          "cuckoo",
+          "Lam Heung Ling",
+          "lam_heung_ling",
+          "Keong Saik Bakery",
+          "keong_saik_bakery",
+          "Turkish Lezzet House",
+          "turkish_lezzet_house",
+          "2112 Bakery",
+          "2112",
+          "Fragrance",
+          "fragrance",
+          "98 Bistro",
+          "98",
+          "Hook Coffee",
+          "hook",
+          "Lucine by Luna",
+          "lucine",
+          "Boost",
+          "boost",
+          "D'Bun",
+          "dbun",
+          "Fernando's Pizza",
+          "fernando_pizza",
+          "greentree"
+        ],
+        "icon-size": {
+          "stops": [
+            [
+              12,
+              0
+            ],
+            [
+              14,
+              0.25
+            ],
+            [
+              17,
+              0.4
+            ]
+          ]
+        },
+        "icon-allow-overlap": {
+          "stops": [
+            [
+              12,
+              false
+            ],
+            [
+              16,
+              true
+            ]
+          ]
+        },
+        "text-offset": {
+          "stops": [
+            [
+              10.7,
+              [
+                0,
+                0
+              ]
+            ],
+            [
+              18,
+              [
+                0,
+                0
+              ]
+            ]
+          ]
+        },
+        "visibility": "visible",
+        "text-allow-overlap": false
+      },
+      "paint": {
+        "icon-opacity": 1
+      }
+    },
+    {
+      "id": "customize_sv2",
+      "type": "symbol",
+      "source": "htm_icons",
+      "source-layer": "sv2",
+      "minzoom": 13,
+      "layout": {
+        "icon-image": [
+          "match",
+          [
+            "get",
+            "Outlet brand"
+          ],
+          "Mr Onigiri",
+          "mronigiri",
+          "SaladStop!",
+          "saladstop",
+          "GOPIZZA",
+          "gopizza",
+          "Kith Caf\u00e9",
+          "kithcafe",
+          "Kind Kones",
+          "kindkones",
+          "Eater's Market",
+          "eatersmarket",
+          "The Fragment Room",
+          "thefragmentroom",
+          "Tuk Tuk Cha",
+          "tuktukcha",
+          "Kakurega",
+          "kakurega",
+          "COCA",
+          "coca",
+          "Happy Cup",
+          "happycup",
+          "Splat Paint House",
+          "splatpainthouse",
+          "Spin Paint House",
+          "spinpainthouse",
+          "The Eyes Inc",
+          "theeyesinc",
+          "Project Send Pte Ltd",
+          "projectsend",
+          "Foreword Coffee",
+          "forewordcoffee",
+          "First Story Caf\u00e9",
+          "firststorycafe",
+          "Mega Adventure ",
+          "megaadventure",
+          "Bliss Nest Capsules",
+          "bnc",
+          "Onya Food",
+          "onyafood",
+          "Tonkotsu Kazan",
+          "kazan",
+          "Belle-Ville",
+          "belle-ville",
+          "Rollney",
+          "rollney",
+          "At Tea",
+          "attea",
+          "Chou Niang Jiu Niang",
+          "chouniangjiuniang",
+          "Tiong Hoe Specialty Coffee",
+          "tionghoespecialtycoffee",
+          "Chimichanga",
+          "chimichanga",
+          "Chimi's",
+          "chimi's",
+          "IRVINS",
+          "irvins",
+          "Avocadoria",
+          "avocadoria",
+          "The Braised House",
+          "thebraisedhouse",
+          "I Love Taimei",
+          "ilovetaimei",
+          "Mixue",
+          "mixue",
+          "FUR: A Vetreska Pet Store",
+          "vetreska",
+          "Tracy\u0092s Sarawak Kitchen",
+          "tracys_sarawak_kitchen",
+          "Kopi & Tarts",
+          "kopi&tarts",
+          "Shake Shack",
+          "shake_shack",
+          "Bali Thai",
+          "bali_thai",
+          "Daily Chicken",
+          "daily_chicken",
+          "So Pho",
+          "so_pho",
+          "Streats",
+          "streats",
+          "Sanchos Taqueria",
+          "sanchos_taqueria",
+          "Rico Rico",
+          "rico_rico",
+          "Tomo Tokyo",
+          "tomo_tokyo",
+          "Daily Beer",
+          "daily_beer",
+          "Famous Amos",
+          "famous_amos",
+          "Fried Chicken Master",
+          "fried_chicken_master",
+          "Telur Thai",
+          "telur_thai",
+          "Egg Thai",
+          "egg_thai",
+          "CHEERS",
+          "cheers",
+          "EM CHEERS",
+          "cheers",
+          "CHEERS FPX",
+          "fairprice_xpress",
+          "EM FPS",
+          "fairprice_xpress",
+          "TANYU",
+          "tanyu",
+          "Nong Geng Ji Hunan Home-Style Cuisine",
+          "nong_geng_ji",
+          "Momolato",
+          "momolato",
+          "High Bar Society",
+          "high_bar_society",
+          "The Planet Traveller",
+          "the_planet_traveller",
+          "Boarding Gate",
+          "boarding_gate",
+          "The Wallet Shop",
+          "the_wallet_shop",
+          "OK Chicken Rice & Humfull Laksa",
+          "ok_chicken_rice_humfull_laksa",
+          "AH HUAT HOKKIEN PRAWN MEE",
+          "ah_huat_hokkien_prawn_mee",
+          "Shiok Burger",
+          "shiok_burger",
+          "First Bowl Rice Kitchen",
+          "first_bowl_rice_kitchen",
+          "Delibowl Rice Kitchen",
+          "delibowl_rice_kitchen",
+          "Takagi Ramen",
+          "takagi_ramen",
+          "Takagi Ramen Express",
+          "takagi_ramen",
+          "ONOSHI",
+          "onoshi",
+          "Makisan",
+          "makisan",
+          "The SGFR Store",
+          "sgfr",
+          "UnaUna",
+          "unauna",
+          "Twyst",
+          "twyst",
+          "Trapo",
+          "trapo",
+          "BEUTEA",
+          "beutea",
+          "Ramen Champion",
+          "ramen_champion",
+          "Duke Bakery",
+          "duke_bakery",
+          "SF Fruits & Juices",
+          "sf",
+          "SF Farm Mart",
+          "sf",
+          "Ketojiak",
+          "ketojiak",
+          "Elixir Esports",
+          "elixir_esports",
+          "PappaRich",
+          "papparich",
+          "GO Noodle House",
+          "go_noodle_house",
+          "Homm Dessert at Heart",
+          "homm",
+          "Daydream Desserts",
+          "daydream_desserts",
+          "The Fat Sparrow",
+          "the_fat_sparrow",
+          "Canadian 2 For 1 Pizza",
+          "canadian_pizza",
+          "Niu Dian Beef Noodles",
+          "niu_dian_beef_noodles",
+          "Two Men Bagel House",
+          "two_men_bagel_house",
+          "Seoul Garden",
+          "seoul_garden",
+          "Seoul Garden HOTPOT",
+          "seoul_garden_hotpot",
+          "Seoul Garden HOTPOT & Caf\u00e9",
+          "seoul_garden_hotpot_cafe",
+          "Rounding",
+          "rounding",
+          "Papa Ayam",
+          "papa_ayam",
+          "August Society",
+          "august_society",
+          "Nana and Friends Caf\u00e9",
+          "nana_and_friends",
+          "DamnMeats",
+          "damnmeats",
+          "Candlescape",
+          "candlescape",
+          "FarEastFlora.com",
+          "fareastflora",
+          "AIBI Fitness",
+          "aibi",
+          "Colorfull Store",
+          "colorfull_store",
+          "Melvados",
+          "melvados",
+          "Churn",
+          "churn",
+          "Bratpack\u00a0",
+          "bratpack",
+          "Timbuk2",
+          "timbuk2",
+          "Herschel",
+          "herschel",
+          "Allbirds",
+          "allbirds",
+          "Toms",
+          "toms",
+          "Hydro Flask",
+          "hydro_flask",
+          "% Arabica ",
+          "arabica",
+          "Island Run Club",
+          "island_run_club",
+          "Carl's Jr",
+          "carls_jr",
+          "Organic Hair Regrowth Solutions",
+          "organic_hair_regrowth_solutions",
+          "Organic Express Hair Color Lab",
+          "organic_express_hair_color_lab",
+          "Sparkle Please",
+          "sparkle_please",
+          "CUCKOO",
+          "cuckoo",
+          "Lam Heung Ling",
+          "lam_heung_ling",
+          "Keong Saik Bakery",
+          "keong_saik_bakery",
+          "Turkish Lezzet House",
+          "turkish_lezzet_house",
+          "2112 Bakery",
+          "2112",
+          "Fragrance",
+          "fragrance",
+          "greentree"
+        ],
+        "icon-size": {
+          "stops": [
+            [
+              12,
+              0
+            ],
+            [
+              14,
+              0.25
+            ],
+            [
+              17,
+              0.4
+            ]
+          ]
+        },
+        "icon-allow-overlap": {
+          "stops": [
+            [
+              12,
+              false
+            ],
+            [
+              14,
+              true
+            ]
+          ]
+        },
+        "text-offset": [
+          0,
+          0
+        ],
+        "visibility": "none",
+        "text-allow-overlap": false,
+        "icon-offset": {
+          "stops": [
+            [
+              10,
+              [
+                0,
+                -300
+              ]
+            ],
+            [
+              18,
+              [
+                0,
+                0
+              ]
+            ]
+          ]
+        }
+      },
+      "paint": {
+        "icon-opacity": 1
+      }
+    },
+    {
+      "id": "customize_sv3",
+      "type": "symbol",
+      "source": "htm_icons",
+      "source-layer": "sv3",
+      "minzoom": 13,
+      "layout": {
+        "icon-image": [
+          "match",
+          [
+            "get",
+            "Outlet brand"
+          ],
+          "Mr Onigiri",
+          "mronigiri",
+          "SaladStop!",
+          "saladstop",
+          "GOPIZZA",
+          "gopizza",
+          "Kith Caf\u00e9",
+          "kithcafe",
+          "Kind Kones",
+          "kindkones",
+          "Eater's Market",
+          "eatersmarket",
+          "The Fragment Room",
+          "thefragmentroom",
+          "Tuk Tuk Cha",
+          "tuktukcha",
+          "Kakurega",
+          "kakurega",
+          "COCA",
+          "coca",
+          "Happy Cup",
+          "happycup",
+          "Splat Paint House",
+          "splatpainthouse",
+          "Spin Paint House",
+          "spinpainthouse",
+          "The Eyes Inc",
+          "theeyesinc",
+          "Project Send Pte Ltd",
+          "projectsend",
+          "Foreword Coffee",
+          "forewordcoffee",
+          "First Story Caf\u00e9",
+          "firststorycafe",
+          "Mega Adventure ",
+          "megaadventure",
+          "Bliss Nest Capsules",
+          "bnc",
+          "Onya Food",
+          "onyafood",
+          "Tonkotsu Kazan",
+          "kazan",
+          "Belle-Ville",
+          "belle-ville",
+          "Rollney",
+          "rollney",
+          "At Tea",
+          "attea",
+          "Chou Niang Jiu Niang",
+          "chouniangjiuniang",
+          "Tiong Hoe Specialty Coffee",
+          "tionghoespecialtycoffee",
+          "Chimichanga",
+          "chimichanga",
+          "Chimi's",
+          "chimi's",
+          "IRVINS",
+          "irvins",
+          "Avocadoria",
+          "avocadoria",
+          "The Braised House",
+          "thebraisedhouse",
+          "I Love Taimei",
+          "ilovetaimei",
+          "Mixue",
+          "mixue",
+          "FUR: A Vetreska Pet Store",
+          "vetreska",
+          "Tracy\u0092s Sarawak Kitchen",
+          "tracys_sarawak_kitchen",
+          "Kopi & Tarts",
+          "kopi&tarts",
+          "Shake Shack",
+          "shake_shack",
+          "Bali Thai",
+          "bali_thai",
+          "Daily Chicken",
+          "daily_chicken",
+          "So Pho",
+          "so_pho",
+          "Streats",
+          "streats",
+          "Sanchos Taqueria",
+          "sanchos_taqueria",
+          "Rico Rico",
+          "rico_rico",
+          "Tomo Tokyo",
+          "tomo_tokyo",
+          "Daily Beer",
+          "daily_beer",
+          "Famous Amos",
+          "famous_amos",
+          "Fried Chicken Master",
+          "fried_chicken_master",
+          "Telur Thai",
+          "telur_thai",
+          "Egg Thai",
+          "egg_thai",
+          "CHEERS",
+          "cheers",
+          "EM CHEERS",
+          "cheers",
+          "CHEERS FPX",
+          "fairprice_xpress",
+          "EM FPS",
+          "fairprice_xpress",
+          "TANYU",
+          "tanyu",
+          "Nong Geng Ji Hunan Home-Style Cuisine",
+          "nong_geng_ji",
+          "Momolato",
+          "momolato",
+          "High Bar Society",
+          "high_bar_society",
+          "The Planet Traveller",
+          "the_planet_traveller",
+          "Boarding Gate",
+          "boarding_gate",
+          "The Wallet Shop",
+          "the_wallet_shop",
+          "OK Chicken Rice & Humfull Laksa",
+          "ok_chicken_rice_humfull_laksa",
+          "AH HUAT HOKKIEN PRAWN MEE",
+          "ah_huat_hokkien_prawn_mee",
+          "Shiok Burger",
+          "shiok_burger",
+          "First Bowl Rice Kitchen",
+          "first_bowl_rice_kitchen",
+          "Delibowl Rice Kitchen",
+          "delibowl_rice_kitchen",
+          "Takagi Ramen",
+          "takagi_ramen",
+          "Takagi Ramen Express",
+          "takagi_ramen",
+          "ONOSHI",
+          "onoshi",
+          "Makisan",
+          "makisan",
+          "The SGFR Store",
+          "sgfr",
+          "UnaUna",
+          "unauna",
+          "Twyst",
+          "twyst",
+          "Trapo",
+          "trapo",
+          "BEUTEA",
+          "beutea",
+          "Ramen Champion",
+          "ramen_champion",
+          "Duke Bakery",
+          "duke_bakery",
+          "SF Fruits & Juices",
+          "sf",
+          "SF Farm Mart",
+          "sf",
+          "Ketojiak",
+          "ketojiak",
+          "Elixir Esports",
+          "elixir_esports",
+          "PappaRich",
+          "papparich",
+          "GO Noodle House",
+          "go_noodle_house",
+          "Homm Dessert at Heart",
+          "homm",
+          "Daydream Desserts",
+          "daydream_desserts",
+          "The Fat Sparrow",
+          "the_fat_sparrow",
+          "Canadian 2 For 1 Pizza",
+          "canadian_pizza",
+          "Niu Dian Beef Noodles",
+          "niu_dian_beef_noodles",
+          "Two Men Bagel House",
+          "two_men_bagel_house",
+          "Seoul Garden",
+          "seoul_garden",
+          "Seoul Garden HOTPOT",
+          "seoul_garden_hotpot",
+          "Seoul Garden HOTPOT & Caf\u00e9",
+          "seoul_garden_hotpot_cafe",
+          "Rounding",
+          "rounding",
+          "Papa Ayam",
+          "papa_ayam",
+          "August Society",
+          "august_society",
+          "Nana and Friends Caf\u00e9",
+          "nana_and_friends",
+          "DamnMeats",
+          "damnmeats",
+          "Candlescape",
+          "candlescape",
+          "FarEastFlora.com",
+          "fareastflora",
+          "AIBI Fitness",
+          "aibi",
+          "Colorfull Store",
+          "colorfull_store",
+          "Melvados",
+          "melvados",
+          "Churn",
+          "churn",
+          "Bratpack\u00a0",
+          "bratpack",
+          "Timbuk2",
+          "timbuk2",
+          "Herschel",
+          "herschel",
+          "Allbirds",
+          "allbirds",
+          "Toms",
+          "toms",
+          "Hydro Flask",
+          "hydro_flask",
+          "% Arabica ",
+          "arabica",
+          "Island Run Club",
+          "island_run_club",
+          "Carl's Jr",
+          "carls_jr",
+          "Organic Hair Regrowth Solutions",
+          "organic_hair_regrowth_solutions",
+          "Organic Express Hair Color Lab",
+          "organic_express_hair_color_lab",
+          "Sparkle Please",
+          "sparkle_please",
+          "CUCKOO",
+          "cuckoo",
+          "Lam Heung Ling",
+          "lam_heung_ling",
+          "Keong Saik Bakery",
+          "keong_saik_bakery",
+          "Turkish Lezzet House",
+          "turkish_lezzet_house",
+          "2112 Bakery",
+          "2112",
+          "Fragrance",
+          "fragrance",
+          "greentree"
+        ],
+        "icon-size": {
+          "stops": [
+            [
+              12,
+              0
+            ],
+            [
+              14,
+              0.25
+            ],
+            [
+              17,
+              0.4
+            ]
+          ]
+        },
+        "icon-allow-overlap": {
+          "stops": [
+            [
+              12,
+              false
+            ],
+            [
+              14,
+              true
+            ]
+          ]
+        },
+        "text-offset": [
+          0,
+          0
+        ],
+        "visibility": "none",
+        "text-allow-overlap": false,
+        "icon-offset": {
+          "stops": [
+            [
+              10,
+              [
+                0,
+                300
+              ]
+            ],
+            [
+              18,
+              [
+                0,
+                0
+              ]
+            ]
+          ]
+        }
+      },
+      "paint": {
+        "icon-opacity": 1
+      }
+    },
+    {
+      "id": "customize_sv4",
+      "type": "symbol",
+      "source": "htm_icons",
+      "source-layer": "sv4",
+      "minzoom": 13,
+      "layout": {
+        "icon-image": [
+          "match",
+          [
+            "get",
+            "Outlet brand"
+          ],
+          "Mr Onigiri",
+          "mronigiri",
+          "SaladStop!",
+          "saladstop",
+          "GOPIZZA",
+          "gopizza",
+          "Kith Caf\u00e9",
+          "kithcafe",
+          "Kind Kones",
+          "kindkones",
+          "Eater's Market",
+          "eatersmarket",
+          "The Fragment Room",
+          "thefragmentroom",
+          "Tuk Tuk Cha",
+          "tuktukcha",
+          "Kakurega",
+          "kakurega",
+          "COCA",
+          "coca",
+          "Happy Cup",
+          "happycup",
+          "Splat Paint House",
+          "splatpainthouse",
+          "Spin Paint House",
+          "spinpainthouse",
+          "The Eyes Inc",
+          "theeyesinc",
+          "Project Send Pte Ltd",
+          "projectsend",
+          "Foreword Coffee",
+          "forewordcoffee",
+          "First Story Caf\u00e9",
+          "firststorycafe",
+          "Mega Adventure ",
+          "megaadventure",
+          "Bliss Nest Capsules",
+          "bnc",
+          "Onya Food",
+          "onyafood",
+          "Tonkotsu Kazan",
+          "kazan",
+          "Belle-Ville",
+          "belle-ville",
+          "Rollney",
+          "rollney",
+          "At Tea",
+          "attea",
+          "Chou Niang Jiu Niang",
+          "chouniangjiuniang",
+          "Tiong Hoe Specialty Coffee",
+          "tionghoespecialtycoffee",
+          "Chimichanga",
+          "chimichanga",
+          "Chimi's",
+          "chimi's",
+          "IRVINS",
+          "irvins",
+          "Avocadoria",
+          "avocadoria",
+          "The Braised House",
+          "thebraisedhouse",
+          "I Love Taimei",
+          "ilovetaimei",
+          "Mixue",
+          "mixue",
+          "FUR: A Vetreska Pet Store",
+          "vetreska",
+          "Tracy\u0092s Sarawak Kitchen",
+          "tracys_sarawak_kitchen",
+          "Kopi & Tarts",
+          "kopi&tarts",
+          "Shake Shack",
+          "shake_shack",
+          "Bali Thai",
+          "bali_thai",
+          "Daily Chicken",
+          "daily_chicken",
+          "So Pho",
+          "so_pho",
+          "Streats",
+          "streats",
+          "Sanchos Taqueria",
+          "sanchos_taqueria",
+          "Rico Rico",
+          "rico_rico",
+          "Tomo Tokyo",
+          "tomo_tokyo",
+          "Daily Beer",
+          "daily_beer",
+          "Famous Amos",
+          "famous_amos",
+          "Fried Chicken Master",
+          "fried_chicken_master",
+          "Telur Thai",
+          "telur_thai",
+          "Egg Thai",
+          "egg_thai",
+          "CHEERS",
+          "cheers",
+          "EM CHEERS",
+          "cheers",
+          "CHEERS FPX",
+          "fairprice_xpress",
+          "EM FPS",
+          "fairprice_xpress",
+          "TANYU",
+          "tanyu",
+          "Nong Geng Ji Hunan Home-Style Cuisine",
+          "nong_geng_ji",
+          "Momolato",
+          "momolato",
+          "High Bar Society",
+          "high_bar_society",
+          "The Planet Traveller",
+          "the_planet_traveller",
+          "Boarding Gate",
+          "boarding_gate",
+          "The Wallet Shop",
+          "the_wallet_shop",
+          "OK Chicken Rice & Humfull Laksa",
+          "ok_chicken_rice_humfull_laksa",
+          "AH HUAT HOKKIEN PRAWN MEE",
+          "ah_huat_hokkien_prawn_mee",
+          "Shiok Burger",
+          "shiok_burger",
+          "First Bowl Rice Kitchen",
+          "first_bowl_rice_kitchen",
+          "Delibowl Rice Kitchen",
+          "delibowl_rice_kitchen",
+          "Takagi Ramen",
+          "takagi_ramen",
+          "Takagi Ramen Express",
+          "takagi_ramen",
+          "ONOSHI",
+          "onoshi",
+          "Makisan",
+          "makisan",
+          "The SGFR Store",
+          "sgfr",
+          "UnaUna",
+          "unauna",
+          "Twyst",
+          "twyst",
+          "Trapo",
+          "trapo",
+          "BEUTEA",
+          "beutea",
+          "Ramen Champion",
+          "ramen_champion",
+          "Duke Bakery",
+          "duke_bakery",
+          "SF Fruits & Juices",
+          "sf",
+          "SF Farm Mart",
+          "sf",
+          "Ketojiak",
+          "ketojiak",
+          "Elixir Esports",
+          "elixir_esports",
+          "PappaRich",
+          "papparich",
+          "GO Noodle House",
+          "go_noodle_house",
+          "Homm Dessert at Heart",
+          "homm",
+          "Daydream Desserts",
+          "daydream_desserts",
+          "The Fat Sparrow",
+          "the_fat_sparrow",
+          "Canadian 2 For 1 Pizza",
+          "canadian_pizza",
+          "Niu Dian Beef Noodles",
+          "niu_dian_beef_noodles",
+          "Two Men Bagel House",
+          "two_men_bagel_house",
+          "Seoul Garden",
+          "seoul_garden",
+          "Seoul Garden HOTPOT",
+          "seoul_garden_hotpot",
+          "Seoul Garden HOTPOT & Caf\u00e9",
+          "seoul_garden_hotpot_cafe",
+          "Rounding",
+          "rounding",
+          "Papa Ayam",
+          "papa_ayam",
+          "August Society",
+          "august_society",
+          "Nana and Friends Caf\u00e9",
+          "nana_and_friends",
+          "DamnMeats",
+          "damnmeats",
+          "Candlescape",
+          "candlescape",
+          "FarEastFlora.com",
+          "fareastflora",
+          "AIBI Fitness",
+          "aibi",
+          "Colorfull Store",
+          "colorfull_store",
+          "Melvados",
+          "melvados",
+          "Churn",
+          "churn",
+          "Bratpack\u00a0",
+          "bratpack",
+          "Timbuk2",
+          "timbuk2",
+          "Herschel",
+          "herschel",
+          "Allbirds",
+          "allbirds",
+          "Toms",
+          "toms",
+          "Hydro Flask",
+          "hydro_flask",
+          "% Arabica ",
+          "arabica",
+          "Island Run Club",
+          "island_run_club",
+          "Carl's Jr",
+          "carls_jr",
+          "Organic Hair Regrowth Solutions",
+          "organic_hair_regrowth_solutions",
+          "Organic Express Hair Color Lab",
+          "organic_express_hair_color_lab",
+          "Sparkle Please",
+          "sparkle_please",
+          "CUCKOO",
+          "cuckoo",
+          "Lam Heung Ling",
+          "lam_heung_ling",
+          "Keong Saik Bakery",
+          "keong_saik_bakery",
+          "Turkish Lezzet House",
+          "turkish_lezzet_house",
+          "2112 Bakery",
+          "2112",
+          "Fragrance",
+          "fragrance",
+          "greentree"
+        ],
+        "icon-size": {
+          "stops": [
+            [
+              12,
+              0
+            ],
+            [
+              14,
+              0.25
+            ],
+            [
+              17,
+              0.4
+            ]
+          ]
+        },
+        "icon-allow-overlap": {
+          "stops": [
+            [
+              12,
+              false
+            ],
+            [
+              14,
+              true
+            ]
+          ]
+        },
+        "text-offset": [
+          0,
+          0
+        ],
+        "visibility": "none",
+        "text-allow-overlap": false,
+        "icon-offset": {
+          "stops": [
+            [
+              10,
+              [
+                -300,
+                0
+              ]
+            ],
+            [
+              18,
+              [
+                0,
+                0
+              ]
+            ]
+          ]
+        }
+      },
+      "paint": {
+        "icon-opacity": 1
+      }
+    },
+    {
+      "id": "customize_sv5",
+      "type": "symbol",
+      "source": "htm_icons",
+      "source-layer": "sv5",
+      "minzoom": 13,
+      "layout": {
+        "icon-image": [
+          "match",
+          [
+            "get",
+            "Outlet brand"
+          ],
+          "Mr Onigiri",
+          "mronigiri",
+          "SaladStop!",
+          "saladstop",
+          "GOPIZZA",
+          "gopizza",
+          "Kith Caf\u00e9",
+          "kithcafe",
+          "Kind Kones",
+          "kindkones",
+          "Eater's Market",
+          "eatersmarket",
+          "The Fragment Room",
+          "thefragmentroom",
+          "Tuk Tuk Cha",
+          "tuktukcha",
+          "Kakurega",
+          "kakurega",
+          "COCA",
+          "coca",
+          "Happy Cup",
+          "happycup",
+          "Splat Paint House",
+          "splatpainthouse",
+          "Spin Paint House",
+          "spinpainthouse",
+          "The Eyes Inc",
+          "theeyesinc",
+          "Project Send Pte Ltd",
+          "projectsend",
+          "Foreword Coffee",
+          "forewordcoffee",
+          "First Story Caf\u00e9",
+          "firststorycafe",
+          "Mega Adventure ",
+          "megaadventure",
+          "Bliss Nest Capsules",
+          "bnc",
+          "Onya Food",
+          "onyafood",
+          "Tonkotsu Kazan",
+          "kazan",
+          "Belle-Ville",
+          "belle-ville",
+          "Rollney",
+          "rollney",
+          "At Tea",
+          "attea",
+          "Chou Niang Jiu Niang",
+          "chouniangjiuniang",
+          "Tiong Hoe Specialty Coffee",
+          "tionghoespecialtycoffee",
+          "Chimichanga",
+          "chimichanga",
+          "Chimi's",
+          "chimi's",
+          "IRVINS",
+          "irvins",
+          "Avocadoria",
+          "avocadoria",
+          "The Braised House",
+          "thebraisedhouse",
+          "I Love Taimei",
+          "ilovetaimei",
+          "Mixue",
+          "mixue",
+          "FUR: A Vetreska Pet Store",
+          "vetreska",
+          "Tracy\u0092s Sarawak Kitchen",
+          "tracys_sarawak_kitchen",
+          "Kopi & Tarts",
+          "kopi&tarts",
+          "Shake Shack",
+          "shake_shack",
+          "Bali Thai",
+          "bali_thai",
+          "Daily Chicken",
+          "daily_chicken",
+          "So Pho",
+          "so_pho",
+          "Streats",
+          "streats",
+          "Sanchos Taqueria",
+          "sanchos_taqueria",
+          "Rico Rico",
+          "rico_rico",
+          "Tomo Tokyo",
+          "tomo_tokyo",
+          "Daily Beer",
+          "daily_beer",
+          "Famous Amos",
+          "famous_amos",
+          "Fried Chicken Master",
+          "fried_chicken_master",
+          "Telur Thai",
+          "telur_thai",
+          "Egg Thai",
+          "egg_thai",
+          "CHEERS",
+          "cheers",
+          "EM CHEERS",
+          "cheers",
+          "CHEERS FPX",
+          "fairprice_xpress",
+          "EM FPS",
+          "fairprice_xpress",
+          "TANYU",
+          "tanyu",
+          "Nong Geng Ji Hunan Home-Style Cuisine",
+          "nong_geng_ji",
+          "Momolato",
+          "momolato",
+          "High Bar Society",
+          "high_bar_society",
+          "The Planet Traveller",
+          "the_planet_traveller",
+          "Boarding Gate",
+          "boarding_gate",
+          "The Wallet Shop",
+          "the_wallet_shop",
+          "OK Chicken Rice & Humfull Laksa",
+          "ok_chicken_rice_humfull_laksa",
+          "AH HUAT HOKKIEN PRAWN MEE",
+          "ah_huat_hokkien_prawn_mee",
+          "Shiok Burger",
+          "shiok_burger",
+          "First Bowl Rice Kitchen",
+          "first_bowl_rice_kitchen",
+          "Delibowl Rice Kitchen",
+          "delibowl_rice_kitchen",
+          "Takagi Ramen",
+          "takagi_ramen",
+          "Takagi Ramen Express",
+          "takagi_ramen",
+          "ONOSHI",
+          "onoshi",
+          "Makisan",
+          "makisan",
+          "The SGFR Store",
+          "sgfr",
+          "UnaUna",
+          "unauna",
+          "Twyst",
+          "twyst",
+          "Trapo",
+          "trapo",
+          "BEUTEA",
+          "beutea",
+          "Ramen Champion",
+          "ramen_champion",
+          "Duke Bakery",
+          "duke_bakery",
+          "SF Fruits & Juices",
+          "sf",
+          "SF Farm Mart",
+          "sf",
+          "Ketojiak",
+          "ketojiak",
+          "Elixir Esports",
+          "elixir_esports",
+          "PappaRich",
+          "papparich",
+          "GO Noodle House",
+          "go_noodle_house",
+          "Homm Dessert at Heart",
+          "homm",
+          "Daydream Desserts",
+          "daydream_desserts",
+          "The Fat Sparrow",
+          "the_fat_sparrow",
+          "Canadian 2 For 1 Pizza",
+          "canadian_pizza",
+          "Niu Dian Beef Noodles",
+          "niu_dian_beef_noodles",
+          "Two Men Bagel House",
+          "two_men_bagel_house",
+          "Seoul Garden",
+          "seoul_garden",
+          "Seoul Garden HOTPOT",
+          "seoul_garden_hotpot",
+          "Seoul Garden HOTPOT & Caf\u00e9",
+          "seoul_garden_hotpot_cafe",
+          "Rounding",
+          "rounding",
+          "Papa Ayam",
+          "papa_ayam",
+          "August Society",
+          "august_society",
+          "Nana and Friends Caf\u00e9",
+          "nana_and_friends",
+          "DamnMeats",
+          "damnmeats",
+          "Candlescape",
+          "candlescape",
+          "FarEastFlora.com",
+          "fareastflora",
+          "AIBI Fitness",
+          "aibi",
+          "Colorfull Store",
+          "colorfull_store",
+          "Melvados",
+          "melvados",
+          "Churn",
+          "churn",
+          "Bratpack\u00a0",
+          "bratpack",
+          "Timbuk2",
+          "timbuk2",
+          "Herschel",
+          "herschel",
+          "Allbirds",
+          "allbirds",
+          "Toms",
+          "toms",
+          "Hydro Flask",
+          "hydro_flask",
+          "% Arabica ",
+          "arabica",
+          "Island Run Club",
+          "island_run_club",
+          "Carl's Jr",
+          "carls_jr",
+          "Organic Hair Regrowth Solutions",
+          "organic_hair_regrowth_solutions",
+          "Organic Express Hair Color Lab",
+          "organic_express_hair_color_lab",
+          "Sparkle Please",
+          "sparkle_please",
+          "CUCKOO",
+          "cuckoo",
+          "Lam Heung Ling",
+          "lam_heung_ling",
+          "Keong Saik Bakery",
+          "keong_saik_bakery",
+          "Turkish Lezzet House",
+          "turkish_lezzet_house",
+          "2112 Bakery",
+          "2112",
+          "Fragrance",
+          "fragrance",
+          "greentree"
+        ],
+        "icon-size": {
+          "stops": [
+            [
+              12,
+              0
+            ],
+            [
+              14,
+              0.25
+            ],
+            [
+              17,
+              0.4
+            ]
+          ]
+        },
+        "icon-allow-overlap": {
+          "stops": [
+            [
+              12,
+              false
+            ],
+            [
+              14,
+              true
+            ]
+          ]
+        },
+        "text-offset": [
+          0,
+          0
+        ],
+        "visibility": "none",
+        "text-allow-overlap": false,
+        "icon-offset": {
+          "stops": [
+            [
+              10,
+              [
+                300,
+                0
+              ]
+            ],
+            [
+              18,
+              [
+                0,
+                0
+              ]
+            ]
+          ]
+        }
+      },
+      "paint": {
+        "icon-opacity": 1
+      }
+    },
+    {
+      "id": "customize_new_silverflag",
+      "type": "symbol",
+      "source": "htm_icons",
+      "source-layer": "silver_flag",
+      "minzoom": 13,
+      "filter": [
+        "all",
+        [
+          "<=",
+          "days",
+          2
+        ]
+      ],
+      "layout": {
+        "icon-size": 0.5,
+        "icon-allow-overlap": true,
+        "visibility": "none",
+        "icon-ignore-placement": true,
+        "icon-image": "silver flag",
+        "icon-anchor": "bottom"
+      }
+    },
+    {
+      "id": "customize_silverflag",
+      "type": "symbol",
+      "source": "htm_icons",
+      "source-layer": "silver_flag",
+      "minzoom": 18,
+      "filter": [
+        "all",
+        [
+          ">",
+          "days",
+          3
+        ]
+      ],
+      "layout": {
+        "icon-size": 0.5,
+        "icon-allow-overlap": true,
+        "visibility": "none",
+        "icon-ignore-placement": true,
+        "icon-image": "silver flag",
+        "icon-anchor": "bottom"
+      }
+    },
+    {
+      "id": "customize_bikeparking",
+      "type": "symbol",
+      "source": "htm_icons",
+      "source-layer": "bicycle_parking",
+      "minzoom": 16,
+      "layout": {
+        "icon-size": {
+          "stops": [
+            [
+              16,
+              0
+            ],
+            [
+              17,
+              0.5
+            ],
+            [
+              22,
+              1
+            ]
+          ]
+        },
+        "icon-allow-overlap": false,
+        "visibility": "visible",
+        "icon-ignore-placement": true,
+        "icon-anchor": "bottom",
+        "icon-image": "bike_parking",
+        "text-anchor": "bottom"
+      },
+      "paint": {
+        "icon-opacity": {
+          "stops": [
+            [
+              14.5,
+              0
+            ],
+            [
+              15,
+              1
+            ]
+          ]
+        }
+      }
+    }
+  ],
+  "id": "2aa8cc7c-f1e6-41b7-95f7-0f7284b4fe58"
+}
