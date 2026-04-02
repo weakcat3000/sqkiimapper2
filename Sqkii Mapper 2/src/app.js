@@ -5413,10 +5413,17 @@
       function setHtmIconsGroupEnabled(layerIds, active) {
         if (!Array.isArray(layerIds) || !layerIds.length) return;
         const shouldEnable = !!active;
-        layerIds.forEach((layerId) => {
-          htmIconsLayerVisibility[layerId] = shouldEnable;
-        });
-        if (shouldEnable) htmIconsShowLabels = false;
+        if (shouldEnable) {
+          htmIconsLayerVisibility = Object.fromEntries(HTM_ICONS_LAYER_DEFS.map((layer) => [layer.id, false]));
+          layerIds.forEach((layerId) => {
+            htmIconsLayerVisibility[layerId] = true;
+          });
+          htmIconsShowLabels = false;
+        } else {
+          layerIds.forEach((layerId) => {
+            htmIconsLayerVisibility[layerId] = false;
+          });
+        }
         saveHtmIconsSettings();
         syncHtmIconsSettingsUi();
         if (shouldEnable) {

@@ -2329,6 +2329,8 @@
       background-repeat: no-repeat;
       background-size: 606px 606px;
       background-position: -279px -388px;
+      transform: translateY(-1px) scale(1.24);
+      transform-origin: center;
       filter:
         drop-shadow(0 8px 16px rgba(148, 163, 184, 0.26))
         drop-shadow(0 0 10px rgba(226, 232, 240, 0.2));
@@ -2787,6 +2789,7 @@
         height: 34px;
         background-size: 505px 505px;
         background-position: -232px -322px;
+        transform: translateY(-1px) scale(1.18);
       }
 
       .tool-rail-toggle-arrow {
