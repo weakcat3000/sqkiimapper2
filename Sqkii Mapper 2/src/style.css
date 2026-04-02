@@ -1927,8 +1927,7 @@
     }
 
     /* Sonar */
-    .compass-btn,
-    .sonar-btn {
+    .compass-btn {
       position: fixed;
       right: 16px;
       z-index: 1500;
@@ -1942,8 +1941,7 @@
       transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease
     }
 
-    .compass-btn:hover,
-    .sonar-btn:hover {
+    .compass-btn:hover {
       transform: translateY(-1px);
       box-shadow: 0 10px 28px rgba(0, 0, 0, .4);
     }
@@ -2017,23 +2015,27 @@
       box-shadow: none;
     }
 
-    .sonar-btn {
-      bottom: 16px;
-      background-image: url('./assets/metal-sonar.png');
-      background-size: contain;
-      background-repeat: no-repeat;
-      background-position: center;
-    }
-
     .tool-rail {
+      --tool-rail-size: 56px;
+      --tool-rail-gap: 12px;
+      --tool-rail-actions-width: 192px;
       position: fixed;
       left: calc(var(--side) + 16px);
       bottom: 16px;
       z-index: 980;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: var(--tool-rail-gap);
       transition: left .28s ease;
+    }
+
+    .tool-rail.open {
+      z-index: 985;
+    }
+
+    .tool-rail-silver {
+      bottom: calc(16px + var(--tool-rail-size) + var(--tool-rail-gap));
+      z-index: 981;
     }
 
     .app.ui-collapsed .tool-rail {
@@ -2046,8 +2048,8 @@
 
     .tool-rail-toggle,
     .tool-rail-btn {
-      width: 56px;
-      height: 56px;
+      width: var(--tool-rail-size);
+      height: var(--tool-rail-size);
       padding: 0;
       border-radius: 16px;
       cursor: pointer;
@@ -2083,6 +2085,18 @@
       overflow: visible;
     }
 
+    .tool-rail-toggle-silver {
+      border-color: rgba(203, 213, 225, 0.38);
+      background:
+        radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.42), transparent 38%),
+        radial-gradient(circle at 78% 80%, rgba(148, 163, 184, 0.24), transparent 48%),
+        linear-gradient(180deg, rgba(56, 64, 79, 0.96), rgba(19, 24, 33, 0.98));
+      box-shadow:
+        0 0 0 1px rgba(226, 232, 240, 0.08),
+        0 12px 28px rgba(30, 41, 59, 0.34),
+        0 0 18px rgba(226, 232, 240, 0.12);
+    }
+
     .tool-rail-toggle-shell {
       position: relative;
       width: 100%;
@@ -2106,6 +2120,14 @@
       transition: transform .28s ease, filter .28s ease;
     }
 
+    .tool-rail-toggle-silver .tool-rail-toggle-coin {
+      left: 6px;
+      transform: translateY(-50%) rotate(-6deg);
+      filter:
+        drop-shadow(0 8px 18px rgba(148, 163, 184, 0.28))
+        drop-shadow(0 0 10px rgba(226, 232, 240, 0.24));
+    }
+
     .tool-rail-toggle-arrow {
       position: absolute;
       right: -8px;
@@ -2125,6 +2147,14 @@
       transition: transform .28s ease, background .28s ease, box-shadow .28s ease;
     }
 
+    .tool-rail-toggle-silver .tool-rail-toggle-arrow {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(203, 213, 225, 0.94));
+      border-color: rgba(71, 85, 105, 0.72);
+      box-shadow:
+        0 4px 14px rgba(0, 0, 0, 0.32),
+        0 0 12px rgba(226, 232, 240, 0.2);
+    }
+
     .tool-rail-toggle-arrow svg {
       width: 13px;
       height: 13px;
@@ -2137,6 +2167,10 @@
       stroke-width: 2.7;
       stroke-linecap: round;
       stroke-linejoin: round;
+    }
+
+    .tool-rail-toggle-silver .tool-rail-toggle-arrow path {
+      stroke: rgba(71, 85, 105, 0.96);
     }
 
     .tool-rail.open .tool-rail-toggle {
@@ -2153,6 +2187,20 @@
         drop-shadow(0 0 12px rgba(250, 204, 21, 0.34));
     }
 
+    .tool-rail-silver.open .tool-rail-toggle {
+      box-shadow:
+        0 0 0 1px rgba(226, 232, 240, 0.14),
+        0 14px 30px rgba(30, 41, 59, 0.38),
+        0 0 22px rgba(226, 232, 240, 0.18);
+    }
+
+    .tool-rail-silver.open .tool-rail-toggle-coin {
+      transform: translateY(-50%) rotate(-1deg) scale(1.07);
+      filter:
+        drop-shadow(0 10px 20px rgba(148, 163, 184, 0.34))
+        drop-shadow(0 0 12px rgba(226, 232, 240, 0.28));
+    }
+
     .tool-rail.open .tool-rail-toggle-arrow {
       transform: translateY(-50%) translateX(2px) scale(1.04);
       background: linear-gradient(180deg, rgba(255, 250, 230, 0.98), rgba(245, 158, 11, 0.96));
@@ -2161,10 +2209,17 @@
         0 0 16px rgba(250, 204, 21, 0.34);
     }
 
+    .tool-rail-silver.open .tool-rail-toggle-arrow {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(203, 213, 225, 0.96));
+      box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.36),
+        0 0 16px rgba(226, 232, 240, 0.24);
+    }
+
     .tool-rail-actions {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: var(--tool-rail-gap);
       width: 0;
       opacity: 0;
       overflow: hidden;
@@ -2173,7 +2228,7 @@
     }
 
     .tool-rail.open .tool-rail-actions {
-      width: 192px;
+      width: var(--tool-rail-actions-width);
       opacity: 1;
       pointer-events: auto;
     }
@@ -2207,6 +2262,14 @@
 
     .tool-rail.open .tool-rail-btn:nth-child(3) {
       transition-delay: .12s;
+    }
+
+    .tool-rail-btn.active {
+      border-color: rgba(226, 232, 240, 0.46);
+      box-shadow:
+        0 0 0 1px rgba(226, 232, 240, 0.14),
+        0 10px 26px rgba(0, 0, 0, 0.34),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
     }
 
     .tool-rail-btn img,
@@ -2249,6 +2312,53 @@
     .tool-rail-btn-sheets svg {
       width: 28px;
       height: 28px;
+    }
+
+    .tool-rail-btn-silver-flag {
+      border-color: rgba(203, 213, 225, 0.28);
+      background:
+        radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.16), transparent 42%),
+        linear-gradient(180deg, rgba(31, 41, 55, 0.96), rgba(10, 15, 24, 0.98));
+    }
+
+    .tool-rail-silver-flag-icon {
+      width: 24px;
+      height: 41px;
+      display: block;
+      background-image: url('/worldwidemaps/maps/htm_icons/sprite@2x.png');
+      background-repeat: no-repeat;
+      background-size: 606px 606px;
+      background-position: -279px -388px;
+      filter:
+        drop-shadow(0 8px 16px rgba(148, 163, 184, 0.26))
+        drop-shadow(0 0 10px rgba(226, 232, 240, 0.2));
+    }
+
+    .tool-rail-btn-voucher {
+      border-color: rgba(250, 204, 21, 0.24);
+      background:
+        radial-gradient(circle at 34% 24%, rgba(250, 204, 21, 0.18), transparent 42%),
+        linear-gradient(180deg, rgba(29, 23, 9, 0.96), rgba(11, 13, 20, 0.98));
+    }
+
+    .tool-rail-btn-voucher img {
+      width: 30px;
+      height: 30px;
+      object-fit: contain;
+      filter:
+        drop-shadow(0 8px 16px rgba(250, 204, 21, 0.26))
+        drop-shadow(0 0 10px rgba(250, 204, 21, 0.2));
+    }
+
+    .tool-rail-btn-sonar.sonar-btn {
+      border-color: rgba(56, 189, 248, 0.22);
+      background:
+        radial-gradient(circle at 34% 24%, rgba(56, 189, 248, 0.2), transparent 42%),
+        linear-gradient(180deg, rgba(10, 24, 36, 0.96), rgba(8, 13, 20, 0.98));
+      background-image: url('./assets/metal-sonar.png');
+      background-size: 76% 76%;
+      background-repeat: no-repeat;
+      background-position: center;
     }
 
     .sheets-view {
@@ -2651,11 +2761,14 @@
         padding: 5px !important;
       }
 
+      .tool-rail {
+        --tool-rail-size: 47.6px;
+        --tool-rail-gap: 10px;
+        --tool-rail-actions-width: 163px;
+      }
+
       .map-edit-fab,
-      .compass-btn,
-      .tool-rail-toggle,
-      .tool-rail-btn,
-      .sonar-btn {
+      .compass-btn {
         width: 47.6px;
         height: 47.6px;
       }
@@ -2669,12 +2782,11 @@
         height: 28px;
       }
 
-      .tool-rail-actions {
-        gap: 10px;
-      }
-
-      .tool-rail.open .tool-rail-actions {
-        width: 163px;
+      .tool-rail-silver-flag-icon {
+        width: 20px;
+        height: 34px;
+        background-size: 505px 505px;
+        background-position: -232px -322px;
       }
 
       .tool-rail-toggle-arrow {

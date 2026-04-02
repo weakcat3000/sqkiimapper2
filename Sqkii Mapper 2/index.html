@@ -278,17 +278,63 @@
       <span class="compass-status" aria-hidden="true"></span>
     </button>
 
-    <!-- Floating Sonar Button -->
-    <button id="sonar-btn" class="sonar-btn disabled" title="Turn on GPS to use Sonar"></button>
+    <div id="silver-tool-rail" class="tool-rail tool-rail-silver" aria-label="Silver tools">
+      <button
+        id="silver-tool-rail-toggle"
+        class="tool-rail-toggle tool-rail-toggle-silver"
+        type="button"
+        title="Open silver tools"
+        aria-label="Open silver tools"
+        aria-expanded="false"
+        data-open-label="Open silver tools"
+        data-close-label="Hide silver tools">
+        <span class="tool-rail-toggle-shell">
+          <img class="tool-rail-toggle-coin" src="silver-coin.png" alt="" />
+          <span class="tool-rail-toggle-arrow" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M8 5.5 15.5 12 8 18.5"></path>
+            </svg>
+          </span>
+        </span>
+      </button>
+
+      <div class="tool-rail-actions" aria-hidden="true">
+        <button
+          id="silver-flags-toggle"
+          class="tool-rail-btn tool-rail-btn-silver-flag"
+          title="Toggle silver coin flags"
+          aria-label="Toggle silver coin flags"
+          aria-pressed="false">
+          <span class="tool-rail-silver-flag-icon" aria-hidden="true"></span>
+        </button>
+
+        <button
+          id="sqkii-voucher-toggle"
+          class="tool-rail-btn tool-rail-btn-voucher"
+          title="Toggle Sqkii voucher icons"
+          aria-label="Toggle Sqkii voucher icons"
+          aria-pressed="false">
+          <img src="voucher.png" alt="" />
+        </button>
+
+        <button
+          id="sonar-btn"
+          class="tool-rail-btn tool-rail-btn-sonar sonar-btn disabled"
+          title="Turn on GPS to use Sonar"
+          aria-label="Turn on GPS to use Sonar"></button>
+      </div>
+    </div>
 
     <div id="tool-rail" class="tool-rail" aria-label="Quick tools">
       <button
         id="tool-rail-toggle"
         class="tool-rail-toggle"
         type="button"
-        title="Open quick tools"
-        aria-label="Open quick tools"
-        aria-expanded="false">
+        title="Open gold tools"
+        aria-label="Open gold tools"
+        aria-expanded="false"
+        data-open-label="Open gold tools"
+        data-close-label="Hide gold tools">
         <span class="tool-rail-toggle-shell">
           <img class="tool-rail-toggle-coin" src="golden-coin.png" alt="" />
           <span class="tool-rail-toggle-arrow" aria-hidden="true">

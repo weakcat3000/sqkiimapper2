@@ -3533,53 +3533,70 @@
       sidebarEl.addEventListener('transitionend', e => { if (e.propertyName === 'width') { if (engine === 'gl') mapgl.resize(); else mapleaf.invalidateSize(true); } });
 
       (() => {
-        const toolRail = document.getElementById('tool-rail');
-        const toggleBtn = document.getElementById('tool-rail-toggle');
-        const actions = toolRail?.querySelector('.tool-rail-actions');
-        if (!toolRail || !toggleBtn || !actions) return;
+        const rails = Array.from(document.querySelectorAll('.tool-rail'));
+        if (!rails.length) return;
 
-        let isOpen = false;
-        const actionButtons = Array.from(actions.querySelectorAll('button'));
-
-        const renderRail = () => {
-          toolRail.classList.toggle('open', isOpen);
-          toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-          toggleBtn.setAttribute('aria-label', isOpen ? 'Hide quick tools' : 'Open quick tools');
-          toggleBtn.title = isOpen ? 'Hide quick tools' : 'Open quick tools';
-          actions.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
-          actionButtons.forEach((button) => {
-            button.tabIndex = isOpen ? 0 : -1;
+        const closeAllRails = (exceptRail = null) => {
+          rails.forEach((rail) => {
+            if (rail === exceptRail) return;
+            rail.__closeToolRail?.();
           });
         };
 
-        const closeRail = () => {
-          if (!isOpen) return;
-          isOpen = false;
-          renderRail();
-        };
+        rails.forEach((toolRail) => {
+          const toggleBtn = toolRail.querySelector('.tool-rail-toggle');
+          const actions = toolRail.querySelector('.tool-rail-actions');
+          if (!toggleBtn || !actions) return;
 
-        toggleBtn.addEventListener('click', (event) => {
-          event.stopPropagation();
-          isOpen = !isOpen;
-          renderRail();
-        });
+          let isOpen = false;
+          const actionButtons = Array.from(actions.querySelectorAll('button'));
+          const openLabel = toggleBtn.dataset.openLabel || toggleBtn.getAttribute('aria-label') || toggleBtn.title || 'Open quick tools';
+          const closeLabel = toggleBtn.dataset.closeLabel || openLabel.replace(/^Open/i, 'Hide');
 
-        actionButtons.forEach((button) => {
-          button.addEventListener('click', () => {
+          const renderRail = () => {
+            toolRail.classList.toggle('open', isOpen);
+            toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            toggleBtn.setAttribute('aria-label', isOpen ? closeLabel : openLabel);
+            toggleBtn.title = isOpen ? closeLabel : openLabel;
+            actions.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+            actionButtons.forEach((button) => {
+              button.tabIndex = isOpen ? 0 : -1;
+            });
+          };
+
+          const closeRail = () => {
+            if (!isOpen) return;
+            isOpen = false;
+            renderRail();
+          };
+
+          toolRail.__closeToolRail = closeRail;
+
+          toggleBtn.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const nextOpen = !isOpen;
+            closeAllRails(nextOpen ? toolRail : null);
+            isOpen = nextOpen;
+            renderRail();
+          });
+
+          actionButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+              closeRail();
+            });
+          });
+
+          document.addEventListener('click', (event) => {
+            if (!isOpen || toolRail.contains(event.target)) return;
             closeRail();
           });
-        });
 
-        document.addEventListener('click', (event) => {
-          if (!isOpen || toolRail.contains(event.target)) return;
-          closeRail();
+          renderRail();
         });
 
         document.addEventListener('keydown', (event) => {
-          if (event.key === 'Escape') closeRail();
+          if (event.key === 'Escape') closeAllRails();
         });
-
-        renderRail();
       })();
 
       /* ===== Basemap switching ===== */
@@ -5272,6 +5289,8 @@
       const audioBtn = document.getElementById('audio-toggle');
       const powerSaveBtn = document.getElementById('power-saving-toggle');
       const htmIconsBtn = document.getElementById('htm-icons-toggle');
+      const silverFlagsQuickBtn = document.getElementById('silver-flags-toggle');
+      const sqkiiVoucherQuickBtn = document.getElementById('sqkii-voucher-toggle');
       const htmIconsModal = document.getElementById('htm-icons-modal');
       const htmIconsCloseBtn = document.getElementById('htm-icons-close');
       const htmIconsMasterBtn = document.getElementById('htm-icons-master-toggle');
@@ -5280,6 +5299,10 @@
       const htmIconsAllOffBtn = document.getElementById('htm-icons-all-off');
       const htmIconsStatusEl = document.getElementById('htm-icons-status');
       const htmIconsListEl = document.getElementById('htm-icons-list');
+      const SILVER_HTM_LAYER_IDS = ['htm-icons-silver'];
+      const SQKII_VOUCHER_LAYER_IDS = HTM_ICONS_LAYER_DEFS
+        .filter((layer) => layer.markerKind === 'sv-ticket')
+        .map((layer) => layer.id);
       function setAudioIcon(on) {
         audioBtn.innerHTML = on
           ? `<svg viewBox="0 0 24 24" fill="none" stroke="#e5e7eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>`
@@ -5362,6 +5385,55 @@
           </label>
         `).join('');
       }
+      function isHtmIconsGroupActive(layerIds = []) {
+        return !!htmIconsEnabled && layerIds.some((layerId) => isHtmIconsLayerEnabled(layerId));
+      }
+      function syncQuickToggleButton(button, active, activeLabel, inactiveLabel) {
+        if (!button) return;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+        const nextLabel = active ? activeLabel : inactiveLabel;
+        button.title = nextLabel;
+        button.setAttribute('aria-label', nextLabel);
+      }
+      function syncHtmIconsQuickButtons() {
+        syncQuickToggleButton(
+          silverFlagsQuickBtn,
+          isHtmIconsGroupActive(SILVER_HTM_LAYER_IDS),
+          'Hide silver coin flags',
+          'Show silver coin flags'
+        );
+        syncQuickToggleButton(
+          sqkiiVoucherQuickBtn,
+          isHtmIconsGroupActive(SQKII_VOUCHER_LAYER_IDS),
+          'Hide Sqkii voucher icons',
+          'Show Sqkii voucher icons'
+        );
+      }
+      function setHtmIconsGroupEnabled(layerIds, active) {
+        if (!Array.isArray(layerIds) || !layerIds.length) return;
+        const shouldEnable = !!active;
+        layerIds.forEach((layerId) => {
+          htmIconsLayerVisibility[layerId] = shouldEnable;
+        });
+        if (shouldEnable) htmIconsShowLabels = false;
+        saveHtmIconsSettings();
+        syncHtmIconsSettingsUi();
+        if (shouldEnable) {
+          setHtmIconsEnabled(true);
+          return;
+        }
+        const hasVisibleLayer = HTM_ICONS_LAYER_DEFS.some((layer) => isHtmIconsLayerEnabled(layer.id));
+        if (htmIconsEnabled) {
+          if (hasVisibleLayer) ensureHtmIconsOverlay();
+          else setHtmIconsEnabled(false);
+        } else {
+          syncHtmIconsQuickButtons();
+        }
+      }
+      function toggleHtmIconsGroup(layerIds) {
+        setHtmIconsGroupEnabled(layerIds, !isHtmIconsGroupActive(layerIds));
+      }
       function syncHtmIconsSettingsUi() {
         const visibleCount = HTM_ICONS_LAYER_DEFS.filter((layer) => isHtmIconsLayerEnabled(layer.id)).length;
         if (htmIconsMasterBtn) htmIconsMasterBtn.textContent = `Dataset: ${htmIconsEnabled ? 'ON' : 'OFF'}`;
@@ -5372,6 +5444,7 @@
             : `Dataset is off${engine !== 'gl' ? ' and GL basemaps are required to render it.' : '.'}`;
         }
         renderHtmIconsSettingsList();
+        syncHtmIconsQuickButtons();
       }
       function openHtmIconsSettings() {
         syncHtmIconsSettingsUi();
@@ -5390,6 +5463,7 @@
           ? 'Open HTM Icons settings (dataset on)'
           : 'Open HTM Icons settings';
         htmIconsBtn.setAttribute('aria-pressed', htmIconsEnabled ? 'true' : 'false');
+        syncHtmIconsQuickButtons();
       }
       function setHtmIconsEnabled(active, { persist = true } = {}) {
         htmIconsEnabled = !!active;
@@ -5463,6 +5537,8 @@
         syncHtmIconsSettingsUi();
         if (htmIconsEnabled) ensureHtmIconsOverlay();
       });
+      silverFlagsQuickBtn?.addEventListener('click', () => toggleHtmIconsGroup(SILVER_HTM_LAYER_IDS));
+      sqkiiVoucherQuickBtn?.addEventListener('click', () => toggleHtmIconsGroup(SQKII_VOUCHER_LAYER_IDS));
       htmIconsListEl?.addEventListener('change', (e) => {
         const input = e.target.closest('input[data-htm-layer-id]');
         if (!input) return;
@@ -5818,16 +5894,19 @@
       }
 
       function updateSonarEnabled() {
+        if (!sonarBtn) return;
         if (lastUserPos) {
           if (sonarBtn.classList.contains('disabled')) {
             // First time GPS is activated
             sonarBtn.classList.remove('disabled');
             sonarBtn.title = 'Activate Coin Sonar';
+            sonarBtn.setAttribute('aria-label', 'Activate Coin Sonar');
             console.log('Sonar now available!');
           }
         } else {
           sonarBtn.classList.add('disabled');
           sonarBtn.title = 'Turn on GPS to use Sonar';
+          sonarBtn.setAttribute('aria-label', 'Turn on GPS to use Sonar');
         }
       }
 
@@ -5845,6 +5924,7 @@
           if (sonarBtn.classList.contains('disabled')) {
             sonarBtn.classList.remove('disabled');
             sonarBtn.title = 'Activate Coin Sonar';
+            sonarBtn.setAttribute('aria-label', 'Activate Coin Sonar');
             console.log('Sonar activated - GPS location acquired');
           }
         }
