@@ -2735,6 +2735,16 @@
     }
 
     @media (max-width: 820px) {
+      .maplibregl-ctrl-top-right {
+        top: auto;
+        right: 16px;
+        bottom: 16px;
+      }
+
+      .maplibregl-ctrl-top-right .maplibregl-ctrl {
+        margin: 0;
+      }
+
       .compass-btn {
         display: grid;
       }
