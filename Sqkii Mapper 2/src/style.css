@@ -2866,7 +2866,8 @@
       }
 
       .compass-btn {
-        bottom: calc(16px + 47.6px + 10px);
+        right: 16px;
+        bottom: 16px;
       }
     }
 
