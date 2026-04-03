@@ -9839,7 +9839,7 @@
 
       function shrinkPredictorBuildConfigSearchSpace(observation) {
         const stepCount = Math.max(0, Number(observation?.observedSteps?.length) || 0);
-        const roomBiases = [0.72, 0.82, 0.92];
+        const roomBiases = [0.76, 0.9];
         const durationBiases = [
           stepCount >= 15 ? 1.5 : 1.35,
           stepCount >= 15 ? 1.8 : 1.6,
@@ -9852,8 +9852,7 @@
         ];
         const scaleModes = [
           { suffix: 'memory', ensembleDelta: { fullScaled: 0.08, shapeScaled: 0.05, fullRaw: -0.06, motionRaw: -0.03 }, blendDelta: { full: 0.04, shape: 0.02, motion: -0.06 } },
-          { suffix: 'balanced', ensembleDelta: {}, blendDelta: {} },
-          { suffix: 'raw', ensembleDelta: { fullRaw: 0.08, shapeRaw: 0.05, fullScaled: -0.07, shapeScaled: -0.03, motionScaled: -0.03 }, blendDelta: { full: 0.04, motion: 0.02, shape: -0.06 } }
+          { suffix: 'balanced', ensembleDelta: {}, blendDelta: {} }
         ];
 
         const candidates = [];
