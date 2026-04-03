@@ -9896,15 +9896,22 @@
         }
 
         const uniquePoints = Array.from(pointMap.values());
+        const kernelSigma = Math.max(18, Math.min(90, safeRadiusMeters * 0.18 || 36));
         const ranked = uniquePoints.map((item) => {
-          const density = uniquePoints.reduce((sum, candidate) => {
+          const support = uniquePoints.reduce((sum, candidate) => {
             const dist = shrinkPredictorMetersBetween(item.point, candidate.point) || 0;
-            return sum + (candidate.seedWeight / Math.max(14, dist));
+            const kernel = Math.exp(-((dist ** 2) / Math.max(2 * (kernelSigma ** 2), 1)));
+            return sum + (candidate.seedWeight * kernel);
           }, 0);
           const centerDistance = shrinkPredictorMetersBetween(item.point, centerPoint) || 0;
+          const anchorDistance = shrinkPredictorMetersBetween(anchor, item.point) || 0;
           return {
             ...item,
-            score: (density * 12) + (item.seedWeight * 4) + (item.source === 'heatmap' ? 3 : 0) - (centerDistance / Math.max(20, safeRadiusMeters || 20))
+            score: (support * 10)
+              + (item.seedWeight * 3.5)
+              + (item.source === 'heatmap' ? 2.5 : 0)
+              - (centerDistance / Math.max(28, kernelSigma))
+              - (anchorDistance / Math.max(60, safeRadiusMeters || 60))
           };
         })
           .sort((a, b) => b.score - a.score)
@@ -10168,6 +10175,18 @@
         });
       }
 
+      function shrinkPredictorBuildSignatureVector(steps = [], outLen = 12) {
+        const signature = shrinkPredictorBuildNormalizedSignature(steps);
+        if (!signature.length) return Array(outLen * 5).fill(0);
+        return [
+          ...shrinkPredictorResampleSeries(signature.map((item) => Number(item.radiusRatio) || 0), outLen),
+          ...shrinkPredictorResampleSeries(signature.map((item) => Number(item.eastRatio) || 0), outLen),
+          ...shrinkPredictorResampleSeries(signature.map((item) => Number(item.northRatio) || 0), outLen),
+          ...shrinkPredictorResampleSeries(signature.map((item) => Number(item.driftRatio) || 0), outLen),
+          ...shrinkPredictorResampleSeries(signature.map((item) => Number(item.stepDistanceRatio) || 0), outLen)
+        ];
+      }
+
       function shrinkPredictorFindCurrentObservation(fid, center, radiusMeters, featureProps = {}) {
         const snapshotState = coinDbSerializeState();
         const groups = buildSilverCoinArchiveGroups(snapshotState);
@@ -10307,7 +10326,8 @@
                   offsetEastMeters / Math.max(1, Number(last?.radiusMeters) || 1),
                   offsetNorthMeters / Math.max(1, Number(last?.radiusMeters) || 1)
                 ],
-                embedding: shrinkPredictorBuildEmbeddingFromSteps(prefix)
+                embedding: shrinkPredictorBuildEmbeddingFromSteps(prefix),
+                signatureVector: shrinkPredictorBuildSignatureVector(prefix)
               });
             }
           }
@@ -10371,8 +10391,10 @@
         const sizePenaltyWeight = Number.isFinite(Number(penaltyWeights.size)) ? Number(penaltyWeights.size) : 1.45;
         const durationPenaltyWeight = Number.isFinite(Number(penaltyWeights.duration)) ? Number(penaltyWeights.duration) : 1.75;
         const shrinkRatePenaltyWeight = Number.isFinite(Number(penaltyWeights.shrinkRate)) ? Number(penaltyWeights.shrinkRate) : 1.55;
+        const signaturePenaltyWeight = Number.isFinite(Number(penaltyWeights.signature)) ? Number(penaltyWeights.signature) : 0.95;
         const roomFactor = shrinkPredictorClamp(Number(options?.roomFactor) || 0.84, 0.55, 1);
         const queryAnchorRadiusMeters = Math.max(1, Number(queryProfile?.anchorRadiusMeters) || 1);
+        const querySignatureVector = Array.isArray(options?.querySignatureVector) ? options.querySignatureVector : null;
 
         const scored = samples
           .filter((sample) => String(sample?.entry?.id || '') !== excludeEntryId)
@@ -10400,11 +10422,15 @@
           const shrinkRatePenalty = queryProfile
             ? profileCompare.shrinkRateRatioLog * shrinkRatePenaltyWeight
             : 0;
-          let adjustedDistance = embeddingDistance + radiusPenalty + driftPenalty + cadencePenalty + sizePenalty + durationPenalty + shrinkRatePenalty;
+          const signaturePenalty = querySignatureVector && Array.isArray(sample.signatureVector)
+            ? (shrinkPredictorDistance(querySignatureVector, sample.signatureVector) * signaturePenaltyWeight)
+            : 0;
+          let adjustedDistance = embeddingDistance + radiusPenalty + driftPenalty + cadencePenalty + sizePenalty + durationPenalty + shrinkRatePenalty + signaturePenalty;
           if (queryRoomCode && sample.roomCode && sample.roomCode === queryRoomCode) adjustedDistance *= roomFactor;
           return {
             ...sample,
             distance: embeddingDistance,
+            signatureDistance: signaturePenalty,
             adjustedDistance
           };
         });
@@ -10480,8 +10506,10 @@
         const queryEmbedding = shrinkPredictorBuildEmbeddingFromSteps(observedSteps);
         const queryStd = shrinkPredictorStandardizeVector(queryEmbedding, model.featureStats);
         const queryProfile = shrinkPredictorBuildSequenceProfile(observedSteps);
+        const querySignatureVector = shrinkPredictorBuildSignatureVector(observedSteps);
         const neighborOptions = {
           queryProfile,
+          querySignatureVector,
           roomCode: options?.roomCode ?? observation?.matchedGroup?.roomCode ?? currentRoomCode ?? '',
           excludeEntryId: options?.excludeEntryId || '',
           penaltyWeights: config.penalties,
@@ -10527,12 +10555,19 @@
           meanOffset[1] * progressScale
         ];
         const scaledNeighbors = blendedNeighbors.map((neighbor) => {
+          const sampleRemaining = Math.max(0.02, Number(neighbor.remainingProgress) || 0.02);
+          const perNeighborScale = shrinkPredictorClamp(
+            (Number(floorState?.remainingProgress) || 0.02) / sampleRemaining,
+            0.55,
+            1.75
+          );
           const output = [
-            (Number(neighbor.output?.[0]) || 0) * progressScale,
-            (Number(neighbor.output?.[1]) || 0) * progressScale
+            (Number(neighbor.output?.[0]) || 0) * perNeighborScale,
+            (Number(neighbor.output?.[1]) || 0) * perNeighborScale
           ];
           return {
             ...neighbor,
+            perNeighborScale,
             scaledOutput: output,
             projectedPoint: shrinkPredictorDestination(anchor, output[0], output[1]) || { lat: anchor.lat, lng: anchor.lng }
           };
