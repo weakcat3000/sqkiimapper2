@@ -9157,6 +9157,10 @@
       const shrinkPredictorRunBtn = byId('shrink-predictor-run');
       const shrinkPredictorClearBtn = byId('shrink-predictor-clear');
       const shrinkPredictorStatusEl = byId('shrink-predictor-status');
+      const shrinkPredictorProgressEl = byId('shrink-predictor-progress');
+      const shrinkPredictorProgressLabelEl = byId('shrink-predictor-progress-label');
+      const shrinkPredictorProgressValueEl = byId('shrink-predictor-progress-value');
+      const shrinkPredictorProgressFillEl = byId('shrink-predictor-progress-fill');
       const shrinkPredictorSummaryEl = byId('shrink-predictor-summary');
       const shrinkPredictorResultsEl = byId('shrink-predictor-results');
       const SHRINK_PREDICTOR_SRC = 'shrink-predictor-src';
@@ -9167,17 +9171,44 @@
       const SHRINK_PREDICTOR_CONF_LINE_SRC = 'shrink-predictor-confidence-line-src';
       const SHRINK_PREDICTOR_EMBED_LEN = 20;
       const SHRINK_PREDICTOR_MIN_PREFIX_STEPS = 2;
+      const SHRINK_PREDICTOR_MIN_OBSERVED_STEPS = 10;
       const SHRINK_PREDICTOR_K = 10;
       let currentShrinkPredictorContext = null;
       let shrinkPredictorLeafletLayer = null;
       let shrinkPredictorSpinFrame = null;
       let shrinkPredictorSpinState = null;
       let shrinkPredictorMlModelPromise = null;
+      let shrinkPredictorIsRunning = false;
 
       function shrinkPredictorSetStatus(message, isError = false) {
         if (!shrinkPredictorStatusEl) return;
         shrinkPredictorStatusEl.textContent = message || '';
         shrinkPredictorStatusEl.style.color = isError ? '#fca5a5' : 'var(--muted)';
+      }
+
+      function shrinkPredictorSetRunningState(isRunning) {
+        shrinkPredictorIsRunning = !!isRunning;
+        if (shrinkPredictorRunBtn) shrinkPredictorRunBtn.disabled = shrinkPredictorIsRunning;
+        if (shrinkPredictorClearBtn) shrinkPredictorClearBtn.disabled = shrinkPredictorIsRunning;
+        if (shrinkPredictorCloseBtn) shrinkPredictorCloseBtn.disabled = shrinkPredictorIsRunning;
+      }
+
+      function shrinkPredictorSetProgress(percent = 0, label = '', visible = true) {
+        if (!shrinkPredictorProgressEl) return;
+        const clamped = shrinkPredictorClamp(Number(percent) || 0, 0, 100);
+        shrinkPredictorProgressEl.classList.toggle('hidden', !visible);
+        shrinkPredictorProgressEl.setAttribute('aria-hidden', visible ? 'false' : 'true');
+        if (shrinkPredictorProgressFillEl) shrinkPredictorProgressFillEl.style.width = `${clamped}%`;
+        if (shrinkPredictorProgressValueEl) shrinkPredictorProgressValueEl.textContent = `${Math.round(clamped)}%`;
+        if (shrinkPredictorProgressLabelEl && label) shrinkPredictorProgressLabelEl.textContent = label;
+      }
+
+      function shrinkPredictorHideProgress() {
+        shrinkPredictorSetProgress(0, 'Preparing prediction...', false);
+      }
+
+      async function shrinkPredictorYieldFrame() {
+        await new Promise((resolve) => requestAnimationFrame(() => resolve()));
       }
 
       function shrinkPredictorClamp(value, min, max) {
@@ -9896,9 +9927,33 @@
           coinLabel: coinLabel || coinDbCanonicalLabel(matchedGroup?.coinLabel || featureProps?.name || 'Selected circle') || 'Selected circle',
           observedSteps,
           matchedGroup,
+          isSqkiiCircle: !!matchedGroup,
           center: lastStep ? [lastStep.lng, lastStep.lat] : center,
           radiusMeters: Number(lastStep?.radiusMeters || radiusMeters) || 0
         };
+      }
+
+      function shrinkPredictorAssessObservation(observation) {
+        if (!observation) {
+          return {
+            ok: false,
+            reason: 'Predict Exact could not read the selected circle.'
+          };
+        }
+        if (!observation.isSqkiiCircle || !observation.matchedGroup) {
+          return {
+            ok: false,
+            reason: 'Predict Exact only works on live Sqkii circles with archived shrink history. Drawn or custom circles are not supported.'
+          };
+        }
+        const observedCount = Array.isArray(observation.observedSteps) ? observation.observedSteps.length : 0;
+        if (observedCount < SHRINK_PREDICTOR_MIN_OBSERVED_STEPS) {
+          return {
+            ok: false,
+            reason: `Predict Exact needs at least ${SHRINK_PREDICTOR_MIN_OBSERVED_STEPS} observed shrink patterns for a reliable result. This circle currently has ${observedCount}.`
+          };
+        }
+        return { ok: true, reason: '' };
       }
 
       async function shrinkPredictorLoadMlModel() {
@@ -10238,14 +10293,17 @@
         };
       }
 
-      function shrinkPredictorCalibrateModel(model, observation) {
+      async function shrinkPredictorCalibrateModel(model, observation, onProgress = null) {
         if (!Array.isArray(model?.samples) || !model.samples.length) return null;
         if (!model.calibrationCache || typeof model.calibrationCache !== 'object') model.calibrationCache = {};
 
         const roomCode = String(observation?.matchedGroup?.roomCode || currentRoomCode || '').trim().toLowerCase();
         const stepCount = Math.max(0, Number(observation?.observedSteps?.length) || 0);
         const cacheKey = `${roomCode || 'all'}:${stepCount}:${model.samples.length}:${model.entries?.length || 0}`;
-        if (model.calibrationCache[cacheKey]) return model.calibrationCache[cacheKey];
+        if (model.calibrationCache[cacheKey]) {
+          if (typeof onProgress === 'function') onProgress(1, 1, model.calibrationCache[cacheKey]);
+          return model.calibrationCache[cacheKey];
+        }
 
         const calibrationSamples = shrinkPredictorSelectCalibrationSamples(model, observation);
         const candidates = shrinkPredictorBuildConfigSearchSpace(observation);
@@ -10253,6 +10311,7 @@
           config: candidates[0],
           backtest: shrinkPredictorBacktestConfig(model, calibrationSamples, candidates[0], observation)
         };
+        if (typeof onProgress === 'function') onProgress(1, candidates.length, best);
 
         for (let index = 1; index < candidates.length; index += 1) {
           const config = candidates[index];
@@ -10263,6 +10322,8 @@
           if (backtest.score < best.backtest.score || (sameScore && (betterSameStage || betterP70))) {
             best = { config, backtest };
           }
+          if (typeof onProgress === 'function') onProgress(index + 1, candidates.length, best);
+          if (index % 3 === 0) await shrinkPredictorYieldFrame();
         }
 
         const calibration = {
@@ -10752,8 +10813,10 @@
       }
 
       async function runShrinkPredictor() {
-        if (!currentShrinkPredictorContext) return;
+        if (!currentShrinkPredictorContext || shrinkPredictorIsRunning) return;
 
+        shrinkPredictorSetRunningState(true);
+        shrinkPredictorSetProgress(4, 'Reading selected circle...', true);
         shrinkPredictorSetStatus('Loading archived exact-ended training samples...');
         shrinkPredictorRenderResults(null);
 
@@ -10764,11 +10827,32 @@
             currentShrinkPredictorContext.radiusMeters,
             currentShrinkPredictorContext.featureProps
           );
+          const assessment = shrinkPredictorAssessObservation(observation);
+          if (!assessment.ok) {
+            shrinkPredictorSetProgress(100, 'Prediction unavailable', false);
+            shrinkPredictorSetStatus(assessment.reason, true);
+            shrinkPredictorResultsEl.innerHTML = `<div class="shrink-predictor-empty">${escapeHtml(assessment.reason)}</div>`;
+            clearShrinkPredictorOverlay();
+            return;
+          }
+
+          shrinkPredictorSetProgress(12, 'Loading archived exact-ended circles...', true);
+          await shrinkPredictorYieldFrame();
           const model = await shrinkPredictorLoadMlModel();
           shrinkPredictorRenderSummary(observation, model.entries?.length || 0);
+          shrinkPredictorSetProgress(28, 'Preparing algorithm search...', true);
           shrinkPredictorSetStatus('Backtesting algorithm profiles against archived exact-ended circles...');
-          const calibration = shrinkPredictorCalibrateModel(model, observation);
+          await shrinkPredictorYieldFrame();
+          const calibration = await shrinkPredictorCalibrateModel(model, observation, (done, total, best) => {
+            const ratio = total > 0 ? done / total : 1;
+            const percent = 28 + (ratio * 58);
+            const bestMean = Number(best?.backtest?.meanErrorMeters);
+            const bestText = Number.isFinite(bestMean) ? ` Best ${shrinkPredictorFormatDistance(bestMean)}.` : '';
+            shrinkPredictorSetProgress(percent, `Backtesting candidate algorithms ${done}/${total}.${bestText}`, true);
+          });
 
+          shrinkPredictorSetProgress(90, 'Building prediction overlay...', true);
+          await shrinkPredictorYieldFrame();
           const result = shrinkPredictorBuildResult(observation, model, calibration);
           if (!result) {
             shrinkPredictorSetStatus('Could not build a prediction from the selected circle.', true);
@@ -10777,6 +10861,7 @@
             return;
           }
 
+          shrinkPredictorSetProgress(100, 'Prediction ready', true);
           shrinkPredictorRenderResults(result);
           renderShrinkPredictorOverlay(result);
           if (result.mode === 'fallback') {
@@ -10795,10 +10880,18 @@
           clearShrinkPredictorOverlay();
           shrinkPredictorRenderResults(null);
           shrinkPredictorSetStatus(coinDbFriendlyError(error), true);
+        } finally {
+          shrinkPredictorSetRunningState(false);
         }
       }
 
       function openShrinkPredictorModal(fid, center, radiusMeters, feature, featureProps = {}) {
+        const previewObservation = shrinkPredictorFindCurrentObservation(fid, center, radiusMeters, featureProps);
+        const assessment = shrinkPredictorAssessObservation(previewObservation);
+        if (!assessment.ok) {
+          alert(assessment.reason);
+          return;
+        }
         currentShrinkPredictorContext = {
           fid: String(fid || ''),
           center: Array.isArray(center) ? center : null,
@@ -10809,19 +10902,23 @@
 
         shrinkPredictorModal?.classList.add('visible');
         appEl.classList.add('blocked-by-modal');
+        shrinkPredictorHideProgress();
         shrinkPredictorSetStatus('Preparing prediction...');
         runShrinkPredictor();
       }
 
       function closeShrinkPredictorModal() {
+        if (shrinkPredictorIsRunning) return;
         shrinkPredictorModal?.classList.remove('visible');
         appEl.classList.remove('blocked-by-modal');
+        shrinkPredictorHideProgress();
       }
 
       shrinkPredictorCloseBtn?.addEventListener('click', closeShrinkPredictorModal);
       shrinkPredictorRunBtn?.addEventListener('click', runShrinkPredictor);
       shrinkPredictorClearBtn?.addEventListener('click', () => {
         clearShrinkPredictorOverlay();
+        shrinkPredictorHideProgress();
         shrinkPredictorSetStatus('Prediction overlay cleared.');
       });
       shrinkPredictorModal?.addEventListener('click', (e) => {
