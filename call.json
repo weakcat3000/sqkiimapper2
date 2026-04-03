@@ -1,1 +1,0 @@
-{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "microsoft_outlook_find_emails", "arguments": {"instructions": "Get my very latest email", "output_hint": "id, subject, from, body, receivedDateTime", "searchValue": ""}}}

@@ -1,0 +1,13 @@
+# Top-level local runtime artifacts
+py-preview*.log
+vite-dev-*.log
+tmp_mainhunt*
+.vscode/
+
+# Archived local scratch output
+archive/local_run_logs/
+archive/mainhunt_reverse_engineering/
+
+# Nested project local-only output
+Sqkii Mapper 2/.local-preview/
+Sqkii Mapper 2/sqkii_mapper.log.*

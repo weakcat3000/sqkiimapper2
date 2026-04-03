@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { execSync } from 'node:child_process';
+import { resolve } from 'node:path';
 import pkg from './package.json' with { type: 'json' };
 
 let gitSha = '';
@@ -20,5 +21,11 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        htmReplica: resolve(__dirname, 'htm-circle-tool-replica.html'),
+      },
+    },
   },
 });
