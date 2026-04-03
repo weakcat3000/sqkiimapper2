@@ -9160,11 +9160,15 @@
       const shrinkPredictorSummaryEl = byId('shrink-predictor-summary');
       const shrinkPredictorResultsEl = byId('shrink-predictor-results');
       const SHRINK_PREDICTOR_SRC = 'shrink-predictor-src';
+      const SHRINK_PREDICTOR_ANCHOR_SRC = 'shrink-predictor-anchor-src';
       const SHRINK_PREDICTOR_MATCH_SRC = 'shrink-predictor-match-src';
       const SHRINK_PREDICTOR_LINE_SRC = 'shrink-predictor-line-src';
       const SHRINK_PREDICTOR_CONF_SRC = 'shrink-predictor-confidence-src';
+      const SHRINK_PREDICTOR_CONF_LINE_SRC = 'shrink-predictor-confidence-line-src';
       let currentShrinkPredictorContext = null;
       let shrinkPredictorLeafletLayer = null;
+      let shrinkPredictorSpinFrame = null;
+      let shrinkPredictorSpinState = null;
 
       function shrinkPredictorSetStatus(message, isError = false) {
         if (!shrinkPredictorStatusEl) return;
@@ -9216,6 +9220,95 @@
         const by = Number(b?.lat);
         if (![ax, ay, bx, by].every(Number.isFinite)) return NaN;
         return turf.distance([ax, ay], [bx, by], { units: 'kilometers' }) * 1000;
+      }
+
+      function shrinkPredictorBuildRotatingRing(centerLngLat, radiusMeters, rotationDegrees = 0, steps = 96) {
+        const lng = Number(centerLngLat?.[0]);
+        const lat = Number(centerLngLat?.[1]);
+        const radius = Number(radiusMeters);
+        if (![lng, lat, radius].every(Number.isFinite) || radius <= 0) return null;
+
+        const coordinates = [];
+        const stepCount = Math.max(24, Math.round(steps));
+        for (let index = 0; index <= stepCount; index += 1) {
+          const bearing = rotationDegrees + (index / stepCount) * 360;
+          const point = turf.destination([lng, lat], radius / 1000, bearing, { units: 'kilometers' });
+          coordinates.push(point.geometry.coordinates);
+        }
+
+        return {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates
+          }
+        };
+      }
+
+      function stopShrinkPredictorSpin() {
+        if (shrinkPredictorSpinFrame != null) {
+          try { cancelAnimationFrame(shrinkPredictorSpinFrame); } catch { }
+        }
+        shrinkPredictorSpinFrame = null;
+        shrinkPredictorSpinState = null;
+      }
+
+      function startShrinkPredictorSpin(centerLngLat, radiusMeters) {
+        stopShrinkPredictorSpin();
+        const lng = Number(centerLngLat?.[0]);
+        const lat = Number(centerLngLat?.[1]);
+        const radius = Number(radiusMeters);
+        if (![lng, lat, radius].every(Number.isFinite) || radius <= 0) return;
+
+        if (engine === 'gl' && mapgl?.getSource?.(SHRINK_PREDICTOR_CONF_LINE_SRC)) {
+          shrinkPredictorSpinState = {
+            mode: 'gl',
+            centerLngLat: [lng, lat],
+            radiusMeters: radius,
+            startedAt: performance.now()
+          };
+
+          const tick = (timestamp) => {
+            if (!shrinkPredictorSpinState || shrinkPredictorSpinState.mode !== 'gl') return;
+            const source = mapgl.getSource?.(SHRINK_PREDICTOR_CONF_LINE_SRC);
+            if (!source) {
+              stopShrinkPredictorSpin();
+              return;
+            }
+            const elapsed = timestamp - shrinkPredictorSpinState.startedAt;
+            const rotationDegrees = (elapsed * 0.022) % 360;
+            const ring = shrinkPredictorBuildRotatingRing(shrinkPredictorSpinState.centerLngLat, shrinkPredictorSpinState.radiusMeters, rotationDegrees);
+            if (ring) source.setData(ring);
+            shrinkPredictorSpinFrame = requestAnimationFrame(tick);
+          };
+
+          shrinkPredictorSpinFrame = requestAnimationFrame(tick);
+          return;
+        }
+
+        if (engine === 'leaf' && shrinkPredictorLeafletLayer?.__confidenceRing) {
+          shrinkPredictorSpinState = {
+            mode: 'leaf',
+            ring: shrinkPredictorLeafletLayer.__confidenceRing,
+            startedAt: performance.now()
+          };
+
+          const tick = (timestamp) => {
+            if (!shrinkPredictorSpinState || shrinkPredictorSpinState.mode !== 'leaf') return;
+            const ring = shrinkPredictorSpinState.ring;
+            if (!ring?.setStyle) {
+              stopShrinkPredictorSpin();
+              return;
+            }
+            const elapsed = timestamp - shrinkPredictorSpinState.startedAt;
+            const dashOffset = `${-((elapsed * 0.05) % 240)}px`;
+            ring.setStyle({ dashOffset });
+            shrinkPredictorSpinFrame = requestAnimationFrame(tick);
+          };
+
+          shrinkPredictorSpinFrame = requestAnimationFrame(tick);
+        }
       }
 
       function shrinkPredictorWeightedPercentile(values, weights, percentile = 0.7) {
@@ -9545,13 +9638,15 @@
       }
 
       function clearShrinkPredictorOverlay() {
+        stopShrinkPredictorSpin();
         if (typeof mapgl !== 'undefined' && mapgl) {
           for (const layerId of [
             'shrink-predictor-confidence-fill',
             'shrink-predictor-confidence-line',
             'shrink-predictor-line',
             'shrink-predictor-match-points',
-            'shrink-predictor-point'
+            'shrink-predictor-point',
+            'shrink-predictor-anchor-point'
           ]) {
             if (mapgl.getLayer?.(layerId)) {
               try { mapgl.removeLayer(layerId); } catch { }
@@ -9559,8 +9654,10 @@
           }
           for (const sourceId of [
             SHRINK_PREDICTOR_CONF_SRC,
+            SHRINK_PREDICTOR_CONF_LINE_SRC,
             SHRINK_PREDICTOR_LINE_SRC,
             SHRINK_PREDICTOR_MATCH_SRC,
+            SHRINK_PREDICTOR_ANCHOR_SRC,
             SHRINK_PREDICTOR_SRC
           ]) {
             if (mapgl.getSource?.(sourceId)) {
@@ -9581,6 +9678,7 @@
 
         const anchor = result.observedSteps[result.observedSteps.length - 1];
         const predictedLngLat = [result.predictedPoint.lng, result.predictedPoint.lat];
+        const anchorLngLat = [anchor.lng, anchor.lat];
         const matchFeatures = (result.matches || []).slice(0, 4).map((match, index) => ({
           type: 'Feature',
           properties: { index: index + 1 },
@@ -9595,6 +9693,7 @@
           }
         };
         const confidenceFeature = turf.circle(predictedLngLat, result.confidenceRadiusMeters, { steps: 72, units: 'meters' });
+        const confidenceLineFeature = shrinkPredictorBuildRotatingRing(predictedLngLat, result.confidenceRadiusMeters, 0, 96);
 
         if (engine === 'gl' && mapgl?.getStyle?.()) {
           if (!mapgl.getSource(SHRINK_PREDICTOR_SRC)) {
@@ -9609,6 +9708,21 @@
             mapgl.getSource(SHRINK_PREDICTOR_SRC).setData({
               type: 'FeatureCollection',
               features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: predictedLngLat } }]
+            });
+          }
+
+          if (!mapgl.getSource(SHRINK_PREDICTOR_ANCHOR_SRC)) {
+            mapgl.addSource(SHRINK_PREDICTOR_ANCHOR_SRC, {
+              type: 'geojson',
+              data: {
+                type: 'FeatureCollection',
+                features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: anchorLngLat } }]
+              }
+            });
+          } else {
+            mapgl.getSource(SHRINK_PREDICTOR_ANCHOR_SRC).setData({
+              type: 'FeatureCollection',
+              features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: anchorLngLat } }]
             });
           }
 
@@ -9630,6 +9744,12 @@
             mapgl.getSource(SHRINK_PREDICTOR_CONF_SRC).setData(confidenceFeature);
           }
 
+          if (!mapgl.getSource(SHRINK_PREDICTOR_CONF_LINE_SRC)) {
+            mapgl.addSource(SHRINK_PREDICTOR_CONF_LINE_SRC, { type: 'geojson', data: confidenceLineFeature });
+          } else if (confidenceLineFeature) {
+            mapgl.getSource(SHRINK_PREDICTOR_CONF_LINE_SRC).setData(confidenceLineFeature);
+          }
+
           if (!mapgl.getLayer('shrink-predictor-confidence-fill')) {
             mapgl.addLayer({
               id: 'shrink-predictor-confidence-fill',
@@ -9646,7 +9766,7 @@
             mapgl.addLayer({
               id: 'shrink-predictor-confidence-line',
               type: 'line',
-              source: SHRINK_PREDICTOR_CONF_SRC,
+              source: SHRINK_PREDICTOR_CONF_LINE_SRC,
               paint: {
                 'line-color': '#d8b4fe',
                 'line-width': 2,
@@ -9699,21 +9819,48 @@
               }
             });
           }
+
+          if (!mapgl.getLayer('shrink-predictor-anchor-point')) {
+            mapgl.addLayer({
+              id: 'shrink-predictor-anchor-point',
+              type: 'circle',
+              source: SHRINK_PREDICTOR_ANCHOR_SRC,
+              paint: {
+                'circle-radius': 5.5,
+                'circle-color': '#1d4ed8',
+                'circle-stroke-color': '#dbeafe',
+                'circle-stroke-width': 2,
+                'circle-opacity': 0.95
+              }
+            });
+          }
+
+          startShrinkPredictorSpin(predictedLngLat, result.confidenceRadiusMeters);
         } else if (engine === 'leaf' && mapleaf) {
           const layers = [];
-          layers.push(L.circle([result.predictedPoint.lat, result.predictedPoint.lng], {
+          const confidenceRing = L.circle([result.predictedPoint.lat, result.predictedPoint.lng], {
             radius: result.confidenceRadiusMeters,
             color: '#d8b4fe',
             weight: 2,
             opacity: 0.9,
             fillColor: '#c084fc',
-            fillOpacity: 0.14
-          }));
+            fillOpacity: 0.14,
+            dashArray: '8 6',
+            dashOffset: '0px'
+          });
+          layers.push(confidenceRing);
           layers.push(L.polyline([[anchor.lat, anchor.lng], [result.predictedPoint.lat, result.predictedPoint.lng]], {
             color: '#f5d0fe',
             weight: 2.5,
             opacity: 0.82,
             dashArray: '6 6'
+          }));
+          layers.push(L.circleMarker([anchor.lat, anchor.lng], {
+            radius: 5.5,
+            color: '#dbeafe',
+            weight: 2,
+            fillColor: '#1d4ed8',
+            fillOpacity: 0.95
           }));
           layers.push(L.circleMarker([result.predictedPoint.lat, result.predictedPoint.lng], {
             radius: 7,
@@ -9732,6 +9879,8 @@
             }));
           }
           shrinkPredictorLeafletLayer = L.layerGroup(layers).addTo(mapleaf);
+          shrinkPredictorLeafletLayer.__confidenceRing = confidenceRing;
+          startShrinkPredictorSpin(predictedLngLat, result.confidenceRadiusMeters);
         }
       }
 
