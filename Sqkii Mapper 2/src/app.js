@@ -9480,6 +9480,19 @@
         return nums.reduce((sum, value) => sum + value, 0) / nums.length;
       }
 
+      function shrinkPredictorWeightedMean(values = [], weights = []) {
+        const items = (Array.isArray(values) ? values : [])
+          .map((value, index) => ({
+            value: Number(value),
+            weight: Math.max(0, Number(weights?.[index]) || 0)
+          }))
+          .filter((item) => Number.isFinite(item.value) && item.weight > 0);
+        if (!items.length) return NaN;
+        const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
+        if (totalWeight <= 0) return NaN;
+        return items.reduce((sum, item) => sum + (item.value * item.weight), 0) / totalWeight;
+      }
+
       function shrinkPredictorResampleSeries(values = [], outLen = SHRINK_PREDICTOR_EMBED_LEN) {
         const nums = (Array.isArray(values) ? values : []).map((value) => Number(value)).filter(Number.isFinite);
         const safeOutLen = Math.max(2, Math.round(outLen));
@@ -9752,6 +9765,152 @@
           elapsedRatioLog: Math.abs(Math.log(safeSampleElapsed / safeQueryElapsed)),
           shrinkRateRatioLog: Math.abs(Math.log(safeSampleRate / safeQueryRate))
         };
+      }
+
+      function shrinkPredictorProfileDistance(queryProfile = {}, sampleProfile = {}) {
+        const metrics = shrinkPredictorCompareProfiles(queryProfile, sampleProfile);
+        return (
+          (metrics.radiusDelta * 3.2)
+          + (metrics.driftDelta * 2.2)
+          + (metrics.cadenceDelta * 1.25)
+          + (metrics.elapsedRatioLog * 1.75)
+          + (metrics.shrinkRateRatioLog * 1.55)
+        );
+      }
+
+      function shrinkPredictorBuildRecordMetrics(steps = [], exactCoords = null) {
+        const normalizedSteps = shrinkPredictorNormalizeSteps(steps);
+        if (!normalizedSteps.length) return null;
+        const origin = normalizedSteps[0];
+        const finalStep = normalizedSteps[normalizedSteps.length - 1];
+        const startRadiusMeters = Math.max(1, Number(origin.radiusMeters) || 1);
+        const floorRadiusMeters = Math.max(1, Number(finalStep.radiusMeters) || 1);
+        const shrinkableRadiusMeters = Math.max(1, startRadiusMeters - floorRadiusMeters);
+        const startTs = coinDbStepTimestamp(origin);
+        const endTs = coinDbStepTimestamp(finalStep);
+        const totalDurationSeconds = Number.isFinite(startTs) && Number.isFinite(endTs) && startTs < Number.MAX_SAFE_INTEGER && endTs < Number.MAX_SAFE_INTEGER
+          ? Math.max(0, (endTs - startTs) / 1000)
+          : Math.max(0, normalizedSteps.length - 1);
+        const totalDriftMeters = exactCoords
+          ? (shrinkPredictorMetersBetween(origin, { lat: Number(exactCoords.lat), lng: Number(exactCoords.lng) }) || 0)
+          : 0;
+        return {
+          startRadiusMeters,
+          floorRadiusMeters,
+          floorRadiusRatio: floorRadiusMeters / startRadiusMeters,
+          shrinkableRadiusMeters,
+          totalDurationSeconds,
+          totalDriftMeters
+        };
+      }
+
+      function shrinkPredictorEstimateFloorState(observedSteps = [], neighbors = []) {
+        const normalizedSteps = shrinkPredictorNormalizeSteps(observedSteps);
+        const origin = normalizedSteps[0];
+        const anchor = normalizedSteps[normalizedSteps.length - 1];
+        if (!origin || !anchor) return null;
+
+        const startRadiusMeters = Math.max(1, Number(origin.radiusMeters) || 1);
+        const anchorRadiusMeters = Math.max(1, Number(anchor.radiusMeters) || 1);
+        const weights = [];
+        const floorRatios = [];
+        const remainingProgresses = [];
+        const totalDurationRatios = [];
+
+        for (const neighbor of (Array.isArray(neighbors) ? neighbors : [])) {
+          const weight = Math.max(0.0001, Number(neighbor?.weight) || 0.0001);
+          const metrics = neighbor?.recordMetrics || {};
+          const floorRatio = Number(metrics.floorRadiusRatio);
+          if (Number.isFinite(floorRatio) && floorRatio > 0 && floorRatio < 1) {
+            weights.push(weight);
+            floorRatios.push(floorRatio);
+          }
+          const remainingProgress = Number(neighbor?.remainingProgress);
+          if (Number.isFinite(remainingProgress)) remainingProgresses.push({ value: remainingProgress, weight });
+          const totalDurationRatio = Number(neighbor?.totalDurationRatio);
+          if (Number.isFinite(totalDurationRatio)) totalDurationRatios.push({ value: totalDurationRatio, weight });
+        }
+
+        const estimatedFloorRatioRaw = shrinkPredictorWeightedMean(floorRatios, weights);
+        const estimatedFloorRatio = shrinkPredictorClamp(
+          Number.isFinite(estimatedFloorRatioRaw) ? estimatedFloorRatioRaw : 0.38,
+          0.08,
+          Math.max(0.09, (anchorRadiusMeters / startRadiusMeters) - 0.005)
+        );
+        const estimatedFloorRadiusMeters = Math.min(
+          anchorRadiusMeters * 0.995,
+          Math.max(12, startRadiusMeters * estimatedFloorRatio)
+        );
+        const shrinkableRadiusMeters = Math.max(1, startRadiusMeters - estimatedFloorRadiusMeters);
+        const observedShrinkMeters = Math.max(0, startRadiusMeters - anchorRadiusMeters);
+        const progressToFloor = shrinkPredictorClamp(observedShrinkMeters / shrinkableRadiusMeters, 0, 1);
+        const remainingProgress = Math.max(0, 1 - progressToFloor);
+        const sampleRemainingProgressMean = remainingProgresses.length
+          ? shrinkPredictorWeightedMean(remainingProgresses.map((item) => item.value), remainingProgresses.map((item) => item.weight))
+          : remainingProgress;
+        const totalDurationRatioMean = totalDurationRatios.length
+          ? shrinkPredictorWeightedMean(totalDurationRatios.map((item) => item.value), totalDurationRatios.map((item) => item.weight))
+          : 1;
+
+        return {
+          startRadiusMeters,
+          anchorRadiusMeters,
+          estimatedFloorRadiusMeters,
+          estimatedFloorRatio,
+          progressToFloor,
+          remainingProgress,
+          sampleRemainingProgressMean: Math.max(0.02, Number(sampleRemainingProgressMean) || remainingProgress || 0.02),
+          totalDurationRatioMean: Math.max(0.1, Number(totalDurationRatioMean) || 1)
+        };
+      }
+
+      function shrinkPredictorBuildCandidateSpots(anchor, centerPoint, neighbors = [], radiusMeters = 0) {
+        if (!anchor || !centerPoint) return [];
+        const safeRadiusMeters = Math.max(0, Number(radiusMeters) || 0);
+        const pointMap = new Map();
+        const sources = [
+          { point: centerPoint, weight: 1.35, source: 'heatmap' },
+          ...(Array.isArray(neighbors) ? neighbors.slice(0, 12).map((neighbor) => ({
+            point: neighbor.projectedPoint,
+            weight: Math.max(0.0001, Number(neighbor.weight) || 0.0001),
+            source: 'memory'
+          })) : [])
+        ];
+
+        for (const source of sources) {
+          const point = source?.point;
+          if (!point || !Number.isFinite(Number(point.lat)) || !Number.isFinite(Number(point.lng))) continue;
+          const distanceFromAnchor = shrinkPredictorMetersBetween(anchor, point) || 0;
+          if (safeRadiusMeters > 0 && distanceFromAnchor > safeRadiusMeters * 1.001) continue;
+          const key = `${Number(point.lat).toFixed(6)}:${Number(point.lng).toFixed(6)}`;
+          const current = pointMap.get(key);
+          if (current) {
+            current.seedWeight += source.weight;
+          } else {
+            pointMap.set(key, {
+              point: { lat: Number(point.lat), lng: Number(point.lng) },
+              seedWeight: source.weight,
+              source: source.source
+            });
+          }
+        }
+
+        const uniquePoints = Array.from(pointMap.values());
+        const ranked = uniquePoints.map((item) => {
+          const density = uniquePoints.reduce((sum, candidate) => {
+            const dist = shrinkPredictorMetersBetween(item.point, candidate.point) || 0;
+            return sum + (candidate.seedWeight / Math.max(14, dist));
+          }, 0);
+          const centerDistance = shrinkPredictorMetersBetween(item.point, centerPoint) || 0;
+          return {
+            ...item,
+            score: (density * 12) + (item.seedWeight * 4) + (item.source === 'heatmap' ? 3 : 0) - (centerDistance / Math.max(20, safeRadiusMeters || 20))
+          };
+        })
+          .sort((a, b) => b.score - a.score)
+          .map((item, index) => ({ ...item, rank: index + 1 }));
+
+        return ranked.slice(0, 5);
       }
 
       function shrinkPredictorIsStateAligned(queryProfile = {}, sampleProfile = {}, mode = 'exact') {
@@ -10095,7 +10254,8 @@
               const exactCoords = coinDbGetExactCoords(entry);
               const steps = shrinkPredictorNormalizeSteps(entry?.lifecycle || []);
               if (!exactCoords || steps.length < SHRINK_PREDICTOR_MIN_PREFIX_STEPS) return null;
-              return { entry, steps, exactCoords };
+              const recordMetrics = shrinkPredictorBuildRecordMetrics(steps, exactCoords);
+              return { entry, steps, exactCoords, recordMetrics };
             })
             .filter(Boolean);
 
@@ -10108,6 +10268,26 @@
               const metersPerDegLng = 111320.0 * Math.cos((Number(last?.lat) || 0) * Math.PI / 180);
               const offsetEastMeters = (Number(record.exactCoords.lng) - Number(last.lng)) * metersPerDegLng;
               const offsetNorthMeters = (Number(record.exactCoords.lat) - Number(last.lat)) * metersPerDegLat;
+              const prefixProfile = shrinkPredictorBuildSequenceProfile(prefix);
+              const startRadiusMeters = Math.max(1, Number(record.recordMetrics?.startRadiusMeters) || Number(prefix[0]?.radiusMeters) || 1);
+              const floorRadiusMeters = Math.max(1, Number(record.recordMetrics?.floorRadiusMeters) || Number(record.steps[record.steps.length - 1]?.radiusMeters) || 1);
+              const shrinkableRadiusMeters = Math.max(1, startRadiusMeters - floorRadiusMeters);
+              const progressToFloor = shrinkPredictorClamp(
+                (startRadiusMeters - Math.max(1, Number(last?.radiusMeters) || 1)) / shrinkableRadiusMeters,
+                0,
+                1
+              );
+              const remainingProgress = Math.max(0, 1 - progressToFloor);
+              const startTs = coinDbStepTimestamp(record.steps[0]);
+              const endTs = coinDbStepTimestamp(record.steps[record.steps.length - 1]);
+              const lastTs = coinDbStepTimestamp(last);
+              const totalDurationSeconds = Number(record.recordMetrics?.totalDurationSeconds) || 0;
+              const elapsedSeconds = Number.isFinite(startTs) && Number.isFinite(lastTs) && startTs < Number.MAX_SAFE_INTEGER && lastTs < Number.MAX_SAFE_INTEGER
+                ? Math.max(0, (lastTs - startTs) / 1000)
+                : Math.max(0, end - 1);
+              const remainingDurationSeconds = Number.isFinite(endTs) && Number.isFinite(lastTs) && endTs < Number.MAX_SAFE_INTEGER && lastTs < Number.MAX_SAFE_INTEGER
+                ? Math.max(0, (endTs - lastTs) / 1000)
+                : Math.max(0, totalDurationSeconds - elapsedSeconds);
               samples.push({
                 sampleId: `${record.entry.id}:${end}`,
                 entry: record.entry,
@@ -10116,7 +10296,12 @@
                 exactCoords: record.exactCoords,
                 prefixLen: end,
                 totalSteps: record.steps.length,
-                profile: shrinkPredictorBuildSequenceProfile(prefix),
+                profile: prefixProfile,
+                recordMetrics: record.recordMetrics,
+                progressToFloor,
+                remainingProgress,
+                totalDurationRatio: totalDurationSeconds > 0 ? (elapsedSeconds / totalDurationSeconds) : progressToFloor,
+                remainingDurationSeconds,
                 output: [offsetEastMeters, offsetNorthMeters],
                 outputNorm: [
                   offsetEastMeters / Math.max(1, Number(last?.radiusMeters) || 1),
@@ -10329,11 +10514,37 @@
           { weight: Number(blendWeights.shape) || 0.28, neighbors: shapeModel.neighbors },
           { weight: Number(blendWeights.motion) || 0.2, neighbors: motionModel.neighbors }
         ]);
-        const uncertaintyMeters = Math.max(12, modelStd + fullModel.spread);
+        const floorState = shrinkPredictorEstimateFloorState(observedSteps, blendedNeighbors);
+        const progressScale = floorState
+          ? shrinkPredictorClamp(
+            (Number(floorState.remainingProgress) || 0.02) / Math.max(0.02, Number(floorState.sampleRemainingProgressMean) || 0.02),
+            0.65,
+            1.45
+          )
+          : 1;
+        const scaledMeanOffset = [
+          meanOffset[0] * progressScale,
+          meanOffset[1] * progressScale
+        ];
+        const scaledNeighbors = blendedNeighbors.map((neighbor) => {
+          const output = [
+            (Number(neighbor.output?.[0]) || 0) * progressScale,
+            (Number(neighbor.output?.[1]) || 0) * progressScale
+          ];
+          return {
+            ...neighbor,
+            scaledOutput: output,
+            projectedPoint: shrinkPredictorDestination(anchor, output[0], output[1]) || { lat: anchor.lat, lng: anchor.lng }
+          };
+        });
+        const uncertaintyMeters = Math.max(12, (modelStd * progressScale) + fullModel.spread);
         const agreement = 1 / (1 + modelStd / 80);
-        const heatmapPeak = shrinkPredictorComputeHeatmapPeak(blendedNeighbors, meanOffset, anchor.radiusMeters, uncertaintyMeters);
+        const heatmapPeak = shrinkPredictorComputeHeatmapPeak(scaledNeighbors, scaledMeanOffset, anchor.radiusMeters, uncertaintyMeters);
         const boundedPeakOffset = shrinkPredictorClampOffsetToCircle(heatmapPeak.peakOffset, anchor.radiusMeters);
-        const predictedPoint = shrinkPredictorDestination(anchor, boundedPeakOffset[0], boundedPeakOffset[1]) || { lat: anchor.lat, lng: anchor.lng };
+        const rawPredictedPoint = shrinkPredictorDestination(anchor, boundedPeakOffset[0], boundedPeakOffset[1]) || { lat: anchor.lat, lng: anchor.lng };
+        const candidateSpots = shrinkPredictorBuildCandidateSpots(anchor, rawPredictedPoint, scaledNeighbors, anchor.radiusMeters);
+        const predictedPoint = candidateSpots[0]?.point || rawPredictedPoint;
+        const predictedOffsetMeters = shrinkPredictorSignedOffsetMeters(anchor, predictedPoint);
 
         return {
           anchor,
@@ -10341,12 +10552,15 @@
           fullModel,
           shapeModel,
           motionModel,
-          blendedNeighbors,
+          blendedNeighbors: scaledNeighbors,
           agreement,
           uncertaintyMeters,
           heatmapPeak,
           predictedPoint,
-          predictedOffsetMeters: boundedPeakOffset,
+          predictedOffsetMeters: [predictedOffsetMeters.east, predictedOffsetMeters.north],
+          progressScale,
+          floorState,
+          candidateSpots,
           modelCount: ensemblePredictions.length,
           roomScope: fullModel.roomScope,
           stageScope: fullModel.stageScope
@@ -10357,35 +10571,66 @@
         const samples = Array.isArray(calibrationSelection?.samples)
           ? calibrationSelection.samples
           : (Array.isArray(calibrationSelection) ? calibrationSelection : []);
-        const errors = [];
+        const coinErrors = [];
         const exactStateErrors = [];
         const nearStateErrors = [];
-        const byEntry = new Set();
         const targetProfile = shrinkPredictorBuildSequenceProfile(observation?.observedSteps || []);
+        const byEntry = new Map();
 
         for (const sample of samples) {
-          const observation = {
-            observedSteps: sample.prefix,
-            matchedGroup: { roomCode: sample.roomCode || '' }
-          };
-          const solved = shrinkPredictorSolveCore(observation, model, {
-            config,
-            roomCode: sample.roomCode || '',
-            excludeEntryId: sample.entry?.id
-          });
-          if (!solved?.predictedOffsetMeters) continue;
-          const errorMeters = Math.hypot(
-            (Number(solved.predictedOffsetMeters[0]) || 0) - (Number(sample.output?.[0]) || 0),
-            (Number(solved.predictedOffsetMeters[1]) || 0) - (Number(sample.output?.[1]) || 0)
-          );
-          if (!Number.isFinite(errorMeters)) continue;
-          errors.push(errorMeters);
-          if (shrinkPredictorIsStateAligned(targetProfile, sample.profile || {}, 'exact')) exactStateErrors.push(errorMeters);
-          if (shrinkPredictorIsStateAligned(targetProfile, sample.profile || {}, 'near')) nearStateErrors.push(errorMeters);
-          if (sample.entry?.id) byEntry.add(String(sample.entry.id));
+          const entryId = String(sample?.entry?.id || '');
+          if (!entryId) continue;
+          if (!byEntry.has(entryId)) byEntry.set(entryId, []);
+          byEntry.get(entryId).push(sample);
         }
 
-        if (!errors.length) {
+        for (const [entryId, entrySamples] of byEntry.entries()) {
+          const weightedErrors = [];
+          const weightedStateErrors = [];
+          for (const sample of entrySamples) {
+            const sampleObservation = {
+              observedSteps: sample.prefix,
+              matchedGroup: { roomCode: sample.roomCode || '' }
+            };
+            const solved = shrinkPredictorSolveCore(sampleObservation, model, {
+              config,
+              roomCode: sample.roomCode || '',
+              excludeEntryId: entryId
+            });
+            if (!solved?.predictedOffsetMeters) continue;
+            const errorMeters = Math.hypot(
+              (Number(solved.predictedOffsetMeters[0]) || 0) - (Number(sample.output?.[0]) || 0),
+              (Number(solved.predictedOffsetMeters[1]) || 0) - (Number(sample.output?.[1]) || 0)
+            );
+            if (!Number.isFinite(errorMeters)) continue;
+            const stateDistance = shrinkPredictorProfileDistance(targetProfile, sample.profile || {});
+            const stateWeight = 1 / Math.max(0.2, 0.5 + (stateDistance * 2.4));
+            weightedErrors.push({ value: errorMeters, weight: stateWeight });
+            if (shrinkPredictorIsStateAligned(targetProfile, sample.profile || {}, 'exact')) exactStateErrors.push(errorMeters);
+            if (shrinkPredictorIsStateAligned(targetProfile, sample.profile || {}, 'near')) nearStateErrors.push(errorMeters);
+            if (shrinkPredictorIsStateAligned(targetProfile, sample.profile || {}, 'near')) {
+              weightedStateErrors.push({ value: errorMeters, weight: stateWeight * 1.2 });
+            }
+          }
+          if (!weightedErrors.length) continue;
+          const coinWeightedMean = shrinkPredictorWeightedMean(
+            weightedErrors.map((item) => item.value),
+            weightedErrors.map((item) => item.weight)
+          );
+          const coinStateMean = weightedStateErrors.length
+            ? shrinkPredictorWeightedMean(
+              weightedStateErrors.map((item) => item.value),
+              weightedStateErrors.map((item) => item.weight)
+            )
+            : coinWeightedMean;
+          coinErrors.push({
+            entryId,
+            meanErrorMeters: coinWeightedMean,
+            stateMeanErrorMeters: coinStateMean
+          });
+        }
+
+        if (!coinErrors.length) {
           return {
             score: Number.POSITIVE_INFINITY,
             meanErrorMeters: Infinity,
@@ -10396,12 +10641,14 @@
           };
         }
 
-        const weights = errors.map(() => 1);
-        const meanErrorMeters = shrinkPredictorMean(errors) || Infinity;
-        const medianErrorMeters = shrinkPredictorWeightedPercentile(errors, weights, 0.5) || Infinity;
-        const p70ErrorMeters = shrinkPredictorWeightedPercentile(errors, weights, 0.7) || Infinity;
+        const perCoinMeans = coinErrors.map((item) => item.meanErrorMeters);
+        const perCoinStateMeans = coinErrors.map((item) => item.stateMeanErrorMeters);
+        const weights = perCoinMeans.map(() => 1);
+        const meanErrorMeters = shrinkPredictorMean(perCoinMeans) || Infinity;
+        const medianErrorMeters = shrinkPredictorWeightedPercentile(perCoinMeans, weights, 0.5) || Infinity;
+        const p70ErrorMeters = shrinkPredictorWeightedPercentile(perCoinMeans, weights, 0.7) || Infinity;
         const exactStateMeanErrorMeters = exactStateErrors.length ? (shrinkPredictorMean(exactStateErrors) || Infinity) : Infinity;
-        const nearStateMeanErrorMeters = nearStateErrors.length ? (shrinkPredictorMean(nearStateErrors) || Infinity) : Infinity;
+        const nearStateMeanErrorMeters = perCoinStateMeans.length ? (shrinkPredictorMean(perCoinStateMeans) || Infinity) : (nearStateErrors.length ? (shrinkPredictorMean(nearStateErrors) || Infinity) : Infinity);
         return {
           score: meanErrorMeters,
           meanErrorMeters,
@@ -10409,8 +10656,8 @@
           p70ErrorMeters,
           exactStateMeanErrorMeters,
           nearStateMeanErrorMeters,
-          sampleCount: errors.length,
-          entryCount: byEntry.size
+          sampleCount: samples.length,
+          entryCount: coinErrors.length
         };
       }
 
@@ -10543,7 +10790,8 @@
         if (!solved) return null;
 
         const matches = solved.blendedNeighbors.slice(0, 8).map((neighbor) => {
-          const projectedPoint = shrinkPredictorDestination(anchor, neighbor.output[0], neighbor.output[1]) || solved.predictedPoint;
+          const projectedOffset = Array.isArray(neighbor.scaledOutput) ? neighbor.scaledOutput : neighbor.output;
+          const projectedPoint = shrinkPredictorDestination(anchor, projectedOffset[0], projectedOffset[1]) || solved.predictedPoint;
           return {
             history: {
               entry: neighbor.entry,
@@ -10554,10 +10802,10 @@
             score: neighbor.weight,
             predictedPoint: projectedPoint,
             projectedOffset: {
-              east: neighbor.output[0],
-              north: neighbor.output[1]
+              east: projectedOffset[0],
+              north: projectedOffset[1]
             },
-            remainingDistanceMeters: Math.hypot(neighbor.output[0], neighbor.output[1]),
+            remainingDistanceMeters: Math.hypot(projectedOffset[0], projectedOffset[1]),
             prefixLen: neighbor.prefixLen,
             totalSteps: neighbor.totalSteps,
             distance: neighbor.distance
@@ -10607,6 +10855,9 @@
           rawConfidenceRadiusMeters,
           confidenceCenterPoint,
           confidenceUsesCurrentCircle,
+          candidateSpots: solved.candidateSpots || [],
+          estimatedFloorRadiusMeters: Number(solved.floorState?.estimatedFloorRadiusMeters) || 0,
+          progressToFloor: Number(solved.floorState?.progressToFloor) || 0,
           matches,
           bestScore: matches[0]?.score || 0,
           agreement: solved.agreement,
@@ -10663,14 +10914,39 @@
         const confidenceAreaLine = result.confidenceUsesCurrentCircle
           ? `Confidence area capped to the current live circle (${shrinkPredictorFormatDistance(result.currentRadiusMeters)} radius).`
           : `Confidence ${confidenceLabel}${Number.isFinite(uncertaintyMeters) ? `, uncertainty +/-${Math.round(uncertaintyMeters)}m` : ''}.`;
+        const progressPct = Math.round(shrinkPredictorClamp(Number(result.progressToFloor) || 0, 0, 1) * 100);
         const summaryLines = [
           `Based on ${result.trainingSampleCount || 0} archived prefix samples from ${result.trainingCoinCount || 0} exact-ended coins.`,
           `Searched ${result.calibration?.candidateCount || 0} candidate settings in ${result.calibration?.searchPasses || 1} pass${(result.calibration?.searchPasses || 1) === 1 ? '' : 'es'}.`,
           Number.isFinite(backtestMean)
             ? `Best backtest mean error ${shrinkPredictorFormatDistance(backtestMean)}${Number.isFinite(backtestExactStateMean) ? `, state-aligned ${shrinkPredictorFormatDistance(backtestExactStateMean)}` : ''}.`
             : `Best historical match score ${bestMatch ? bestMatch.score.toFixed(2) : 'n/a'}.`,
+          Number.isFinite(result.estimatedFloorRadiusMeters) && result.estimatedFloorRadiusMeters > 0
+            ? `Estimated floor radius ${shrinkPredictorFormatDistance(result.estimatedFloorRadiusMeters)}, current progress ${progressPct}% toward floor.`
+            : 'Estimated floor radius unavailable from current historical neighbors.',
           `${confidenceAreaLine}${result.confidenceUsesCurrentCircle && Number.isFinite(uncertaintyMeters) ? ` Raw model uncertainty +/-${Math.round(uncertaintyMeters)}m.` : ''}`
         ];
+        const candidateHtml = result.candidateSpots?.length
+          ? `
+            <section class="shrink-predictor-matches">
+              <h4>Top Candidate Spots</h4>
+              <div class="shrink-predictor-match-list">
+                ${result.candidateSpots.map((spot) => `
+                  <div class="shrink-predictor-match">
+                    <div class="shrink-predictor-match-top">
+                      <div class="shrink-predictor-match-title">${spot.rank}. Candidate Spot</div>
+                      <span class="shrink-predictor-match-score">${Math.round(Math.max(1, Math.min(99, spot.score * 4)))}% fit</span>
+                    </div>
+                    <div class="shrink-predictor-match-meta">
+                      <span>${escapeHtml(`${coinDbFormatCoord(spot.point.lat)}, ${coinDbFormatCoord(spot.point.lng)}`)}</span>
+                      <span>${spot.source === 'heatmap' ? 'Heatmap peak' : 'Historical cluster'}</span>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </section>
+          `
+          : '';
 
         const matchHtml = result.matches.length
           ? result.matches.map((match, index) => {
@@ -10727,6 +11003,7 @@
             </div>
             ${backtestProfile ? `<div class="shrink-predictor-note">Algorithm: ${escapeHtml(backtestProfile)}${Number.isFinite(backtestMedian) ? `. Median error ${escapeHtml(shrinkPredictorFormatDistance(backtestMedian))}` : ''}.</div>` : ''}
           </section>
+          ${candidateHtml}
           <section class="shrink-predictor-matches">
             <h4>${result.matches.length ? 'Closest Historical Matches' : 'Historical Matches'}</h4>
             <div class="shrink-predictor-match-list">${matchHtml}</div>
