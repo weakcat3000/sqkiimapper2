@@ -10584,9 +10584,19 @@
             (matches[0]?.remainingDistanceMeters || 0) * 0.14
           )
         );
-        const confidenceRadiusMeters = insideCurrentCircleMax > 0
-          ? Math.min(rawConfidenceRadiusMeters, insideCurrentCircleMax * 0.998)
+        const currentRadiusMeters = Number(anchor.radiusMeters) || 0;
+        const maxInnerConfidenceRadius = insideCurrentCircleMax > 0
+          ? insideCurrentCircleMax * 0.998
           : 0;
+        const confidenceUsesCurrentCircle = currentRadiusMeters > 0 && rawConfidenceRadiusMeters > maxInnerConfidenceRadius;
+        const confidenceRadiusMeters = confidenceUsesCurrentCircle
+          ? currentRadiusMeters
+          : (insideCurrentCircleMax > 0
+            ? Math.min(rawConfidenceRadiusMeters, maxInnerConfidenceRadius)
+            : 0);
+        const confidenceCenterPoint = confidenceUsesCurrentCircle
+          ? { lat: anchor.lat, lng: anchor.lng }
+          : solved.predictedPoint;
 
         return {
           mode: 'ml',
@@ -10594,11 +10604,14 @@
           observedSteps,
           predictedPoint: solved.predictedPoint,
           confidenceRadiusMeters,
+          rawConfidenceRadiusMeters,
+          confidenceCenterPoint,
+          confidenceUsesCurrentCircle,
           matches,
           bestScore: matches[0]?.score || 0,
           agreement: solved.agreement,
           uncertaintyMeters: solved.uncertaintyMeters,
-          currentRadiusMeters: Number(anchor.radiusMeters) || 0,
+          currentRadiusMeters,
           peakOffsetMeters: solved.predictedOffsetMeters,
           modelCount: solved.modelCount,
           trainingSampleCount: model.samples.length,
@@ -10647,13 +10660,16 @@
         const backtestExactStateMean = Number(result.calibration?.backtest?.exactStateMeanErrorMeters);
         const backtestProfile = result.calibration?.config?.label || result.calibration?.config?.id || '';
         const uncertaintyMeters = Number(result.uncertaintyMeters);
+        const confidenceAreaLine = result.confidenceUsesCurrentCircle
+          ? `Confidence area capped to the current live circle (${shrinkPredictorFormatDistance(result.currentRadiusMeters)} radius).`
+          : `Confidence ${confidenceLabel}${Number.isFinite(uncertaintyMeters) ? `, uncertainty +/-${Math.round(uncertaintyMeters)}m` : ''}.`;
         const summaryLines = [
           `Based on ${result.trainingSampleCount || 0} archived prefix samples from ${result.trainingCoinCount || 0} exact-ended coins.`,
           `Searched ${result.calibration?.candidateCount || 0} candidate settings in ${result.calibration?.searchPasses || 1} pass${(result.calibration?.searchPasses || 1) === 1 ? '' : 'es'}.`,
           Number.isFinite(backtestMean)
             ? `Best backtest mean error ${shrinkPredictorFormatDistance(backtestMean)}${Number.isFinite(backtestExactStateMean) ? `, state-aligned ${shrinkPredictorFormatDistance(backtestExactStateMean)}` : ''}.`
             : `Best historical match score ${bestMatch ? bestMatch.score.toFixed(2) : 'n/a'}.`,
-          `Confidence ${confidenceLabel}${Number.isFinite(uncertaintyMeters) ? `, uncertainty +/-${Math.round(uncertaintyMeters)}m` : ''}.`
+          `${confidenceAreaLine}${result.confidenceUsesCurrentCircle && Number.isFinite(uncertaintyMeters) ? ` Raw model uncertainty +/-${Math.round(uncertaintyMeters)}m.` : ''}`
         ];
 
         const matchHtml = result.matches.length
@@ -10685,8 +10701,8 @@
                 <span class="shrink-predictor-stat-value">${escapeHtml(predictedCoordText)}</span>
               </div>
               <div class="shrink-predictor-stat">
-                <span class="shrink-predictor-stat-label">Confidence Radius</span>
-                <span class="shrink-predictor-stat-value">${escapeHtml(shrinkPredictorFormatDistance(result.confidenceRadiusMeters))}</span>
+                <span class="shrink-predictor-stat-label">${result.confidenceUsesCurrentCircle ? 'Confidence Area' : 'Confidence Radius'}</span>
+                <span class="shrink-predictor-stat-value">${escapeHtml(result.confidenceUsesCurrentCircle ? `Current circle (${shrinkPredictorFormatDistance(result.currentRadiusMeters)})` : shrinkPredictorFormatDistance(result.confidenceRadiusMeters))}</span>
               </div>
               <div class="shrink-predictor-stat">
                 <span class="shrink-predictor-stat-label">Confidence</span>
@@ -10761,14 +10777,18 @@
         const anchor = result.observedSteps[result.observedSteps.length - 1];
         const predictedLngLat = [result.predictedPoint.lng, result.predictedPoint.lat];
         const anchorLngLat = [anchor.lng, anchor.lat];
+        const confidenceCenterLngLat = [
+          Number(result.confidenceCenterPoint?.lng) || predictedLngLat[0],
+          Number(result.confidenceCenterPoint?.lat) || predictedLngLat[1]
+        ];
         const matchFeatures = (result.matches || []).slice(0, 4).map((match, index) => ({
           type: 'Feature',
           properties: { index: index + 1 },
           geometry: { type: 'Point', coordinates: [match.predictedPoint.lng, match.predictedPoint.lat] }
         }));
         const lineFeature = shrinkPredictorBuildArrowLines(anchorLngLat, predictedLngLat);
-        const confidenceFeature = turf.circle(predictedLngLat, result.confidenceRadiusMeters, { steps: 72, units: 'meters' });
-        const confidenceLineFeature = shrinkPredictorBuildDottedRing(predictedLngLat, result.confidenceRadiusMeters, 0);
+        const confidenceFeature = turf.circle(confidenceCenterLngLat, result.confidenceRadiusMeters, { steps: 72, units: 'meters' });
+        const confidenceLineFeature = shrinkPredictorBuildDottedRing(confidenceCenterLngLat, result.confidenceRadiusMeters, 0);
 
         if (engine === 'gl' && mapgl?.getStyle?.()) {
           if (!mapgl.getSource(SHRINK_PREDICTOR_SRC)) {
@@ -10932,10 +10952,10 @@
             });
           }
 
-          startShrinkPredictorSpin(predictedLngLat, result.confidenceRadiusMeters);
+          startShrinkPredictorSpin(confidenceCenterLngLat, result.confidenceRadiusMeters);
         } else if (engine === 'leaf' && mapleaf) {
           const layers = [];
-          const confidenceRing = L.circle([result.predictedPoint.lat, result.predictedPoint.lng], {
+          const confidenceRing = L.circle([confidenceCenterLngLat[1], confidenceCenterLngLat[0]], {
             radius: result.confidenceRadiusMeters,
             color: '#d8b4fe',
             weight: 2,
@@ -11004,7 +11024,7 @@
           }
           shrinkPredictorLeafletLayer = L.layerGroup(layers).addTo(mapleaf);
           shrinkPredictorLeafletLayer.__confidenceRingSegments = confidenceSegments;
-          startShrinkPredictorSpin(predictedLngLat, result.confidenceRadiusMeters);
+          startShrinkPredictorSpin(confidenceCenterLngLat, result.confidenceRadiusMeters);
         }
       }
 
