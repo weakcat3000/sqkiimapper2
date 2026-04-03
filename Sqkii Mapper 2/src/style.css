@@ -1675,6 +1675,27 @@
       white-space: pre-wrap;
     }
 
+    .shrink-predictor-summary-box {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(96, 165, 250, 0.08);
+      border: 1px solid rgba(96, 165, 250, 0.18);
+    }
+
+    .shrink-predictor-summary-box h5 {
+      margin: 0;
+      font-size: 13px;
+      color: #dbeafe;
+    }
+
+    .shrink-predictor-summary-line {
+      font-size: 12px;
+      line-height: 1.45;
+      color: #dbeafe;
+    }
+
     .shrink-predictor-matches {
       display: grid;
       gap: 10px;

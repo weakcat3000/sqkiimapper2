@@ -9703,7 +9703,10 @@
             anchorRadiusMeters: 0,
             radiusRatio: 0,
             driftRatio: 0,
-            meanStepDistanceRatio: 0
+            meanStepDistanceRatio: 0,
+            elapsedSeconds: 0,
+            elapsedPerRadius: 0,
+            shrinkRateNorm: 0
           };
         }
 
@@ -9715,6 +9718,14 @@
         const stepDistances = normalizedSteps.slice(1).map((step, index) => (
           shrinkPredictorMetersBetween(normalizedSteps[index], step) || 0
         ));
+        const startTs = coinDbStepTimestamp(origin);
+        const anchorTs = coinDbStepTimestamp(anchor);
+        const elapsedSeconds = Number.isFinite(startTs) && Number.isFinite(anchorTs) && startTs < Number.MAX_SAFE_INTEGER && anchorTs < Number.MAX_SAFE_INTEGER
+          ? Math.max(0, (anchorTs - startTs) / 1000)
+          : Math.max(0, normalizedSteps.length - 1);
+        const elapsedPerRadius = elapsedSeconds / startRadiusMeters;
+        const shrunkFraction = Math.max(0, 1 - (anchorRadiusMeters / startRadiusMeters));
+        const shrinkRateNorm = shrunkFraction / Math.max(elapsedSeconds / 3600, 1 / 60);
 
         return {
           stepCount: normalizedSteps.length,
@@ -9722,8 +9733,40 @@
           anchorRadiusMeters,
           radiusRatio: anchorRadiusMeters / startRadiusMeters,
           driftRatio: driftMeters / startRadiusMeters,
-          meanStepDistanceRatio: (shrinkPredictorMean(stepDistances) || 0) / startRadiusMeters
+          meanStepDistanceRatio: (shrinkPredictorMean(stepDistances) || 0) / startRadiusMeters,
+          elapsedSeconds,
+          elapsedPerRadius,
+          shrinkRateNorm
         };
+      }
+
+      function shrinkPredictorCompareProfiles(queryProfile = {}, sampleProfile = {}) {
+        const safeQueryElapsed = Math.max(1e-6, Number(queryProfile.elapsedPerRadius) || 1e-6);
+        const safeSampleElapsed = Math.max(1e-6, Number(sampleProfile.elapsedPerRadius) || 1e-6);
+        const safeQueryRate = Math.max(1e-6, Number(queryProfile.shrinkRateNorm) || 1e-6);
+        const safeSampleRate = Math.max(1e-6, Number(sampleProfile.shrinkRateNorm) || 1e-6);
+        return {
+          radiusDelta: Math.abs((Number(sampleProfile.radiusRatio) || 0) - (Number(queryProfile.radiusRatio) || 0)),
+          driftDelta: Math.abs((Number(sampleProfile.driftRatio) || 0) - (Number(queryProfile.driftRatio) || 0)),
+          cadenceDelta: Math.abs((Number(sampleProfile.meanStepDistanceRatio) || 0) - (Number(queryProfile.meanStepDistanceRatio) || 0)),
+          elapsedRatioLog: Math.abs(Math.log(safeSampleElapsed / safeQueryElapsed)),
+          shrinkRateRatioLog: Math.abs(Math.log(safeSampleRate / safeQueryRate))
+        };
+      }
+
+      function shrinkPredictorIsStateAligned(queryProfile = {}, sampleProfile = {}, mode = 'exact') {
+        const metrics = shrinkPredictorCompareProfiles(queryProfile, sampleProfile);
+        if (mode === 'exact') {
+          return metrics.radiusDelta <= 0.075
+            && metrics.elapsedRatioLog <= 0.65
+            && metrics.shrinkRateRatioLog <= 0.85;
+        }
+        if (mode === 'near') {
+          return metrics.radiusDelta <= 0.14
+            && metrics.elapsedRatioLog <= 1.0
+            && metrics.shrinkRateRatioLog <= 1.2;
+        }
+        return true;
       }
 
       function shrinkPredictorNormalizeWeightMap(map = {}, fallback = {}) {
@@ -9738,7 +9781,7 @@
           {
             id: 'algo-balanced',
             label: 'Balanced',
-            penalties: { radius: 3.2, drift: 2.2, cadence: 1.25, size: 1.45, stage: 1.85 },
+            penalties: { radius: 3.2, drift: 2.2, cadence: 1.25, size: 1.45, duration: 1.75, shrinkRate: 1.55 },
             roomFactor: 0.84,
             ensemble: { fullRaw: 0.22, fullScaled: 0.28, shapeRaw: 0.15, shapeScaled: 0.19, motionRaw: 0.07, motionScaled: 0.09 },
             blend: { full: 0.52, shape: 0.28, motion: 0.2 }
@@ -9746,7 +9789,7 @@
           {
             id: 'algo-scaled',
             label: 'Scaled',
-            penalties: { radius: 4.3, drift: 2.6, cadence: 1.0, size: 1.8, stage: 1.95 },
+            penalties: { radius: 4.3, drift: 2.6, cadence: 1.0, size: 1.8, duration: 1.95, shrinkRate: 1.7 },
             roomFactor: 0.82,
             ensemble: { fullRaw: 0.14, fullScaled: 0.34, shapeRaw: 0.1, shapeScaled: 0.24, motionRaw: 0.05, motionScaled: 0.13 },
             blend: { full: 0.46, shape: 0.34, motion: 0.2 }
@@ -9754,7 +9797,7 @@
           {
             id: 'algo-shape',
             label: 'Shape-first',
-            penalties: { radius: 4.8, drift: 3.1, cadence: 1.4, size: 1.6, stage: 2.15 },
+            penalties: { radius: 4.8, drift: 3.1, cadence: 1.4, size: 1.6, duration: 2.05, shrinkRate: 1.8 },
             roomFactor: 0.86,
             ensemble: { fullRaw: 0.16, fullScaled: 0.23, shapeRaw: 0.2, shapeScaled: 0.24, motionRaw: 0.05, motionScaled: 0.12 },
             blend: { full: 0.35, shape: 0.45, motion: 0.2 }
@@ -9762,7 +9805,7 @@
           {
             id: 'algo-room',
             label: 'Room-aware',
-            penalties: { radius: 3.0, drift: 2.0, cadence: 1.1, size: 1.35, stage: 1.8 },
+            penalties: { radius: 3.0, drift: 2.0, cadence: 1.1, size: 1.35, duration: 1.65, shrinkRate: 1.5 },
             roomFactor: 0.74,
             ensemble: { fullRaw: 0.2, fullScaled: 0.27, shapeRaw: 0.13, shapeScaled: 0.18, motionRaw: 0.08, motionScaled: 0.14 },
             blend: { full: 0.58, shape: 0.22, motion: 0.2 }
@@ -9770,7 +9813,7 @@
           {
             id: 'algo-drift',
             label: 'Drift-first',
-            penalties: { radius: 2.6, drift: 3.8, cadence: 1.55, size: 1.2, stage: 1.9 },
+            penalties: { radius: 2.6, drift: 3.8, cadence: 1.55, size: 1.2, duration: 1.6, shrinkRate: 1.9 },
             roomFactor: 0.84,
             ensemble: { fullRaw: 0.24, fullScaled: 0.23, shapeRaw: 0.12, shapeScaled: 0.16, motionRaw: 0.1, motionScaled: 0.15 },
             blend: { full: 0.42, shape: 0.22, motion: 0.36 }
@@ -9796,12 +9839,16 @@
 
       function shrinkPredictorBuildConfigSearchSpace(observation) {
         const stepCount = Math.max(0, Number(observation?.observedSteps?.length) || 0);
-        const sameStageBias = stepCount >= 4 ? 2.25 : (stepCount === 3 ? 2.0 : 1.75);
         const roomBiases = [0.72, 0.82, 0.92];
-        const stageBiases = [
-          Math.max(1.2, sameStageBias - 0.35),
-          sameStageBias,
-          sameStageBias + 0.35
+        const durationBiases = [
+          stepCount >= 15 ? 1.5 : 1.35,
+          stepCount >= 15 ? 1.8 : 1.6,
+          stepCount >= 15 ? 2.1 : 1.85
+        ];
+        const shrinkRateBiases = [
+          1.35,
+          1.65,
+          1.95
         ];
         const scaleModes = [
           { suffix: 'memory', ensembleDelta: { fullScaled: 0.08, shapeScaled: 0.05, fullRaw: -0.06, motionRaw: -0.03 }, blendDelta: { full: 0.04, shape: 0.02, motion: -0.06 } },
@@ -9812,7 +9859,8 @@
         const candidates = [];
         for (const base of shrinkPredictorGetBaseConfigLibrary()) {
           for (const roomFactor of roomBiases) {
-            for (const stageWeight of stageBiases) {
+            for (const durationWeight of durationBiases) {
+              for (const shrinkRateWeight of shrinkRateBiases) {
               for (const scaleMode of scaleModes) {
                 const ensemble = { ...base.ensemble };
                 for (const [key, delta] of Object.entries(scaleMode.ensembleDelta)) {
@@ -9822,12 +9870,13 @@
                 for (const [key, delta] of Object.entries(scaleMode.blendDelta)) {
                   blend[key] = (Number(blend[key]) || 0) + delta;
                 }
-                candidates.push(shrinkPredictorCreateCandidateConfig(base, `${scaleMode.suffix}-rf${Math.round(roomFactor * 100)}-st${Math.round(stageWeight * 100)}`, {
+                candidates.push(shrinkPredictorCreateCandidateConfig(base, `${scaleMode.suffix}-rf${Math.round(roomFactor * 100)}-du${Math.round(durationWeight * 100)}-sr${Math.round(shrinkRateWeight * 100)}`, {
                   roomFactor,
-                  penalties: { stage: stageWeight },
+                  penalties: { duration: durationWeight, shrinkRate: shrinkRateWeight },
                   ensemble,
                   blend
                 }));
+              }
               }
             }
           }
@@ -9872,11 +9921,11 @@
 
           add('tight-stage', {
             roomFactor: shrinkPredictorClamp(roomFactor - (roomStep * 0.25), 0.6, 0.96),
-            penalties: { stage: Math.max(1.0, (Number(penalties.stage) || 1.8) + stageStep) }
+            penalties: { duration: Math.max(0.8, (Number(penalties.duration) || 1.7) + stageStep * 0.35) }
           });
           add('loose-stage', {
             roomFactor: shrinkPredictorClamp(roomFactor + (roomStep * 0.25), 0.6, 0.96),
-            penalties: { stage: Math.max(0.9, (Number(penalties.stage) || 1.8) - stageStep) }
+            penalties: { duration: Math.max(0.7, (Number(penalties.duration) || 1.7) - stageStep * 0.35) }
           });
           add('memory-bias', {
             roomFactor: shrinkPredictorClamp(roomFactor, 0.6, 0.96),
@@ -9894,7 +9943,8 @@
               drift: Math.max(0.6, (Number(penalties.drift) || 1) * (1 + penaltyScale * 0.85)),
               cadence: Math.max(0.4, (Number(penalties.cadence) || 1) * (1 - penaltyScale * 0.5)),
               size: Math.max(0.4, (Number(penalties.size) || 1) * (1 - penaltyScale * 0.35)),
-              stage: Math.max(0.9, Number(penalties.stage) || 1.8)
+              duration: Math.max(0.7, (Number(penalties.duration) || 1.7) * (1 + penaltyScale * 0.55)),
+              shrinkRate: Math.max(0.7, (Number(penalties.shrinkRate) || 1.6) * (1 + penaltyScale * 0.75))
             }
           });
         }
@@ -9916,21 +9966,17 @@
 
       function shrinkPredictorSelectCalibrationSamples(model, observation) {
         const allSamples = Array.isArray(model?.samples) ? model.samples : [];
-        const targetStepCount = Math.max(0, Number(observation?.observedSteps?.length) || 0);
         const roomCode = String(observation?.matchedGroup?.roomCode || currentRoomCode || '').trim().toLowerCase();
-        const exactStage = targetStepCount > 0
-          ? allSamples.filter((sample) => (Number(sample.prefixLen) || 0) === targetStepCount)
-          : [];
-        const nearStage = targetStepCount > 0
-          ? allSamples.filter((sample) => Math.abs((Number(sample.prefixLen) || 0) - targetStepCount) <= 1)
-          : [];
+        const queryProfile = shrinkPredictorBuildSequenceProfile(observation?.observedSteps || []);
+        const exactState = allSamples.filter((sample) => shrinkPredictorIsStateAligned(queryProfile, sample.profile || {}, 'exact'));
+        const nearState = allSamples.filter((sample) => shrinkPredictorIsStateAligned(queryProfile, sample.profile || {}, 'near'));
         const sameRoom = roomCode ? allSamples.filter((sample) => sample.roomCode === roomCode) : [];
         return {
           samples: allSamples,
           stats: {
             totalCount: allSamples.length,
-            exactStageCount: exactStage.length,
-            nearStageCount: nearStage.length,
+            exactStateCount: exactState.length,
+            nearStateCount: nearState.length,
             sameRoomCount: sameRoom.length
           }
         };
@@ -10139,34 +10185,38 @@
         const driftPenaltyWeight = Number.isFinite(Number(penaltyWeights.drift)) ? Number(penaltyWeights.drift) : 2.2;
         const cadencePenaltyWeight = Number.isFinite(Number(penaltyWeights.cadence)) ? Number(penaltyWeights.cadence) : 1.25;
         const sizePenaltyWeight = Number.isFinite(Number(penaltyWeights.size)) ? Number(penaltyWeights.size) : 1.45;
-        const stagePenaltyWeight = Number.isFinite(Number(penaltyWeights.stage)) ? Number(penaltyWeights.stage) : 1.85;
+        const durationPenaltyWeight = Number.isFinite(Number(penaltyWeights.duration)) ? Number(penaltyWeights.duration) : 1.75;
+        const shrinkRatePenaltyWeight = Number.isFinite(Number(penaltyWeights.shrinkRate)) ? Number(penaltyWeights.shrinkRate) : 1.55;
         const roomFactor = shrinkPredictorClamp(Number(options?.roomFactor) || 0.84, 0.55, 1);
         const queryAnchorRadiusMeters = Math.max(1, Number(queryProfile?.anchorRadiusMeters) || 1);
-        const targetStepCount = Math.max(0, Number(options?.targetStepCount) || Number(queryProfile?.stepCount) || 0);
 
         const scored = samples
           .filter((sample) => String(sample?.entry?.id || '') !== excludeEntryId)
           .map((sample) => {
           const embeddingDistance = shrinkPredictorDistance(queryStd, sample.embeddingStd, indices);
           const sampleProfile = sample.profile || {};
+          const profileCompare = shrinkPredictorCompareProfiles(queryProfile, sampleProfile);
           const radiusPenalty = queryProfile
-            ? Math.abs((Number(sampleProfile.radiusRatio) || 0) - (Number(queryProfile.radiusRatio) || 0)) * radiusPenaltyWeight
+            ? profileCompare.radiusDelta * radiusPenaltyWeight
             : 0;
           const driftPenalty = queryProfile
-            ? Math.abs((Number(sampleProfile.driftRatio) || 0) - (Number(queryProfile.driftRatio) || 0)) * driftPenaltyWeight
+            ? profileCompare.driftDelta * driftPenaltyWeight
             : 0;
           const cadencePenalty = queryProfile
-            ? Math.abs((Number(sampleProfile.meanStepDistanceRatio) || 0) - (Number(queryProfile.meanStepDistanceRatio) || 0)) * cadencePenaltyWeight
+            ? profileCompare.cadenceDelta * cadencePenaltyWeight
             : 0;
           const sizePenalty = queryProfile
             ? Math.abs(Math.log(
               Math.max(1, Number(sampleProfile.anchorRadiusMeters) || 1) / queryAnchorRadiusMeters
             )) * sizePenaltyWeight
             : 0;
-          const stagePenalty = targetStepCount > 0
-            ? Math.abs((Number(sample.prefixLen) || 0) - targetStepCount) * stagePenaltyWeight
+          const durationPenalty = queryProfile
+            ? profileCompare.elapsedRatioLog * durationPenaltyWeight
             : 0;
-          let adjustedDistance = embeddingDistance + radiusPenalty + driftPenalty + cadencePenalty + sizePenalty + stagePenalty;
+          const shrinkRatePenalty = queryProfile
+            ? profileCompare.shrinkRateRatioLog * shrinkRatePenaltyWeight
+            : 0;
+          let adjustedDistance = embeddingDistance + radiusPenalty + driftPenalty + cadencePenalty + sizePenalty + durationPenalty + shrinkRatePenalty;
           if (queryRoomCode && sample.roomCode && sample.roomCode === queryRoomCode) adjustedDistance *= roomFactor;
           return {
             ...sample,
@@ -10181,13 +10231,13 @@
         const useSameRoomOnly = sameRoomSamples.length >= Math.max(limit, 6);
         const roomPool = useSameRoomOnly ? sameRoomSamples : scored;
         let pool = roomPool;
-        if (targetStepCount > 0) {
-          const exactStagePool = roomPool.filter((sample) => (Number(sample.prefixLen) || 0) === targetStepCount);
-          const nearStagePool = roomPool.filter((sample) => Math.abs((Number(sample.prefixLen) || 0) - targetStepCount) <= 1);
-          if (exactStagePool.length >= Math.max(4, Math.ceil(limit * 0.6))) {
-            pool = exactStagePool;
-          } else if (nearStagePool.length >= Math.max(5, Math.ceil(limit * 0.75))) {
-            pool = nearStagePool;
+        if (queryProfile) {
+          const exactStatePool = roomPool.filter((sample) => shrinkPredictorIsStateAligned(queryProfile, sample.profile || {}, 'exact'));
+          const nearStatePool = roomPool.filter((sample) => shrinkPredictorIsStateAligned(queryProfile, sample.profile || {}, 'near'));
+          if (exactStatePool.length >= Math.max(4, Math.ceil(limit * 0.6))) {
+            pool = exactStatePool;
+          } else if (nearStatePool.length >= Math.max(5, Math.ceil(limit * 0.75))) {
+            pool = nearStatePool;
           }
         }
 
@@ -10222,9 +10272,9 @@
           predictionScaled,
           spread,
           roomScope: useSameRoomOnly ? 'room' : 'global',
-          stageScope: targetStepCount > 0 && pool.every((sample) => (Number(sample.prefixLen) || 0) === targetStepCount)
-            ? 'exact'
-            : (targetStepCount > 0 && pool.every((sample) => Math.abs((Number(sample.prefixLen) || 0) - targetStepCount) <= 1) ? 'near' : 'wide')
+          stageScope: queryProfile && pool.every((sample) => shrinkPredictorIsStateAligned(queryProfile, sample.profile || {}, 'exact'))
+            ? 'state-exact'
+            : (queryProfile && pool.every((sample) => shrinkPredictorIsStateAligned(queryProfile, sample.profile || {}, 'near')) ? 'state-near' : 'state-wide')
         };
       }
 
@@ -10309,10 +10359,10 @@
           ? calibrationSelection.samples
           : (Array.isArray(calibrationSelection) ? calibrationSelection : []);
         const errors = [];
-        const exactStageErrors = [];
-        const nearStageErrors = [];
+        const exactStateErrors = [];
+        const nearStateErrors = [];
         const byEntry = new Set();
-        const targetStepCount = Math.max(0, Number(observation?.observedSteps?.length) || 0);
+        const targetProfile = shrinkPredictorBuildSequenceProfile(observation?.observedSteps || []);
 
         for (const sample of samples) {
           const observation = {
@@ -10331,11 +10381,8 @@
           );
           if (!Number.isFinite(errorMeters)) continue;
           errors.push(errorMeters);
-          if (targetStepCount > 0) {
-            const stepDelta = Math.abs((Number(sample.prefixLen) || 0) - targetStepCount);
-            if (stepDelta === 0) exactStageErrors.push(errorMeters);
-            if (stepDelta <= 1) nearStageErrors.push(errorMeters);
-          }
+          if (shrinkPredictorIsStateAligned(targetProfile, sample.profile || {}, 'exact')) exactStateErrors.push(errorMeters);
+          if (shrinkPredictorIsStateAligned(targetProfile, sample.profile || {}, 'near')) nearStateErrors.push(errorMeters);
           if (sample.entry?.id) byEntry.add(String(sample.entry.id));
         }
 
@@ -10354,15 +10401,15 @@
         const meanErrorMeters = shrinkPredictorMean(errors) || Infinity;
         const medianErrorMeters = shrinkPredictorWeightedPercentile(errors, weights, 0.5) || Infinity;
         const p70ErrorMeters = shrinkPredictorWeightedPercentile(errors, weights, 0.7) || Infinity;
-        const exactStageMeanErrorMeters = exactStageErrors.length ? (shrinkPredictorMean(exactStageErrors) || Infinity) : Infinity;
-        const nearStageMeanErrorMeters = nearStageErrors.length ? (shrinkPredictorMean(nearStageErrors) || Infinity) : Infinity;
+        const exactStateMeanErrorMeters = exactStateErrors.length ? (shrinkPredictorMean(exactStateErrors) || Infinity) : Infinity;
+        const nearStateMeanErrorMeters = nearStateErrors.length ? (shrinkPredictorMean(nearStateErrors) || Infinity) : Infinity;
         return {
           score: meanErrorMeters,
           meanErrorMeters,
           medianErrorMeters,
           p70ErrorMeters,
-          exactStageMeanErrorMeters,
-          nearStageMeanErrorMeters,
+          exactStateMeanErrorMeters,
+          nearStateMeanErrorMeters,
           sampleCount: errors.length,
           entryCount: byEntry.size
         };
@@ -10374,8 +10421,8 @@
           .sort((a, b) => {
             const scoreDiff = (Number(a.backtest?.score) || Infinity) - (Number(b.backtest?.score) || Infinity);
             if (Math.abs(scoreDiff) > 1e-6) return scoreDiff;
-            const exactStageDiff = (Number(a.backtest?.exactStageMeanErrorMeters) || Infinity) - (Number(b.backtest?.exactStageMeanErrorMeters) || Infinity);
-            if (Math.abs(exactStageDiff) > 1e-6) return exactStageDiff;
+            const exactStateDiff = (Number(a.backtest?.exactStateMeanErrorMeters) || Infinity) - (Number(b.backtest?.exactStateMeanErrorMeters) || Infinity);
+            if (Math.abs(exactStateDiff) > 1e-6) return exactStateDiff;
             return (Number(a.backtest?.p70ErrorMeters) || Infinity) - (Number(b.backtest?.p70ErrorMeters) || Infinity);
           });
       }
@@ -10460,8 +10507,8 @@
           candidateCount: totalCandidateCount,
           targetStepCount: stepCount,
           sampleCount: calibrationSamples.stats?.totalCount || calibrationSamples.samples?.length || 0,
-          exactStageSampleCount: calibrationSamples.stats?.exactStageCount || 0,
-          nearStageSampleCount: calibrationSamples.stats?.nearStageCount || 0,
+          exactStateSampleCount: calibrationSamples.stats?.exactStateCount || 0,
+          nearStateSampleCount: calibrationSamples.stats?.nearStateCount || 0,
           sameRoomSampleCount: calibrationSamples.stats?.sameRoomCount || 0,
           searchPasses: phasePlans.length
         };
@@ -10598,8 +10645,17 @@
         const bestMatch = result.matches[0];
         const backtestMean = Number(result.calibration?.backtest?.meanErrorMeters);
         const backtestMedian = Number(result.calibration?.backtest?.medianErrorMeters);
-        const backtestExactStageMean = Number(result.calibration?.backtest?.exactStageMeanErrorMeters);
+        const backtestExactStateMean = Number(result.calibration?.backtest?.exactStateMeanErrorMeters);
         const backtestProfile = result.calibration?.config?.label || result.calibration?.config?.id || '';
+        const uncertaintyMeters = Number(result.uncertaintyMeters);
+        const summaryLines = [
+          `Based on ${result.trainingSampleCount || 0} archived prefix samples from ${result.trainingCoinCount || 0} exact-ended coins.`,
+          `Searched ${result.calibration?.candidateCount || 0} candidate settings in ${result.calibration?.searchPasses || 1} pass${(result.calibration?.searchPasses || 1) === 1 ? '' : 'es'}.`,
+          Number.isFinite(backtestMean)
+            ? `Best backtest mean error ${shrinkPredictorFormatDistance(backtestMean)}${Number.isFinite(backtestExactStateMean) ? `, state-aligned ${shrinkPredictorFormatDistance(backtestExactStateMean)}` : ''}.`
+            : `Best historical match score ${bestMatch ? bestMatch.score.toFixed(2) : 'n/a'}.`,
+          `Confidence ${confidenceLabel}${Number.isFinite(uncertaintyMeters) ? `, uncertainty +/-${Math.round(uncertaintyMeters)}m` : ''}.`
+        ];
 
         const matchHtml = result.matches.length
           ? result.matches.map((match, index) => {
@@ -10612,7 +10668,7 @@
                   <span class="shrink-predictor-match-score">${scorePct}% match</span>
                 </div>
                 <div class="shrink-predictor-match-meta">
-                  <span>${escapeHtml(String(match.history?.steps?.length || 0))} shrinks</span>
+                  <span>${escapeHtml(`${String(match.prefixLen || match.history?.steps?.length || 0)} / ${String(match.totalSteps || match.history?.steps?.length || 0)} shrinks`)}</span>
                   <span>Remaining drift ${escapeHtml(shrinkPredictorFormatDistance(match.remainingDistanceMeters))}</span>
                   <span>Exact ${escapeHtml(`${coinDbFormatCoord(exactCoords.lat)}, ${coinDbFormatCoord(exactCoords.lng)}`)}</span>
                 </div>
@@ -10643,20 +10699,22 @@
                   <span class="shrink-predictor-stat-value">${escapeHtml(shrinkPredictorFormatDistance(backtestMean))}</span>
                 </div>
               ` : ''}
-              ${Number.isFinite(backtestExactStageMean) ? `
+              ${Number.isFinite(backtestExactStateMean) ? `
                 <div class="shrink-predictor-stat">
-                  <span class="shrink-predictor-stat-label">Same-Stage Mean Error</span>
-                  <span class="shrink-predictor-stat-value">${escapeHtml(shrinkPredictorFormatDistance(backtestExactStageMean))}</span>
+                  <span class="shrink-predictor-stat-label">State-Aligned Mean Error</span>
+                  <span class="shrink-predictor-stat-value">${escapeHtml(shrinkPredictorFormatDistance(backtestExactStateMean))}</span>
                 </div>
               ` : ''}
             </div>
-            <div class="shrink-predictor-note">${escapeHtml(result.note || '')}</div>
-            ${backtestProfile && Number.isFinite(backtestMedian) ? `<div class="shrink-predictor-note">Selected algorithm profile: ${escapeHtml(backtestProfile)}. Historical median error ${escapeHtml(shrinkPredictorFormatDistance(backtestMedian))}. Backtested across ${escapeHtml(String(result.calibration?.sampleCount || 0))} exact-ended prefix samples.</div>` : ''}
+            <div class="shrink-predictor-summary-box">
+              <h5>Summary</h5>
+              ${summaryLines.map((line) => `<div class="shrink-predictor-summary-line">${escapeHtml(line)}</div>`).join('')}
+            </div>
+            ${backtestProfile ? `<div class="shrink-predictor-note">Algorithm: ${escapeHtml(backtestProfile)}${Number.isFinite(backtestMedian) ? `. Median error ${escapeHtml(shrinkPredictorFormatDistance(backtestMedian))}` : ''}.</div>` : ''}
           </section>
           <section class="shrink-predictor-matches">
             <h4>${result.matches.length ? 'Closest Historical Matches' : 'Historical Matches'}</h4>
             <div class="shrink-predictor-match-list">${matchHtml}</div>
-            ${bestMatch ? `<div class="shrink-predictor-note">Best match shape score: ${escapeHtml(bestMatch.score.toFixed(2))}</div>` : ''}
           </section>
         `;
       }
@@ -11013,9 +11071,9 @@
             const candidateCount = Number(result.calibration?.candidateCount || 0);
             const sampleCount = Number(result.calibration?.sampleCount || 0);
             const backtestMsg = Number.isFinite(backtestMean)
-              ? ` Searched ${candidateCount} candidate algorithm setting${candidateCount === 1 ? '' : 's'} over ${sampleCount} exact-ended prefix sample${sampleCount === 1 ? '' : 's'}; best mean error ${shrinkPredictorFormatDistance(backtestMean)} with ${profileLabel}.`
+              ? ` Searched ${candidateCount} settings over ${sampleCount} samples; best mean error ${shrinkPredictorFormatDistance(backtestMean)} with ${profileLabel}.`
               : '';
-            shrinkPredictorSetStatus(`Prediction built from ${result.trainingSampleCount} browser-side training sample${result.trainingSampleCount === 1 ? '' : 's'} across ${result.trainingCoinCount} exact-ended coin${result.trainingCoinCount === 1 ? '' : 's'}.${backtestMsg}`);
+            shrinkPredictorSetStatus(`Prediction ready.${backtestMsg}`);
           }
         } catch (error) {
           clearShrinkPredictorOverlay();
