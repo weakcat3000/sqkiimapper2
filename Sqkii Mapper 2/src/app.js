@@ -9695,12 +9695,19 @@
         };
       }
 
-      function shrinkPredictorGetConfigLibrary() {
+      function shrinkPredictorNormalizeWeightMap(map = {}, fallback = {}) {
+        const entries = Object.entries({ ...fallback, ...map }).map(([key, value]) => [key, Math.max(0, Number(value) || 0)]);
+        const total = entries.reduce((sum, [, value]) => sum + value, 0);
+        if (total <= 0) return { ...fallback };
+        return Object.fromEntries(entries.map(([key, value]) => [key, value / total]));
+      }
+
+      function shrinkPredictorGetBaseConfigLibrary() {
         return [
           {
             id: 'algo-balanced',
             label: 'Balanced',
-            penalties: { radius: 3.2, drift: 2.2, cadence: 1.25, size: 1.45 },
+            penalties: { radius: 3.2, drift: 2.2, cadence: 1.25, size: 1.45, stage: 1.85 },
             roomFactor: 0.84,
             ensemble: { fullRaw: 0.22, fullScaled: 0.28, shapeRaw: 0.15, shapeScaled: 0.19, motionRaw: 0.07, motionScaled: 0.09 },
             blend: { full: 0.52, shape: 0.28, motion: 0.2 }
@@ -9708,7 +9715,7 @@
           {
             id: 'algo-scaled',
             label: 'Scaled',
-            penalties: { radius: 4.3, drift: 2.6, cadence: 1.0, size: 1.8 },
+            penalties: { radius: 4.3, drift: 2.6, cadence: 1.0, size: 1.8, stage: 1.95 },
             roomFactor: 0.82,
             ensemble: { fullRaw: 0.14, fullScaled: 0.34, shapeRaw: 0.1, shapeScaled: 0.24, motionRaw: 0.05, motionScaled: 0.13 },
             blend: { full: 0.46, shape: 0.34, motion: 0.2 }
@@ -9716,7 +9723,7 @@
           {
             id: 'algo-shape',
             label: 'Shape-first',
-            penalties: { radius: 4.8, drift: 3.1, cadence: 1.4, size: 1.6 },
+            penalties: { radius: 4.8, drift: 3.1, cadence: 1.4, size: 1.6, stage: 2.15 },
             roomFactor: 0.86,
             ensemble: { fullRaw: 0.16, fullScaled: 0.23, shapeRaw: 0.2, shapeScaled: 0.24, motionRaw: 0.05, motionScaled: 0.12 },
             blend: { full: 0.35, shape: 0.45, motion: 0.2 }
@@ -9724,7 +9731,7 @@
           {
             id: 'algo-room',
             label: 'Room-aware',
-            penalties: { radius: 3.0, drift: 2.0, cadence: 1.1, size: 1.35 },
+            penalties: { radius: 3.0, drift: 2.0, cadence: 1.1, size: 1.35, stage: 1.8 },
             roomFactor: 0.74,
             ensemble: { fullRaw: 0.2, fullScaled: 0.27, shapeRaw: 0.13, shapeScaled: 0.18, motionRaw: 0.08, motionScaled: 0.14 },
             blend: { full: 0.58, shape: 0.22, motion: 0.2 }
@@ -9732,7 +9739,7 @@
           {
             id: 'algo-drift',
             label: 'Drift-first',
-            penalties: { radius: 2.6, drift: 3.8, cadence: 1.55, size: 1.2 },
+            penalties: { radius: 2.6, drift: 3.8, cadence: 1.55, size: 1.2, stage: 1.9 },
             roomFactor: 0.84,
             ensemble: { fullRaw: 0.24, fullScaled: 0.23, shapeRaw: 0.12, shapeScaled: 0.16, motionRaw: 0.1, motionScaled: 0.15 },
             blend: { full: 0.42, shape: 0.22, motion: 0.36 }
@@ -9740,22 +9747,87 @@
         ];
       }
 
+      function shrinkPredictorCreateCandidateConfig(base, suffix, overrides = {}) {
+        const config = {
+          ...base,
+          ...overrides,
+          id: `${base.id}-${suffix}`,
+          label: `${base.label} ${suffix}`,
+          penalties: {
+            ...base.penalties,
+            ...(overrides.penalties || {})
+          },
+          ensemble: shrinkPredictorNormalizeWeightMap(overrides.ensemble || base.ensemble, base.ensemble),
+          blend: shrinkPredictorNormalizeWeightMap(overrides.blend || base.blend, base.blend)
+        };
+        return config;
+      }
+
+      function shrinkPredictorBuildConfigSearchSpace(observation) {
+        const stepCount = Math.max(0, Number(observation?.observedSteps?.length) || 0);
+        const sameStageBias = stepCount >= 4 ? 2.25 : (stepCount === 3 ? 2.0 : 1.75);
+        const roomBiases = [0.72, 0.82, 0.92];
+        const stageBiases = [
+          Math.max(1.2, sameStageBias - 0.35),
+          sameStageBias,
+          sameStageBias + 0.35
+        ];
+        const scaleModes = [
+          { suffix: 'memory', ensembleDelta: { fullScaled: 0.08, shapeScaled: 0.05, fullRaw: -0.06, motionRaw: -0.03 }, blendDelta: { full: 0.04, shape: 0.02, motion: -0.06 } },
+          { suffix: 'balanced', ensembleDelta: {}, blendDelta: {} },
+          { suffix: 'raw', ensembleDelta: { fullRaw: 0.08, shapeRaw: 0.05, fullScaled: -0.07, shapeScaled: -0.03, motionScaled: -0.03 }, blendDelta: { full: 0.04, motion: 0.02, shape: -0.06 } }
+        ];
+
+        const candidates = [];
+        for (const base of shrinkPredictorGetBaseConfigLibrary()) {
+          for (const roomFactor of roomBiases) {
+            for (const stageWeight of stageBiases) {
+              for (const scaleMode of scaleModes) {
+                const ensemble = { ...base.ensemble };
+                for (const [key, delta] of Object.entries(scaleMode.ensembleDelta)) {
+                  ensemble[key] = (Number(ensemble[key]) || 0) + delta;
+                }
+                const blend = { ...base.blend };
+                for (const [key, delta] of Object.entries(scaleMode.blendDelta)) {
+                  blend[key] = (Number(blend[key]) || 0) + delta;
+                }
+                candidates.push(shrinkPredictorCreateCandidateConfig(base, `${scaleMode.suffix}-rf${Math.round(roomFactor * 100)}-st${Math.round(stageWeight * 100)}`, {
+                  roomFactor,
+                  penalties: { stage: stageWeight },
+                  ensemble,
+                  blend
+                }));
+              }
+            }
+          }
+        }
+        return candidates;
+      }
+
       function shrinkPredictorGetDefaultConfig() {
-        return shrinkPredictorGetConfigLibrary()[0];
+        return shrinkPredictorGetBaseConfigLibrary()[0];
       }
 
       function shrinkPredictorSelectCalibrationSamples(model, observation) {
         const allSamples = Array.isArray(model?.samples) ? model.samples : [];
         const targetStepCount = Math.max(0, Number(observation?.observedSteps?.length) || 0);
         const roomCode = String(observation?.matchedGroup?.roomCode || currentRoomCode || '').trim().toLowerCase();
-        let selected = allSamples.filter((sample) => sample.prefixLen === targetStepCount);
-        if (selected.length < 10 && targetStepCount > 0) {
-          selected = allSamples.filter((sample) => Math.abs((Number(sample.prefixLen) || 0) - targetStepCount) <= 1);
-        }
-        if (selected.length < 12) selected = allSamples;
-        const sameRoom = roomCode ? selected.filter((sample) => sample.roomCode === roomCode) : [];
-        if (sameRoom.length >= Math.max(6, Math.ceil(selected.length * 0.45))) selected = sameRoom;
-        return selected;
+        const exactStage = targetStepCount > 0
+          ? allSamples.filter((sample) => (Number(sample.prefixLen) || 0) === targetStepCount)
+          : [];
+        const nearStage = targetStepCount > 0
+          ? allSamples.filter((sample) => Math.abs((Number(sample.prefixLen) || 0) - targetStepCount) <= 1)
+          : [];
+        const sameRoom = roomCode ? allSamples.filter((sample) => sample.roomCode === roomCode) : [];
+        return {
+          samples: allSamples,
+          stats: {
+            totalCount: allSamples.length,
+            exactStageCount: exactStage.length,
+            nearStageCount: nearStage.length,
+            sameRoomCount: sameRoom.length
+          }
+        };
       }
 
       function shrinkPredictorBuildNormalizedSignature(steps = []) {
@@ -10102,11 +10174,17 @@
         };
       }
 
-      function shrinkPredictorBacktestConfig(model, samples = [], config) {
+      function shrinkPredictorBacktestConfig(model, calibrationSelection, config, observation = null) {
+        const samples = Array.isArray(calibrationSelection?.samples)
+          ? calibrationSelection.samples
+          : (Array.isArray(calibrationSelection) ? calibrationSelection : []);
         const errors = [];
+        const exactStageErrors = [];
+        const nearStageErrors = [];
         const byEntry = new Set();
+        const targetStepCount = Math.max(0, Number(observation?.observedSteps?.length) || 0);
 
-        for (const sample of (Array.isArray(samples) ? samples : [])) {
+        for (const sample of samples) {
           const observation = {
             observedSteps: sample.prefix,
             matchedGroup: { roomCode: sample.roomCode || '' }
@@ -10123,6 +10201,11 @@
           );
           if (!Number.isFinite(errorMeters)) continue;
           errors.push(errorMeters);
+          if (targetStepCount > 0) {
+            const stepDelta = Math.abs((Number(sample.prefixLen) || 0) - targetStepCount);
+            if (stepDelta === 0) exactStageErrors.push(errorMeters);
+            if (stepDelta <= 1) nearStageErrors.push(errorMeters);
+          }
           if (sample.entry?.id) byEntry.add(String(sample.entry.id));
         }
 
@@ -10141,11 +10224,15 @@
         const meanErrorMeters = shrinkPredictorMean(errors) || Infinity;
         const medianErrorMeters = shrinkPredictorWeightedPercentile(errors, weights, 0.5) || Infinity;
         const p70ErrorMeters = shrinkPredictorWeightedPercentile(errors, weights, 0.7) || Infinity;
+        const exactStageMeanErrorMeters = exactStageErrors.length ? (shrinkPredictorMean(exactStageErrors) || Infinity) : Infinity;
+        const nearStageMeanErrorMeters = nearStageErrors.length ? (shrinkPredictorMean(nearStageErrors) || Infinity) : Infinity;
         return {
-          score: meanErrorMeters * 0.55 + p70ErrorMeters * 0.45,
+          score: meanErrorMeters,
           meanErrorMeters,
           medianErrorMeters,
           p70ErrorMeters,
+          exactStageMeanErrorMeters,
+          nearStageMeanErrorMeters,
           sampleCount: errors.length,
           entryCount: byEntry.size
         };
@@ -10161,16 +10248,19 @@
         if (model.calibrationCache[cacheKey]) return model.calibrationCache[cacheKey];
 
         const calibrationSamples = shrinkPredictorSelectCalibrationSamples(model, observation);
-        const candidates = shrinkPredictorGetConfigLibrary();
+        const candidates = shrinkPredictorBuildConfigSearchSpace(observation);
         let best = {
           config: candidates[0],
-          backtest: shrinkPredictorBacktestConfig(model, calibrationSamples, candidates[0])
+          backtest: shrinkPredictorBacktestConfig(model, calibrationSamples, candidates[0], observation)
         };
 
         for (let index = 1; index < candidates.length; index += 1) {
           const config = candidates[index];
-          const backtest = shrinkPredictorBacktestConfig(model, calibrationSamples, config);
-          if (backtest.score < best.backtest.score) {
+          const backtest = shrinkPredictorBacktestConfig(model, calibrationSamples, config, observation);
+          const sameScore = Math.abs(backtest.score - best.backtest.score) < 1e-6;
+          const betterSameStage = (backtest.exactStageMeanErrorMeters || Infinity) < (best.backtest.exactStageMeanErrorMeters || Infinity);
+          const betterP70 = (backtest.p70ErrorMeters || Infinity) < (best.backtest.p70ErrorMeters || Infinity);
+          if (backtest.score < best.backtest.score || (sameScore && (betterSameStage || betterP70))) {
             best = { config, backtest };
           }
         }
@@ -10180,7 +10270,10 @@
           backtest: best.backtest,
           candidateCount: candidates.length,
           targetStepCount: stepCount,
-          sampleCount: calibrationSamples.length
+          sampleCount: calibrationSamples.stats?.totalCount || calibrationSamples.samples?.length || 0,
+          exactStageSampleCount: calibrationSamples.stats?.exactStageCount || 0,
+          nearStageSampleCount: calibrationSamples.stats?.nearStageCount || 0,
+          sameRoomSampleCount: calibrationSamples.stats?.sameRoomCount || 0
         };
         model.calibrationCache[cacheKey] = calibration;
         return calibration;
@@ -10269,7 +10362,7 @@
           calibration,
           note: observedSteps.length <= 1
             ? 'Only one observed shrink step was available, so the browser model is extrapolating mostly from historical offset neighbors and should be treated as directional.'
-            : `Memory-style predictor using ${model.samples.length} archived prefix sample${model.samples.length === 1 ? '' : 's'} from ${model.entries.length} exact-ended coin${model.entries.length === 1 ? '' : 's'}. It first backtests ${calibration?.candidateCount || 1} algorithm profile${(calibration?.candidateCount || 1) === 1 ? '' : 's'} against ${calibration?.backtest?.sampleCount || 0} historical prefix sample${(calibration?.backtest?.sampleCount || 0) === 1 ? '' : 's'}, then asks: based on this shrink pattern, where did remembered coins end up? The green dot is placed at the hottest remembered endpoint cluster. Agreement ${(solved.agreement * 100).toFixed(0)}%, uncertainty +/-${Math.round(solved.uncertaintyMeters)}m.`
+            : `Memory-style predictor using ${model.samples.length} archived prefix sample${model.samples.length === 1 ? '' : 's'} from ${model.entries.length} exact-ended coin${model.entries.length === 1 ? '' : 's'}. It now searches ${calibration?.candidateCount || 1} candidate algorithm settings and backtests them across ${calibration?.sampleCount || 0} exact-ended prefix sample${(calibration?.sampleCount || 0) === 1 ? '' : 's'}, selecting the lowest average miss distance before predicting the live coin. Then it asks: based on this shrink pattern, where did remembered coins end up? The green dot is placed at the hottest remembered endpoint cluster. Agreement ${(solved.agreement * 100).toFixed(0)}%, uncertainty +/-${Math.round(solved.uncertaintyMeters)}m.`
         };
       }
 
@@ -10305,6 +10398,7 @@
         const bestMatch = result.matches[0];
         const backtestMean = Number(result.calibration?.backtest?.meanErrorMeters);
         const backtestMedian = Number(result.calibration?.backtest?.medianErrorMeters);
+        const backtestExactStageMean = Number(result.calibration?.backtest?.exactStageMeanErrorMeters);
         const backtestProfile = result.calibration?.config?.label || result.calibration?.config?.id || '';
 
         const matchHtml = result.matches.length
@@ -10349,9 +10443,15 @@
                   <span class="shrink-predictor-stat-value">${escapeHtml(shrinkPredictorFormatDistance(backtestMean))}</span>
                 </div>
               ` : ''}
+              ${Number.isFinite(backtestExactStageMean) ? `
+                <div class="shrink-predictor-stat">
+                  <span class="shrink-predictor-stat-label">Same-Stage Mean Error</span>
+                  <span class="shrink-predictor-stat-value">${escapeHtml(shrinkPredictorFormatDistance(backtestExactStageMean))}</span>
+                </div>
+              ` : ''}
             </div>
             <div class="shrink-predictor-note">${escapeHtml(result.note || '')}</div>
-            ${backtestProfile && Number.isFinite(backtestMedian) ? `<div class="shrink-predictor-note">Selected algorithm profile: ${escapeHtml(backtestProfile)}. Historical median error ${escapeHtml(shrinkPredictorFormatDistance(backtestMedian))}.</div>` : ''}
+            ${backtestProfile && Number.isFinite(backtestMedian) ? `<div class="shrink-predictor-note">Selected algorithm profile: ${escapeHtml(backtestProfile)}. Historical median error ${escapeHtml(shrinkPredictorFormatDistance(backtestMedian))}. Backtested across ${escapeHtml(String(result.calibration?.sampleCount || 0))} exact-ended prefix samples.</div>` : ''}
           </section>
           <section class="shrink-predictor-matches">
             <h4>${result.matches.length ? 'Closest Historical Matches' : 'Historical Matches'}</h4>
@@ -10684,8 +10784,10 @@
           } else {
             const backtestMean = Number(result.calibration?.backtest?.meanErrorMeters);
             const profileLabel = result.calibration?.config?.label || result.calibration?.config?.id || 'calibrated';
+            const candidateCount = Number(result.calibration?.candidateCount || 0);
+            const sampleCount = Number(result.calibration?.sampleCount || 0);
             const backtestMsg = Number.isFinite(backtestMean)
-              ? ` Backtest mean error ${shrinkPredictorFormatDistance(backtestMean)} with ${profileLabel}.`
+              ? ` Searched ${candidateCount} candidate algorithm setting${candidateCount === 1 ? '' : 's'} over ${sampleCount} exact-ended prefix sample${sampleCount === 1 ? '' : 's'}; best mean error ${shrinkPredictorFormatDistance(backtestMean)} with ${profileLabel}.`
               : '';
             shrinkPredictorSetStatus(`Prediction built from ${result.trainingSampleCount} browser-side training sample${result.trainingSampleCount === 1 ? '' : 's'} across ${result.trainingCoinCount} exact-ended coin${result.trainingCoinCount === 1 ? '' : 's'}.${backtestMsg}`);
           }
