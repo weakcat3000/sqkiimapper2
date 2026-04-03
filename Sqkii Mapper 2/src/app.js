@@ -9246,6 +9246,92 @@
         };
       }
 
+      function shrinkPredictorBuildDottedRing(centerLngLat, radiusMeters, rotationDegrees = 0, segmentCount = 28, visibleFraction = 0.52, pointsPerSegment = 7) {
+        const lng = Number(centerLngLat?.[0]);
+        const lat = Number(centerLngLat?.[1]);
+        const radius = Number(radiusMeters);
+        if (![lng, lat, radius].every(Number.isFinite) || radius <= 0) return null;
+
+        const features = [];
+        const safeSegmentCount = Math.max(8, Math.round(segmentCount));
+        const sweepPerSegment = 360 / safeSegmentCount;
+        const visibleSweep = sweepPerSegment * shrinkPredictorClamp(visibleFraction, 0.12, 0.9);
+        const safePoints = Math.max(2, Math.round(pointsPerSegment));
+
+        for (let segmentIndex = 0; segmentIndex < safeSegmentCount; segmentIndex += 1) {
+          const startBearing = rotationDegrees + segmentIndex * sweepPerSegment;
+          const coordinates = [];
+          for (let pointIndex = 0; pointIndex <= safePoints; pointIndex += 1) {
+            const bearing = startBearing + (pointIndex / safePoints) * visibleSweep;
+            const point = turf.destination([lng, lat], radius / 1000, bearing, { units: 'kilometers' });
+            coordinates.push(point.geometry.coordinates);
+          }
+          features.push({
+            type: 'Feature',
+            properties: { segment: segmentIndex + 1 },
+            geometry: {
+              type: 'LineString',
+              coordinates
+            }
+          });
+        }
+
+        return {
+          type: 'FeatureCollection',
+          features
+        };
+      }
+
+      function shrinkPredictorBuildArrowLines(startLngLat, endLngLat, headLengthMeters = 18) {
+        const startLng = Number(startLngLat?.[0]);
+        const startLat = Number(startLngLat?.[1]);
+        const endLng = Number(endLngLat?.[0]);
+        const endLat = Number(endLngLat?.[1]);
+        if (![startLng, startLat, endLng, endLat].every(Number.isFinite)) {
+          return { type: 'FeatureCollection', features: [] };
+        }
+
+        const distanceMeters = turf.distance([startLng, startLat], [endLng, endLat], { units: 'kilometers' }) * 1000;
+        if (!Number.isFinite(distanceMeters) || distanceMeters < 1) {
+          return { type: 'FeatureCollection', features: [] };
+        }
+
+        const bearing = turf.bearing([startLng, startLat], [endLng, endLat]);
+        const headLength = shrinkPredictorClamp(Math.min(headLengthMeters, distanceMeters * 0.28), 10, 22);
+        const leftPoint = turf.destination([endLng, endLat], headLength / 1000, bearing + 150, { units: 'kilometers' }).geometry.coordinates;
+        const rightPoint = turf.destination([endLng, endLat], headLength / 1000, bearing - 150, { units: 'kilometers' }).geometry.coordinates;
+
+        return {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: { role: 'shaft' },
+              geometry: {
+                type: 'LineString',
+                coordinates: [[startLng, startLat], [endLng, endLat]]
+              }
+            },
+            {
+              type: 'Feature',
+              properties: { role: 'head-left' },
+              geometry: {
+                type: 'LineString',
+                coordinates: [[endLng, endLat], leftPoint]
+              }
+            },
+            {
+              type: 'Feature',
+              properties: { role: 'head-right' },
+              geometry: {
+                type: 'LineString',
+                coordinates: [[endLng, endLat], rightPoint]
+              }
+            }
+          ]
+        };
+      }
+
       function stopShrinkPredictorSpin() {
         if (shrinkPredictorSpinFrame != null) {
           try { cancelAnimationFrame(shrinkPredictorSpinFrame); } catch { }
@@ -9277,8 +9363,8 @@
               return;
             }
             const elapsed = timestamp - shrinkPredictorSpinState.startedAt;
-            const rotationDegrees = (elapsed * 0.022) % 360;
-            const ring = shrinkPredictorBuildRotatingRing(shrinkPredictorSpinState.centerLngLat, shrinkPredictorSpinState.radiusMeters, rotationDegrees);
+            const rotationDegrees = (elapsed * 0.0075) % 360;
+            const ring = shrinkPredictorBuildDottedRing(shrinkPredictorSpinState.centerLngLat, shrinkPredictorSpinState.radiusMeters, rotationDegrees);
             if (ring) source.setData(ring);
             shrinkPredictorSpinFrame = requestAnimationFrame(tick);
           };
@@ -9287,23 +9373,36 @@
           return;
         }
 
-        if (engine === 'leaf' && shrinkPredictorLeafletLayer?.__confidenceRing) {
+        if (engine === 'leaf' && shrinkPredictorLeafletLayer?.__confidenceRingSegments?.length) {
           shrinkPredictorSpinState = {
             mode: 'leaf',
-            ring: shrinkPredictorLeafletLayer.__confidenceRing,
+            segments: shrinkPredictorLeafletLayer.__confidenceRingSegments,
+            centerLngLat: [lng, lat],
+            radiusMeters: radius,
             startedAt: performance.now()
           };
 
           const tick = (timestamp) => {
             if (!shrinkPredictorSpinState || shrinkPredictorSpinState.mode !== 'leaf') return;
-            const ring = shrinkPredictorSpinState.ring;
-            if (!ring?.setStyle) {
+            const segments = shrinkPredictorSpinState.segments;
+            if (!Array.isArray(segments) || !segments.length) {
               stopShrinkPredictorSpin();
               return;
             }
             const elapsed = timestamp - shrinkPredictorSpinState.startedAt;
-            const dashOffset = `${-((elapsed * 0.05) % 240)}px`;
-            ring.setStyle({ dashOffset });
+            const rotationDegrees = (elapsed * 0.0075) % 360;
+            const ring = shrinkPredictorBuildDottedRing(shrinkPredictorSpinState.centerLngLat, shrinkPredictorSpinState.radiusMeters, rotationDegrees);
+            const ringFeatures = ring?.features || [];
+            if (!ringFeatures.length) {
+              stopShrinkPredictorSpin();
+              return;
+            }
+            for (let index = 0; index < segments.length; index += 1) {
+              const segment = segments[index];
+              const coords = ringFeatures[index]?.geometry?.coordinates || [];
+              if (!segment?.setLatLngs || !coords.length) continue;
+              segment.setLatLngs(coords.map(([coordLng, coordLat]) => [coordLat, coordLng]));
+            }
             shrinkPredictorSpinFrame = requestAnimationFrame(tick);
           };
 
@@ -9643,6 +9742,7 @@
           for (const layerId of [
             'shrink-predictor-confidence-fill',
             'shrink-predictor-confidence-line',
+            'shrink-predictor-arrowhead',
             'shrink-predictor-line',
             'shrink-predictor-match-points',
             'shrink-predictor-point',
@@ -9684,16 +9784,9 @@
           properties: { index: index + 1 },
           geometry: { type: 'Point', coordinates: [match.predictedPoint.lng, match.predictedPoint.lat] }
         }));
-        const lineFeature = {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            type: 'LineString',
-            coordinates: [[anchor.lng, anchor.lat], predictedLngLat]
-          }
-        };
+        const lineFeature = shrinkPredictorBuildArrowLines(anchorLngLat, predictedLngLat);
         const confidenceFeature = turf.circle(predictedLngLat, result.confidenceRadiusMeters, { steps: 72, units: 'meters' });
-        const confidenceLineFeature = shrinkPredictorBuildRotatingRing(predictedLngLat, result.confidenceRadiusMeters, 0, 96);
+        const confidenceLineFeature = shrinkPredictorBuildDottedRing(predictedLngLat, result.confidenceRadiusMeters, 0);
 
         if (engine === 'gl' && mapgl?.getStyle?.()) {
           if (!mapgl.getSource(SHRINK_PREDICTOR_SRC)) {
@@ -9781,11 +9874,30 @@
               id: 'shrink-predictor-line',
               type: 'line',
               source: SHRINK_PREDICTOR_LINE_SRC,
+              filter: ['==', ['get', 'role'], 'shaft'],
               paint: {
                 'line-color': '#f5d0fe',
                 'line-width': 2.5,
                 'line-opacity': 0.82,
                 'line-dasharray': [1.2, 1.6]
+              }
+            });
+          }
+
+          if (!mapgl.getLayer('shrink-predictor-arrowhead')) {
+            mapgl.addLayer({
+              id: 'shrink-predictor-arrowhead',
+              type: 'line',
+              source: SHRINK_PREDICTOR_LINE_SRC,
+              filter: ['match', ['get', 'role'], ['head-left', 'head-right'], true, false],
+              paint: {
+                'line-color': '#f5d0fe',
+                'line-width': 2.5,
+                'line-opacity': 0.96
+              },
+              layout: {
+                'line-cap': 'round',
+                'line-join': 'round'
               }
             });
           }
@@ -9862,6 +9974,19 @@
             fillColor: '#1d4ed8',
             fillOpacity: 0.95
           }));
+          const arrowLines = shrinkPredictorBuildArrowLines(anchorLngLat, predictedLngLat).features || [];
+          for (const feature of arrowLines) {
+            const coords = feature?.geometry?.coordinates || [];
+            if (coords.length < 2) continue;
+            layers.push(L.polyline(coords.map(([coordLng, coordLat]) => [coordLat, coordLng]), {
+              color: '#f5d0fe',
+              weight: feature.properties?.role === 'shaft' ? 2.5 : 2.2,
+              opacity: 0.9,
+              dashArray: feature.properties?.role === 'shaft' ? '6 6' : null,
+              lineCap: 'round',
+              lineJoin: 'round'
+            }));
+          }
           layers.push(L.circleMarker([result.predictedPoint.lat, result.predictedPoint.lng], {
             radius: 7,
             color: '#ffffff',
@@ -9878,8 +10003,22 @@
               fillOpacity: 0.92
             }));
           }
+          const confidenceSegments = [];
+          for (const feature of (confidenceLineFeature?.features || [])) {
+            const coords = feature?.geometry?.coordinates || [];
+            if (coords.length < 2) continue;
+            const polyline = L.polyline(coords.map(([coordLng, coordLat]) => [coordLat, coordLng]), {
+              color: '#d8b4fe',
+              weight: 2,
+              opacity: 0.86,
+              lineCap: 'round',
+              lineJoin: 'round'
+            });
+            confidenceSegments.push(polyline);
+            layers.push(polyline);
+          }
           shrinkPredictorLeafletLayer = L.layerGroup(layers).addTo(mapleaf);
-          shrinkPredictorLeafletLayer.__confidenceRing = confidenceRing;
+          shrinkPredictorLeafletLayer.__confidenceRingSegments = confidenceSegments;
           startShrinkPredictorSpin(predictedLngLat, result.confidenceRadiusMeters);
         }
       }
