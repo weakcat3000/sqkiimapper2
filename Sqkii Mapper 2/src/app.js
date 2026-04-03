@@ -9298,20 +9298,33 @@
 
         const bearing = turf.bearing([startLng, startLat], [endLng, endLat]);
         const headLength = shrinkPredictorClamp(Math.min(headLengthMeters, distanceMeters * 0.28), 10, 22);
+        const shaftVisibleMeters = shrinkPredictorClamp(distanceMeters * 0.12, 8, 18);
+        const shaftGapMeters = shrinkPredictorClamp(distanceMeters * 0.07, 5, 12);
+        const shaftEndMeters = Math.max(0, distanceMeters - headLength * 0.92);
         const leftPoint = turf.destination([endLng, endLat], headLength / 1000, bearing + 150, { units: 'kilometers' }).geometry.coordinates;
         const rightPoint = turf.destination([endLng, endLat], headLength / 1000, bearing - 150, { units: 'kilometers' }).geometry.coordinates;
+        const features = [];
+
+        for (let cursor = 0; cursor < shaftEndMeters; cursor += shaftVisibleMeters + shaftGapMeters) {
+          const segStart = Math.max(0, cursor);
+          const segEnd = Math.min(shaftEndMeters, cursor + shaftVisibleMeters);
+          if (segEnd <= segStart) continue;
+          const segStartPoint = turf.destination([startLng, startLat], segStart / 1000, bearing, { units: 'kilometers' }).geometry.coordinates;
+          const segEndPoint = turf.destination([startLng, startLat], segEnd / 1000, bearing, { units: 'kilometers' }).geometry.coordinates;
+          features.push({
+            type: 'Feature',
+            properties: { role: 'shaft' },
+            geometry: {
+              type: 'LineString',
+              coordinates: [segStartPoint, segEndPoint]
+            }
+          });
+        }
 
         return {
           type: 'FeatureCollection',
           features: [
-            {
-              type: 'Feature',
-              properties: { role: 'shaft' },
-              geometry: {
-                type: 'LineString',
-                coordinates: [[startLng, startLat], [endLng, endLat]]
-              }
-            },
+            ...features,
             {
               type: 'Feature',
               properties: { role: 'head-left' },
@@ -9426,6 +9439,12 @@
         return items[items.length - 1].value;
       }
 
+      function shrinkPredictorMean(values = []) {
+        const nums = (Array.isArray(values) ? values : []).map((value) => Number(value)).filter(Number.isFinite);
+        if (!nums.length) return NaN;
+        return nums.reduce((sum, value) => sum + value, 0) / nums.length;
+      }
+
       function shrinkPredictorNormalizeSteps(rawSteps = []) {
         return (Array.isArray(rawSteps) ? rawSteps : [])
           .map((step, index) => {
@@ -9449,6 +9468,34 @@
             return coinDbStepTimestamp(a) - coinDbStepTimestamp(b);
           })
           .map((step, index) => ({ ...step, step: index + 1 }));
+      }
+
+      function shrinkPredictorBuildNormalizedSignature(steps = []) {
+        const normalizedSteps = shrinkPredictorNormalizeSteps(steps);
+        if (!normalizedSteps.length) return [];
+
+        const origin = normalizedSteps[0];
+        const originRadius = Math.max(1, Number(origin.radiusMeters) || 1);
+        const totalPathMeters = normalizedSteps.slice(1).reduce((sum, step, index) => {
+          return sum + (shrinkPredictorMetersBetween(normalizedSteps[index], step) || 0);
+        }, 0);
+        const safeTotalPath = Math.max(originRadius * 0.05, totalPathMeters);
+
+        return normalizedSteps.map((step, index) => {
+          const offset = shrinkPredictorSignedOffsetMeters(origin, step);
+          const prev = index > 0 ? normalizedSteps[index - 1] : null;
+          const stepDistance = prev ? (shrinkPredictorMetersBetween(prev, step) || 0) : 0;
+          const driftDistance = Math.hypot(offset.east, offset.north);
+          return {
+            index,
+            progress: normalizedSteps.length <= 1 ? 1 : index / (normalizedSteps.length - 1),
+            radiusRatio: step.radiusMeters / originRadius,
+            eastRatio: offset.east / originRadius,
+            northRatio: offset.north / originRadius,
+            driftRatio: driftDistance / originRadius,
+            stepDistanceRatio: stepDistance / safeTotalPath
+          };
+        });
       }
 
       function shrinkPredictorFindCurrentObservation(fid, center, radiusMeters, featureProps = {}) {
@@ -9529,10 +9576,13 @@
         const observedLastRadius = Math.max(1, Number(observedLast.radiusMeters) || 1);
         const historyFirstRadius = Math.max(1, Number(historyFirst.radiusMeters) || 1);
         const historyLastRadius = Math.max(1, Number(historyLast.radiusMeters) || 1);
+        const observedSignature = shrinkPredictorBuildNormalizedSignature(observedSteps);
+        const historySignature = shrinkPredictorBuildNormalizedSignature(prefix);
 
         let radiusErr = 0;
         let centerErr = 0;
         let movementErr = 0;
+        let shapeErr = 0;
 
         for (let index = 0; index < observedSteps.length; index += 1) {
           const observedStep = observedSteps[index];
@@ -9553,20 +9603,33 @@
             const historyStepMove = shrinkPredictorMetersBetween(historyPrev, historyStep) / Math.max(1, Number(historyPrev.radiusMeters) || 1);
             movementErr += Math.abs(observedStepMove - historyStepMove);
           }
+
+          const observedPoint = observedSignature[index];
+          const historyPoint = historySignature[index];
+          if (observedPoint && historyPoint) {
+            shapeErr += Math.sqrt(
+              ((observedPoint.radiusRatio - historyPoint.radiusRatio) ** 2) * 2.8 +
+              ((observedPoint.eastRatio - historyPoint.eastRatio) ** 2) * 1.55 +
+              ((observedPoint.northRatio - historyPoint.northRatio) ** 2) * 1.55 +
+              ((observedPoint.stepDistanceRatio - historyPoint.stepDistanceRatio) ** 2) * 0.9
+            );
+          }
         }
 
         radiusErr /= observedSteps.length;
         centerErr /= observedSteps.length;
         if (observedSteps.length > 1) movementErr /= (observedSteps.length - 1);
+        shapeErr /= observedSteps.length;
 
         const progressErr = Math.abs(
           (observedLastRadius / observedFirstRadius) - (historyLastRadius / historyFirstRadius)
         );
 
         const historyRemaining = shrinkPredictorSignedOffsetMeters(historyLast, history.exactCoords);
-        const scaleFirst = observedFirstRadius / historyFirstRadius;
-        const scaleLast = observedLastRadius / historyLastRadius;
-        const scale = shrinkPredictorClamp(Math.sqrt(Math.max(0.25, scaleFirst * scaleLast)), 0.55, 2.4);
+        const averageRadiusScale = shrinkPredictorMean(observedSteps.map((step, index) => (
+          step.radiusMeters / Math.max(1, Number(prefix[index]?.radiusMeters) || 1)
+        )));
+        const scale = shrinkPredictorClamp(Number.isFinite(averageRadiusScale) ? averageRadiusScale : (observedFirstRadius / historyFirstRadius), 0.55, 2.4);
         const projectedOffset = {
           east: historyRemaining.east * scale,
           north: historyRemaining.north * scale
@@ -9574,8 +9637,14 @@
         const predictedPoint = shrinkPredictorDestination(observedLast, projectedOffset.east, projectedOffset.north);
         if (!predictedPoint) return null;
 
-        const score = (1 / (0.35 + radiusErr * 3.1 + centerErr * 1.35 + movementErr * 1.6 + progressErr * 2.4))
-          * (1 + Math.min(observedSteps.length, 6) * 0.045);
+        const score = 1 / (
+          0.4 +
+          shapeErr * 2.55 +
+          radiusErr * 1.85 +
+          centerErr * 1.15 +
+          movementErr * 1.05 +
+          progressErr * 1.65
+        );
 
         return {
           history,
@@ -9587,7 +9656,8 @@
           radiusErr,
           centerErr,
           movementErr,
-          progressErr
+          progressErr,
+          shapeErr
         };
       }
 
@@ -9654,7 +9724,7 @@
           bestScore: matches[0]?.score || 0,
           note: observedSteps.length <= 1
             ? 'Only one observed shrink step was available, so the prediction leans heavily on historical shape matching and should be treated as directional.'
-            : `Weighted from ${matches.length} historical match${matches.length === 1 ? '' : 'es'} with known exact endpoints.`
+            : `Matched against ${matches.length} historical shrink path${matches.length === 1 ? '' : 's'} using normalized full-path geometry and radius ratios.`
         };
       }
 
@@ -9878,8 +9948,11 @@
               paint: {
                 'line-color': '#f5d0fe',
                 'line-width': 2.5,
-                'line-opacity': 0.82,
-                'line-dasharray': [1.2, 1.6]
+                'line-opacity': 0.82
+              },
+              layout: {
+                'line-cap': 'round',
+                'line-join': 'round'
               }
             });
           }
