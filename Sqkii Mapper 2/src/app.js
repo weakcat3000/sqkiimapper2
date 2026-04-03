@@ -9835,6 +9835,81 @@
         return candidates;
       }
 
+      function shrinkPredictorConfigFingerprint(config) {
+        if (!config) return '';
+        return JSON.stringify({
+          roomFactor: Number(config.roomFactor || 0).toFixed(3),
+          penalties: Object.fromEntries(Object.entries(config.penalties || {}).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => [key, Number(value || 0).toFixed(3)])),
+          ensemble: Object.fromEntries(Object.entries(config.ensemble || {}).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => [key, Number(value || 0).toFixed(4)])),
+          blend: Object.fromEntries(Object.entries(config.blend || {}).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => [key, Number(value || 0).toFixed(4)]))
+        });
+      }
+
+      function shrinkPredictorShiftWeights(baseWeights = {}, deltas = {}, fallback = {}) {
+        const next = { ...fallback, ...baseWeights };
+        for (const [key, delta] of Object.entries(deltas || {})) {
+          next[key] = (Number(next[key]) || 0) + (Number(delta) || 0);
+        }
+        return shrinkPredictorNormalizeWeightMap(next, fallback);
+      }
+
+      function shrinkPredictorGenerateRefinedCandidates(leaders = [], round = 1) {
+        const seeds = (Array.isArray(leaders) ? leaders : []).slice(0, round === 1 ? 4 : 2);
+        if (!seeds.length) return [];
+        const roomStep = round === 1 ? 0.055 : 0.03;
+        const stageStep = round === 1 ? 0.28 : 0.16;
+        const penaltyScale = round === 1 ? 0.16 : 0.09;
+        const candidates = [];
+
+        for (const leader of seeds) {
+          const base = leader?.config;
+          if (!base) continue;
+          const roomFactor = Number(base.roomFactor) || 0.82;
+          const penalties = base.penalties || {};
+          const add = (suffix, overrides = {}) => {
+            candidates.push(shrinkPredictorCreateCandidateConfig(base, `${suffix}-r${round}`, overrides));
+          };
+
+          add('tight-stage', {
+            roomFactor: shrinkPredictorClamp(roomFactor - (roomStep * 0.25), 0.6, 0.96),
+            penalties: { stage: Math.max(1.0, (Number(penalties.stage) || 1.8) + stageStep) }
+          });
+          add('loose-stage', {
+            roomFactor: shrinkPredictorClamp(roomFactor + (roomStep * 0.25), 0.6, 0.96),
+            penalties: { stage: Math.max(0.9, (Number(penalties.stage) || 1.8) - stageStep) }
+          });
+          add('memory-bias', {
+            roomFactor: shrinkPredictorClamp(roomFactor, 0.6, 0.96),
+            ensemble: shrinkPredictorShiftWeights(base.ensemble, { fullScaled: 0.05, shapeScaled: 0.03, fullRaw: -0.04, motionRaw: -0.02 }, base.ensemble),
+            blend: shrinkPredictorShiftWeights(base.blend, { full: 0.03, shape: 0.03, motion: -0.06 }, base.blend)
+          });
+          add('raw-bias', {
+            roomFactor: shrinkPredictorClamp(roomFactor, 0.6, 0.96),
+            ensemble: shrinkPredictorShiftWeights(base.ensemble, { fullRaw: 0.05, motionRaw: 0.03, fullScaled: -0.04, shapeScaled: -0.02 }, base.ensemble),
+            blend: shrinkPredictorShiftWeights(base.blend, { motion: 0.05, full: 0.02, shape: -0.07 }, base.blend)
+          });
+          add('radius-drift', {
+            penalties: {
+              radius: Math.max(0.6, (Number(penalties.radius) || 1) * (1 + penaltyScale)),
+              drift: Math.max(0.6, (Number(penalties.drift) || 1) * (1 + penaltyScale * 0.85)),
+              cadence: Math.max(0.4, (Number(penalties.cadence) || 1) * (1 - penaltyScale * 0.5)),
+              size: Math.max(0.4, (Number(penalties.size) || 1) * (1 - penaltyScale * 0.35)),
+              stage: Math.max(0.9, Number(penalties.stage) || 1.8)
+            }
+          });
+        }
+
+        const deduped = [];
+        const seen = new Set();
+        for (const candidate of candidates) {
+          const key = shrinkPredictorConfigFingerprint(candidate);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          deduped.push(candidate);
+        }
+        return deduped;
+      }
+
       function shrinkPredictorGetDefaultConfig() {
         return shrinkPredictorGetBaseConfigLibrary()[0];
       }
@@ -10293,6 +10368,18 @@
         };
       }
 
+      function shrinkPredictorRankCandidates(results = []) {
+        return (Array.isArray(results) ? results : [])
+          .filter((item) => item?.config && item?.backtest)
+          .sort((a, b) => {
+            const scoreDiff = (Number(a.backtest?.score) || Infinity) - (Number(b.backtest?.score) || Infinity);
+            if (Math.abs(scoreDiff) > 1e-6) return scoreDiff;
+            const exactStageDiff = (Number(a.backtest?.exactStageMeanErrorMeters) || Infinity) - (Number(b.backtest?.exactStageMeanErrorMeters) || Infinity);
+            if (Math.abs(exactStageDiff) > 1e-6) return exactStageDiff;
+            return (Number(a.backtest?.p70ErrorMeters) || Infinity) - (Number(b.backtest?.p70ErrorMeters) || Infinity);
+          });
+      }
+
       async function shrinkPredictorCalibrateModel(model, observation, onProgress = null) {
         if (!Array.isArray(model?.samples) || !model.samples.length) return null;
         if (!model.calibrationCache || typeof model.calibrationCache !== 'object') model.calibrationCache = {};
@@ -10301,40 +10388,82 @@
         const stepCount = Math.max(0, Number(observation?.observedSteps?.length) || 0);
         const cacheKey = `${roomCode || 'all'}:${stepCount}:${model.samples.length}:${model.entries?.length || 0}`;
         if (model.calibrationCache[cacheKey]) {
-          if (typeof onProgress === 'function') onProgress(1, 1, model.calibrationCache[cacheKey]);
+          if (typeof onProgress === 'function') {
+            onProgress({
+              phaseIndex: 0,
+              phaseLabel: 'cached result',
+              phaseDone: 1,
+              phaseTotal: 1,
+              overallPercent: 1,
+              best: model.calibrationCache[cacheKey]
+            });
+          }
           return model.calibrationCache[cacheKey];
         }
 
         const calibrationSamples = shrinkPredictorSelectCalibrationSamples(model, observation);
-        const candidates = shrinkPredictorBuildConfigSearchSpace(observation);
-        let best = {
-          config: candidates[0],
-          backtest: shrinkPredictorBacktestConfig(model, calibrationSamples, candidates[0], observation)
-        };
-        if (typeof onProgress === 'function') onProgress(1, candidates.length, best);
+        const phaseOneCandidates = shrinkPredictorBuildConfigSearchSpace(observation);
+        const phasePlans = [
+          { label: 'coarse search', candidates: phaseOneCandidates, progressStart: 0.06, progressEnd: 0.72, round: 1 },
+          { label: 'refining winners', candidates: [], progressStart: 0.72, progressEnd: 0.92, round: 2 },
+          { label: 'final refinement', candidates: [], progressStart: 0.92, progressEnd: 0.995, round: 3 }
+        ];
+        const allResults = [];
+        const seen = new Set();
+        let best = null;
 
-        for (let index = 1; index < candidates.length; index += 1) {
-          const config = candidates[index];
-          const backtest = shrinkPredictorBacktestConfig(model, calibrationSamples, config, observation);
-          const sameScore = Math.abs(backtest.score - best.backtest.score) < 1e-6;
-          const betterSameStage = (backtest.exactStageMeanErrorMeters || Infinity) < (best.backtest.exactStageMeanErrorMeters || Infinity);
-          const betterP70 = (backtest.p70ErrorMeters || Infinity) < (best.backtest.p70ErrorMeters || Infinity);
-          if (backtest.score < best.backtest.score || (sameScore && (betterSameStage || betterP70))) {
-            best = { config, backtest };
+        const evaluatePhase = async (phaseIndex, phase) => {
+          const candidates = (Array.isArray(phase.candidates) ? phase.candidates : []).filter((candidate) => {
+            const key = shrinkPredictorConfigFingerprint(candidate);
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+          phasePlans[phaseIndex].candidates = candidates;
+          const total = Math.max(1, candidates.length);
+          for (let index = 0; index < candidates.length; index += 1) {
+            const config = candidates[index];
+            const backtest = shrinkPredictorBacktestConfig(model, calibrationSamples, config, observation);
+            const current = { config, backtest };
+            allResults.push(current);
+            const ranked = shrinkPredictorRankCandidates(allResults);
+            best = ranked[0] || current;
+            if (typeof onProgress === 'function') {
+              const ratio = (index + 1) / total;
+              const overallPercent = phase.progressStart + ((phase.progressEnd - phase.progressStart) * ratio);
+              onProgress({
+                phaseIndex,
+                phaseLabel: phase.label,
+                phaseDone: index + 1,
+                phaseTotal: total,
+                overallPercent,
+                best,
+                improved: best === current
+              });
+            }
+            if (index % 3 === 0) await shrinkPredictorYieldFrame();
           }
-          if (typeof onProgress === 'function') onProgress(index + 1, candidates.length, best);
-          if (index % 3 === 0) await shrinkPredictorYieldFrame();
-        }
+          return shrinkPredictorRankCandidates(allResults);
+        };
+
+        const rankedAfterCoarse = await evaluatePhase(0, phasePlans[0]);
+        phasePlans[1].candidates = shrinkPredictorGenerateRefinedCandidates(rankedAfterCoarse, 1);
+        const rankedAfterRefine = await evaluatePhase(1, phasePlans[1]);
+        phasePlans[2].candidates = shrinkPredictorGenerateRefinedCandidates(rankedAfterRefine, 2);
+        const rankedFinal = await evaluatePhase(2, phasePlans[2]);
+        best = rankedFinal[0] || best;
+        const totalCandidateCount = phasePlans.reduce((sum, phase) => sum + (phase.candidates?.length || 0), 0);
 
         const calibration = {
           config: best.config,
           backtest: best.backtest,
-          candidateCount: candidates.length,
+          candidateCount: totalCandidateCount,
           targetStepCount: stepCount,
           sampleCount: calibrationSamples.stats?.totalCount || calibrationSamples.samples?.length || 0,
           exactStageSampleCount: calibrationSamples.stats?.exactStageCount || 0,
           nearStageSampleCount: calibrationSamples.stats?.nearStageCount || 0,
-          sameRoomSampleCount: calibrationSamples.stats?.sameRoomCount || 0
+          sameRoomSampleCount: calibrationSamples.stats?.sameRoomCount || 0,
+          searchPasses: phasePlans.length
         };
         model.calibrationCache[cacheKey] = calibration;
         return calibration;
@@ -10423,7 +10552,7 @@
           calibration,
           note: observedSteps.length <= 1
             ? 'Only one observed shrink step was available, so the browser model is extrapolating mostly from historical offset neighbors and should be treated as directional.'
-            : `Memory-style predictor using ${model.samples.length} archived prefix sample${model.samples.length === 1 ? '' : 's'} from ${model.entries.length} exact-ended coin${model.entries.length === 1 ? '' : 's'}. It now searches ${calibration?.candidateCount || 1} candidate algorithm settings and backtests them across ${calibration?.sampleCount || 0} exact-ended prefix sample${(calibration?.sampleCount || 0) === 1 ? '' : 's'}, selecting the lowest average miss distance before predicting the live coin. Then it asks: based on this shrink pattern, where did remembered coins end up? The green dot is placed at the hottest remembered endpoint cluster. Agreement ${(solved.agreement * 100).toFixed(0)}%, uncertainty +/-${Math.round(solved.uncertaintyMeters)}m.`
+            : `Memory-style predictor using ${model.samples.length} archived prefix sample${model.samples.length === 1 ? '' : 's'} from ${model.entries.length} exact-ended coin${model.entries.length === 1 ? '' : 's'}. It now does a multi-pass search across ${calibration?.candidateCount || 1} candidate algorithm settings in ${calibration?.searchPasses || 1} pass${(calibration?.searchPasses || 1) === 1 ? '' : 'es'}, backtesting them across ${calibration?.sampleCount || 0} exact-ended prefix sample${(calibration?.sampleCount || 0) === 1 ? '' : 's'} and refining around the best settings found so far before predicting the live coin. Then it asks: based on this shrink pattern, where did remembered coins end up? The green dot is placed at the hottest remembered endpoint cluster. Agreement ${(solved.agreement * 100).toFixed(0)}%, uncertainty +/-${Math.round(solved.uncertaintyMeters)}m.`
         };
       }
 
@@ -10843,12 +10972,14 @@
           shrinkPredictorSetProgress(28, 'Preparing algorithm search...', true);
           shrinkPredictorSetStatus('Backtesting algorithm profiles against archived exact-ended circles...');
           await shrinkPredictorYieldFrame();
-          const calibration = await shrinkPredictorCalibrateModel(model, observation, (done, total, best) => {
-            const ratio = total > 0 ? done / total : 1;
-            const percent = 28 + (ratio * 58);
-            const bestMean = Number(best?.backtest?.meanErrorMeters);
+          const calibration = await shrinkPredictorCalibrateModel(model, observation, (progress) => {
+            const percent = 28 + (shrinkPredictorClamp(Number(progress?.overallPercent) || 0, 0, 1) * 58);
+            const bestMean = Number(progress?.best?.backtest?.meanErrorMeters);
             const bestText = Number.isFinite(bestMean) ? ` Best ${shrinkPredictorFormatDistance(bestMean)}.` : '';
-            shrinkPredictorSetProgress(percent, `Backtesting candidate algorithms ${done}/${total}.${bestText}`, true);
+            const phaseLabel = String(progress?.phaseLabel || 'searching');
+            const phaseDone = Math.max(0, Number(progress?.phaseDone) || 0);
+            const phaseTotal = Math.max(1, Number(progress?.phaseTotal) || 1);
+            shrinkPredictorSetProgress(percent, `${phaseLabel} ${phaseDone}/${phaseTotal}.${bestText}`, true);
           });
 
           shrinkPredictorSetProgress(90, 'Building prediction overlay...', true);
