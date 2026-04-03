@@ -9604,6 +9604,16 @@
         };
       }
 
+      function shrinkPredictorClampOffsetToCircle(offset = [0, 0], radiusMeters = 0) {
+        const east = Number(offset?.[0]) || 0;
+        const north = Number(offset?.[1]) || 0;
+        const radius = Math.max(0, Number(radiusMeters) || 0);
+        const distance = Math.hypot(east, north);
+        if (!radius || !Number.isFinite(distance) || distance <= radius) return [east, north];
+        const scale = (radius * 0.999) / Math.max(distance, 1e-6);
+        return [east * scale, north * scale];
+      }
+
       function shrinkPredictorBlendNeighborCloud(models = []) {
         const merged = new Map();
         for (const modelItem of (Array.isArray(models) ? models : [])) {
@@ -9927,8 +9937,10 @@
         const driftPenaltyWeight = Number.isFinite(Number(penaltyWeights.drift)) ? Number(penaltyWeights.drift) : 2.2;
         const cadencePenaltyWeight = Number.isFinite(Number(penaltyWeights.cadence)) ? Number(penaltyWeights.cadence) : 1.25;
         const sizePenaltyWeight = Number.isFinite(Number(penaltyWeights.size)) ? Number(penaltyWeights.size) : 1.45;
+        const stagePenaltyWeight = Number.isFinite(Number(penaltyWeights.stage)) ? Number(penaltyWeights.stage) : 1.85;
         const roomFactor = shrinkPredictorClamp(Number(options?.roomFactor) || 0.84, 0.55, 1);
         const queryAnchorRadiusMeters = Math.max(1, Number(queryProfile?.anchorRadiusMeters) || 1);
+        const targetStepCount = Math.max(0, Number(options?.targetStepCount) || Number(queryProfile?.stepCount) || 0);
 
         const scored = samples
           .filter((sample) => String(sample?.entry?.id || '') !== excludeEntryId)
@@ -9949,7 +9961,10 @@
               Math.max(1, Number(sampleProfile.anchorRadiusMeters) || 1) / queryAnchorRadiusMeters
             )) * sizePenaltyWeight
             : 0;
-          let adjustedDistance = embeddingDistance + radiusPenalty + driftPenalty + cadencePenalty + sizePenalty;
+          const stagePenalty = targetStepCount > 0
+            ? Math.abs((Number(sample.prefixLen) || 0) - targetStepCount) * stagePenaltyWeight
+            : 0;
+          let adjustedDistance = embeddingDistance + radiusPenalty + driftPenalty + cadencePenalty + sizePenalty + stagePenalty;
           if (queryRoomCode && sample.roomCode && sample.roomCode === queryRoomCode) adjustedDistance *= roomFactor;
           return {
             ...sample,
@@ -9962,7 +9977,17 @@
           ? scored.filter((sample) => sample.roomCode === queryRoomCode)
           : [];
         const useSameRoomOnly = sameRoomSamples.length >= Math.max(limit, 6);
-        const pool = useSameRoomOnly ? sameRoomSamples : scored;
+        const roomPool = useSameRoomOnly ? sameRoomSamples : scored;
+        let pool = roomPool;
+        if (targetStepCount > 0) {
+          const exactStagePool = roomPool.filter((sample) => (Number(sample.prefixLen) || 0) === targetStepCount);
+          const nearStagePool = roomPool.filter((sample) => Math.abs((Number(sample.prefixLen) || 0) - targetStepCount) <= 1);
+          if (exactStagePool.length >= Math.max(4, Math.ceil(limit * 0.6))) {
+            pool = exactStagePool;
+          } else if (nearStagePool.length >= Math.max(5, Math.ceil(limit * 0.75))) {
+            pool = nearStagePool;
+          }
+        }
 
         const neighbors = pool
           .sort((a, b) => a.adjustedDistance - b.adjustedDistance)
@@ -9994,7 +10019,10 @@
           prediction,
           predictionScaled,
           spread,
-          roomScope: useSameRoomOnly ? 'room' : 'global'
+          roomScope: useSameRoomOnly ? 'room' : 'global',
+          stageScope: targetStepCount > 0 && pool.every((sample) => (Number(sample.prefixLen) || 0) === targetStepCount)
+            ? 'exact'
+            : (targetStepCount > 0 && pool.every((sample) => Math.abs((Number(sample.prefixLen) || 0) - targetStepCount) <= 1) ? 'near' : 'wide')
         };
       }
 
@@ -10053,7 +10081,8 @@
         const uncertaintyMeters = Math.max(12, modelStd + fullModel.spread);
         const agreement = 1 / (1 + modelStd / 80);
         const heatmapPeak = shrinkPredictorComputeHeatmapPeak(blendedNeighbors, meanOffset, anchor.radiusMeters, uncertaintyMeters);
-        const predictedPoint = shrinkPredictorDestination(anchor, heatmapPeak.peakOffset[0], heatmapPeak.peakOffset[1]) || { lat: anchor.lat, lng: anchor.lng };
+        const boundedPeakOffset = shrinkPredictorClampOffsetToCircle(heatmapPeak.peakOffset, anchor.radiusMeters);
+        const predictedPoint = shrinkPredictorDestination(anchor, boundedPeakOffset[0], boundedPeakOffset[1]) || { lat: anchor.lat, lng: anchor.lng };
 
         return {
           anchor,
@@ -10066,9 +10095,10 @@
           uncertaintyMeters,
           heatmapPeak,
           predictedPoint,
-          predictedOffsetMeters: heatmapPeak.peakOffset,
+          predictedOffsetMeters: boundedPeakOffset,
           modelCount: ensemblePredictions.length,
-          roomScope: fullModel.roomScope
+          roomScope: fullModel.roomScope,
+          stageScope: fullModel.stageScope
         };
       }
 
@@ -10230,15 +10260,16 @@
           agreement: solved.agreement,
           uncertaintyMeters: solved.uncertaintyMeters,
           currentRadiusMeters: Number(anchor.radiusMeters) || 0,
-          peakOffsetMeters: solved.heatmapPeak.peakOffset,
+          peakOffsetMeters: solved.predictedOffsetMeters,
           modelCount: solved.modelCount,
           trainingSampleCount: model.samples.length,
           trainingCoinCount: model.entries.length,
           roomScope: solved.roomScope,
+          stageScope: solved.stageScope,
           calibration,
           note: observedSteps.length <= 1
             ? 'Only one observed shrink step was available, so the browser model is extrapolating mostly from historical offset neighbors and should be treated as directional.'
-            : `Browser-side heatmap model using ${model.samples.length} prefix sample${model.samples.length === 1 ? '' : 's'} from ${model.entries.length} archived exact-ended coin${model.entries.length === 1 ? '' : 's'}. It first backtests ${calibration?.candidateCount || 1} algorithm profile${(calibration?.candidateCount || 1) === 1 ? '' : 's'} against ${calibration?.backtest?.sampleCount || 0} historical prefix sample${(calibration?.backtest?.sampleCount || 0) === 1 ? '' : 's'} and then uses the lowest-error profile for the live circle. The green dot is placed at the hottest blended-neighbor peak. Agreement ${(solved.agreement * 100).toFixed(0)}%, uncertainty +/-${Math.round(solved.uncertaintyMeters)}m.`
+            : `Memory-style predictor using ${model.samples.length} archived prefix sample${model.samples.length === 1 ? '' : 's'} from ${model.entries.length} exact-ended coin${model.entries.length === 1 ? '' : 's'}. It first backtests ${calibration?.candidateCount || 1} algorithm profile${(calibration?.candidateCount || 1) === 1 ? '' : 's'} against ${calibration?.backtest?.sampleCount || 0} historical prefix sample${(calibration?.backtest?.sampleCount || 0) === 1 ? '' : 's'}, then asks: based on this shrink pattern, where did remembered coins end up? The green dot is placed at the hottest remembered endpoint cluster. Agreement ${(solved.agreement * 100).toFixed(0)}%, uncertainty +/-${Math.round(solved.uncertaintyMeters)}m.`
         };
       }
 
