@@ -10602,7 +10602,7 @@
         };
       }
 
-      function shrinkPredictorBacktestConfig(model, calibrationSelection, config, observation = null) {
+      function shrinkPredictorBacktestConfig(model, calibrationSelection, config, observation = null, options = {}) {
         const samples = Array.isArray(calibrationSelection?.samples)
           ? calibrationSelection.samples
           : (Array.isArray(calibrationSelection) ? calibrationSelection : []);
@@ -10611,6 +10611,7 @@
         const nearStateErrors = [];
         const targetProfile = shrinkPredictorBuildSequenceProfile(observation?.observedSteps || []);
         const byEntry = new Map();
+        const abortScore = Number(options?.abortScore);
 
         for (const sample of samples) {
           const entryId = String(sample?.entry?.id || '');
@@ -10663,6 +10664,23 @@
             meanErrorMeters: coinWeightedMean,
             stateMeanErrorMeters: coinStateMean
           });
+
+          if (Number.isFinite(abortScore) && coinErrors.length >= 3) {
+            const runningMean = shrinkPredictorMean(coinErrors.map((item) => item.meanErrorMeters)) || Infinity;
+            if (runningMean > abortScore * 1.035) {
+              return {
+                score: runningMean,
+                meanErrorMeters: runningMean,
+                medianErrorMeters: Infinity,
+                p70ErrorMeters: Infinity,
+                exactStateMeanErrorMeters: exactStateErrors.length ? (shrinkPredictorMean(exactStateErrors) || Infinity) : Infinity,
+                nearStateMeanErrorMeters: nearStateErrors.length ? (shrinkPredictorMean(nearStateErrors) || Infinity) : Infinity,
+                sampleCount: samples.length,
+                entryCount: coinErrors.length,
+                abortedEarly: true
+              };
+            }
+          }
         }
 
         if (!coinErrors.length) {
@@ -10751,7 +10769,14 @@
           const total = Math.max(1, candidates.length);
           for (let index = 0; index < candidates.length; index += 1) {
             const config = candidates[index];
-            const backtest = shrinkPredictorBacktestConfig(model, calibrationSamples, config, observation);
+            const abortScore = Number(best?.backtest?.score);
+            const backtest = shrinkPredictorBacktestConfig(
+              model,
+              calibrationSamples,
+              config,
+              observation,
+              phaseIndex < 2 && Number.isFinite(abortScore) ? { abortScore } : {}
+            );
             const current = { config, backtest };
             allResults.push(current);
             const ranked = shrinkPredictorRankCandidates(allResults);
