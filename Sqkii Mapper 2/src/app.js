@@ -10520,17 +10520,27 @@
 
         const spreadDistances = matches.map((match) => shrinkPredictorMetersBetween(solved.predictedPoint, match.predictedPoint));
         const spreadWeights = matches.map((match) => match.score);
-        const confidenceRadiusMeters = shrinkPredictorClamp(
+        const predictedDriftMeters = Math.hypot(
+          Number(solved.predictedOffsetMeters?.[0]) || 0,
+          Number(solved.predictedOffsetMeters?.[1]) || 0
+        );
+        const insideCurrentCircleMax = Math.max(
+          0,
+          (Number(anchor.radiusMeters) || 0) - predictedDriftMeters
+        );
+        const rawConfidenceRadiusMeters = Math.max(
+          0,
           Math.max(
-            15,
+            12,
             shrinkPredictorWeightedPercentile(spreadDistances, spreadWeights, 0.72) || 0,
             solved.uncertaintyMeters * 1.18,
             solved.heatmapPeak.heatRadiusMeters * 0.92,
             (matches[0]?.remainingDistanceMeters || 0) * 0.14
-          ),
-          15,
-          Math.max(45, Number(anchor.radiusMeters) * 1.35 || 45)
+          )
         );
+        const confidenceRadiusMeters = insideCurrentCircleMax > 0
+          ? Math.min(rawConfidenceRadiusMeters, insideCurrentCircleMax * 0.998)
+          : 0;
 
         return {
           mode: 'ml',
