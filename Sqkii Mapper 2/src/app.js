@@ -10012,9 +10012,8 @@
           stepCount >= 15 ? 2.1 : 1.85
         ];
         const shrinkRateBiases = [
-          1.35,
-          1.65,
-          1.95
+          1.4,
+          1.8
         ];
         const scaleModes = [
           { suffix: 'memory', ensembleDelta: { fullScaled: 0.08, shapeScaled: 0.05, fullRaw: -0.06, motionRaw: -0.03 }, blendDelta: { full: 0.04, shape: 0.02, motion: -0.06 } },
