@@ -3668,6 +3668,7 @@
       let seGlimpseSigns = null;
       let seReconCoin = null;
       let seSearchLampPost = null;
+      let sePredictExact = null;
 
 
       seDrag.addEventListener('click', () => {
@@ -3901,6 +3902,10 @@
             try { seSearchLampPost.remove(); } catch { }
             seSearchLampPost = null;
           }
+          if (sePredictExact) {
+            try { sePredictExact.remove(); } catch { }
+            sePredictExact = null;
+          }
 
           // Create new Calculate Statistics button
           seCalcStats = document.createElement('button');
@@ -4019,12 +4024,39 @@
             openLampPostSearchModal(center, radius);
           };
 
+          sePredictExact = document.createElement('button');
+          sePredictExact.className = 'btn small';
+          sePredictExact.style.cssText = 'width:100%;margin-top:4px;background:rgba(168,85,247,0.14);border-color:#c084fc;color:#f3e8ff;';
+          sePredictExact.textContent = '✨ Predict Exact';
+
+          sePredictExact.onclick = () => {
+            let center = p._circleCenter;
+            let radius = p._circleRadius;
+
+            if (!center || !radius) {
+              try {
+                const centroid = turf.centroid(f);
+                center = centroid.geometry.coordinates;
+                const bbox = turf.bbox(f);
+                const dx = bbox[2] - bbox[0];
+                const dy = bbox[3] - bbox[1];
+                radius = Math.max(dx, dy) * 111320 / 2;
+              } catch {
+                alert('Could not determine circle parameters.');
+                return;
+              }
+            }
+
+            openShrinkPredictorModal(fid, center, radius, f, p);
+          };
+
           // Insert all buttons before the actions row
           const actionsRow = editorEl.querySelector('.style-actions');
           if (actionsRow) {
             const parent = actionsRow.parentElement;
-            // Order: Calculate → Recon → Glimpse → actions
+            // Order: Calculate → Predict → Recon → Glimpse → Search → actions
             parent.insertBefore(seCalcStats, actionsRow);
+            parent.insertBefore(sePredictExact, actionsRow);
             parent.insertBefore(seReconCoin, actionsRow);
             parent.insertBefore(seGlimpseSigns, actionsRow);
             parent.insertBefore(seSearchLampPost, actionsRow);
@@ -4075,6 +4107,10 @@
           if (seSearchLampPost) {
             try { seSearchLampPost.remove(); } catch { }
             seSearchLampPost = null;
+          }
+          if (sePredictExact) {
+            try { sePredictExact.remove(); } catch { }
+            sePredictExact = null;
           }
 
 
@@ -4139,6 +4175,10 @@
         if (seGlimpseSigns) {
           try { seGlimpseSigns.remove(); } catch { }
           seGlimpseSigns = null;
+        }
+        if (sePredictExact) {
+          try { sePredictExact.remove(); } catch { }
+          sePredictExact = null;
         }
       }
 
@@ -9110,6 +9150,658 @@
 
         coinDbSetStatus(`Exported ${rows.length} row(s) to Excel.`);
       }
+
+      /* ================= Shrink Predictor ================= */
+      const shrinkPredictorModal = byId('shrink-predictor-modal');
+      const shrinkPredictorCloseBtn = byId('shrink-predictor-close');
+      const shrinkPredictorRunBtn = byId('shrink-predictor-run');
+      const shrinkPredictorClearBtn = byId('shrink-predictor-clear');
+      const shrinkPredictorStatusEl = byId('shrink-predictor-status');
+      const shrinkPredictorSummaryEl = byId('shrink-predictor-summary');
+      const shrinkPredictorResultsEl = byId('shrink-predictor-results');
+      const SHRINK_PREDICTOR_SRC = 'shrink-predictor-src';
+      const SHRINK_PREDICTOR_MATCH_SRC = 'shrink-predictor-match-src';
+      const SHRINK_PREDICTOR_LINE_SRC = 'shrink-predictor-line-src';
+      const SHRINK_PREDICTOR_CONF_SRC = 'shrink-predictor-confidence-src';
+      let currentShrinkPredictorContext = null;
+      let shrinkPredictorLeafletLayer = null;
+
+      function shrinkPredictorSetStatus(message, isError = false) {
+        if (!shrinkPredictorStatusEl) return;
+        shrinkPredictorStatusEl.textContent = message || '';
+        shrinkPredictorStatusEl.style.color = isError ? '#fca5a5' : 'var(--muted)';
+      }
+
+      function shrinkPredictorClamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function shrinkPredictorFormatDistance(value) {
+        const meters = Number(value);
+        if (!Number.isFinite(meters)) return 'n/a';
+        if (meters >= 1000) return `${(meters / 1000).toFixed(2)} km`;
+        return `${Math.round(meters)} m`;
+      }
+
+      function shrinkPredictorSignedOffsetMeters(origin, target) {
+        const ox = Number(origin?.lng);
+        const oy = Number(origin?.lat);
+        const tx = Number(target?.lng);
+        const ty = Number(target?.lat);
+        if (![ox, oy, tx, ty].every(Number.isFinite)) return { east: 0, north: 0 };
+
+        const east = turf.distance([ox, oy], [tx, oy], { units: 'kilometers' }) * 1000 * (tx >= ox ? 1 : -1);
+        const north = turf.distance([ox, oy], [ox, ty], { units: 'kilometers' }) * 1000 * (ty >= oy ? 1 : -1);
+        return { east, north };
+      }
+
+      function shrinkPredictorDestination(origin, east, north) {
+        const lng = Number(origin?.lng);
+        const lat = Number(origin?.lat);
+        if (![lng, lat, east, north].every(Number.isFinite)) return null;
+        const distanceMeters = Math.hypot(east, north);
+        if (!Number.isFinite(distanceMeters) || distanceMeters <= 0.001) return { lat, lng };
+        const bearing = Math.atan2(east, north) * 180 / Math.PI;
+        const destination = turf.destination([lng, lat], distanceMeters / 1000, bearing, { units: 'kilometers' });
+        return {
+          lat: Number(destination?.geometry?.coordinates?.[1]),
+          lng: Number(destination?.geometry?.coordinates?.[0])
+        };
+      }
+
+      function shrinkPredictorMetersBetween(a, b) {
+        const ax = Number(a?.lng);
+        const ay = Number(a?.lat);
+        const bx = Number(b?.lng);
+        const by = Number(b?.lat);
+        if (![ax, ay, bx, by].every(Number.isFinite)) return NaN;
+        return turf.distance([ax, ay], [bx, by], { units: 'kilometers' }) * 1000;
+      }
+
+      function shrinkPredictorWeightedPercentile(values, weights, percentile = 0.7) {
+        const items = values
+          .map((value, index) => ({ value: Number(value), weight: Math.max(0, Number(weights?.[index]) || 0) }))
+          .filter((item) => Number.isFinite(item.value) && item.weight > 0)
+          .sort((a, b) => a.value - b.value);
+        if (!items.length) return NaN;
+        const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
+        const target = totalWeight * shrinkPredictorClamp(percentile, 0, 1);
+        let running = 0;
+        for (const item of items) {
+          running += item.weight;
+          if (running >= target) return item.value;
+        }
+        return items[items.length - 1].value;
+      }
+
+      function shrinkPredictorNormalizeSteps(rawSteps = []) {
+        return (Array.isArray(rawSteps) ? rawSteps : [])
+          .map((step, index) => {
+            const lat = Number(step?.lat);
+            const lng = Number(step?.lng);
+            const radiusMeters = Number(step?.radiusMeters);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(radiusMeters) || radiusMeters <= 0) return null;
+            const stepNo = Number(step?.step);
+            return {
+              ...step,
+              step: Number.isFinite(stepNo) ? stepNo : index + 1,
+              lat,
+              lng,
+              radiusMeters
+            };
+          })
+          .filter(Boolean)
+          .sort((a, b) => {
+            const stepDiff = (Number(a.step) || 0) - (Number(b.step) || 0);
+            if (stepDiff !== 0) return stepDiff;
+            return coinDbStepTimestamp(a) - coinDbStepTimestamp(b);
+          })
+          .map((step, index) => ({ ...step, step: index + 1 }));
+      }
+
+      function shrinkPredictorFindCurrentObservation(fid, center, radiusMeters, featureProps = {}) {
+        const snapshotState = coinDbSerializeState();
+        const groups = buildSilverCoinArchiveGroups(snapshotState);
+        const coinId = coinDbRootCoinId(featureProps?._coinId || featureProps?.coin_id || featureProps?.fid || featureProps?._gid || '');
+        const coinLabel = coinDbCanonicalLabel(featureProps?._coinLabel || featureProps?.coin_label || featureProps?.name || featureProps?.title || '');
+        let matchedGroup = groups.find((group) => group.steps.some((step) => String(step?.fid || '') === String(fid)));
+
+        if (!matchedGroup && coinId) {
+          matchedGroup = groups.find((group) => coinDbRootCoinId(group.coinId) === coinId);
+        }
+
+        if (!matchedGroup && coinLabel) {
+          matchedGroup = groups.find((group) => coinDbCanonicalLabel(group.coinLabel) === coinLabel);
+        }
+
+        let observedSteps = shrinkPredictorNormalizeSteps(matchedGroup?.steps || []);
+        const matchedIndex = observedSteps.findIndex((step) => String(step?.fid || '') === String(fid));
+        if (matchedIndex >= 0) {
+          observedSteps = observedSteps.slice(0, matchedIndex + 1);
+        }
+
+        if (!observedSteps.length) {
+          observedSteps = [{
+            step: 1,
+            lat: Number(center?.[1]),
+            lng: Number(center?.[0]),
+            radiusMeters: Number(radiusMeters),
+            featureName: String(featureProps?.name || 'Selected circle')
+          }].filter((step) => Number.isFinite(step.lat) && Number.isFinite(step.lng) && Number.isFinite(step.radiusMeters) && step.radiusMeters > 0);
+        }
+
+        const lastStep = observedSteps[observedSteps.length - 1] || null;
+        return {
+          fid: String(fid || ''),
+          coinId,
+          coinLabel: coinLabel || coinDbCanonicalLabel(matchedGroup?.coinLabel || featureProps?.name || 'Selected circle') || 'Selected circle',
+          observedSteps,
+          matchedGroup,
+          center: lastStep ? [lastStep.lng, lastStep.lat] : center,
+          radiusMeters: Number(lastStep?.radiusMeters || radiusMeters) || 0
+        };
+      }
+
+      async function shrinkPredictorLoadHistories() {
+        let entries = [];
+        if (currentRoomCode) {
+          entries = await fetchCoinDbEntries();
+        } else if (Array.isArray(coinDbEntriesCache) && coinDbEntriesCache.length) {
+          entries = coinDbEntriesCache;
+        }
+
+        return (entries || [])
+          .map((entry) => {
+            const exactCoords = coinDbGetExactCoords(entry);
+            const steps = shrinkPredictorNormalizeSteps(entry?.lifecycle || []);
+            if (!exactCoords || !steps.length) return null;
+            return {
+              entry,
+              steps,
+              exactCoords
+            };
+          })
+          .filter(Boolean);
+      }
+
+      function shrinkPredictorMatchHistory(observedSteps, history) {
+        if (!Array.isArray(observedSteps) || !observedSteps.length || !history?.steps?.length || !history?.exactCoords) return null;
+        if (history.steps.length < observedSteps.length) return null;
+
+        const prefix = history.steps.slice(0, observedSteps.length);
+        const observedFirst = observedSteps[0];
+        const observedLast = observedSteps[observedSteps.length - 1];
+        const historyFirst = prefix[0];
+        const historyLast = prefix[prefix.length - 1];
+        const observedFirstRadius = Math.max(1, Number(observedFirst.radiusMeters) || 1);
+        const observedLastRadius = Math.max(1, Number(observedLast.radiusMeters) || 1);
+        const historyFirstRadius = Math.max(1, Number(historyFirst.radiusMeters) || 1);
+        const historyLastRadius = Math.max(1, Number(historyLast.radiusMeters) || 1);
+
+        let radiusErr = 0;
+        let centerErr = 0;
+        let movementErr = 0;
+
+        for (let index = 0; index < observedSteps.length; index += 1) {
+          const observedStep = observedSteps[index];
+          const historyStep = prefix[index];
+          radiusErr += Math.abs((observedStep.radiusMeters / observedFirstRadius) - (historyStep.radiusMeters / historyFirstRadius));
+
+          const observedOffset = shrinkPredictorSignedOffsetMeters(observedFirst, observedStep);
+          const historyOffset = shrinkPredictorSignedOffsetMeters(historyFirst, historyStep);
+          centerErr += Math.hypot(
+            observedOffset.east / observedFirstRadius - historyOffset.east / historyFirstRadius,
+            observedOffset.north / observedFirstRadius - historyOffset.north / historyFirstRadius
+          );
+
+          if (index > 0) {
+            const observedPrev = observedSteps[index - 1];
+            const historyPrev = prefix[index - 1];
+            const observedStepMove = shrinkPredictorMetersBetween(observedPrev, observedStep) / Math.max(1, Number(observedPrev.radiusMeters) || 1);
+            const historyStepMove = shrinkPredictorMetersBetween(historyPrev, historyStep) / Math.max(1, Number(historyPrev.radiusMeters) || 1);
+            movementErr += Math.abs(observedStepMove - historyStepMove);
+          }
+        }
+
+        radiusErr /= observedSteps.length;
+        centerErr /= observedSteps.length;
+        if (observedSteps.length > 1) movementErr /= (observedSteps.length - 1);
+
+        const progressErr = Math.abs(
+          (observedLastRadius / observedFirstRadius) - (historyLastRadius / historyFirstRadius)
+        );
+
+        const historyRemaining = shrinkPredictorSignedOffsetMeters(historyLast, history.exactCoords);
+        const scaleFirst = observedFirstRadius / historyFirstRadius;
+        const scaleLast = observedLastRadius / historyLastRadius;
+        const scale = shrinkPredictorClamp(Math.sqrt(Math.max(0.25, scaleFirst * scaleLast)), 0.55, 2.4);
+        const projectedOffset = {
+          east: historyRemaining.east * scale,
+          north: historyRemaining.north * scale
+        };
+        const predictedPoint = shrinkPredictorDestination(observedLast, projectedOffset.east, projectedOffset.north);
+        if (!predictedPoint) return null;
+
+        const score = (1 / (0.35 + radiusErr * 3.1 + centerErr * 1.35 + movementErr * 1.6 + progressErr * 2.4))
+          * (1 + Math.min(observedSteps.length, 6) * 0.045);
+
+        return {
+          history,
+          prefix,
+          score,
+          predictedPoint,
+          projectedOffset,
+          remainingDistanceMeters: Math.hypot(projectedOffset.east, projectedOffset.north),
+          radiusErr,
+          centerErr,
+          movementErr,
+          progressErr
+        };
+      }
+
+      function shrinkPredictorConfidenceLabel(result) {
+        if (!result || result.mode === 'fallback') return 'Low';
+        if ((result.observedSteps?.length || 0) >= 4 && result.matches.length >= 5 && result.bestScore >= 1.6) return 'Higher';
+        if ((result.observedSteps?.length || 0) >= 2 && result.matches.length >= 3 && result.bestScore >= 0.95) return 'Medium';
+        return 'Low';
+      }
+
+      function shrinkPredictorBuildResult(observation, histories) {
+        const observedSteps = observation?.observedSteps || [];
+        const anchor = observedSteps[observedSteps.length - 1];
+        if (!anchor) return null;
+
+        const matches = histories
+          .map((history) => shrinkPredictorMatchHistory(observedSteps, history))
+          .filter(Boolean)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 8);
+
+        if (!matches.length) {
+          const predictedPoint = { lat: anchor.lat, lng: anchor.lng };
+          return {
+            mode: 'fallback',
+            observation,
+            observedSteps,
+            predictedPoint,
+            confidenceRadiusMeters: Math.max(25, Number(anchor.radiusMeters) || 25),
+            matches: [],
+            bestScore: 0,
+            note: 'No archived circles with exact endpoints were available for this room yet, so the predictor is using the current circle center as a baseline.'
+          };
+        }
+
+        const totalWeight = matches.reduce((sum, match) => sum + match.score, 0) || 1;
+        const weightedOffset = matches.reduce((acc, match) => {
+          const offset = shrinkPredictorSignedOffsetMeters(anchor, match.predictedPoint);
+          acc.east += offset.east * match.score;
+          acc.north += offset.north * match.score;
+          return acc;
+        }, { east: 0, north: 0 });
+
+        const predictedPoint = shrinkPredictorDestination(anchor, weightedOffset.east / totalWeight, weightedOffset.north / totalWeight) || { lat: anchor.lat, lng: anchor.lng };
+        const spreadDistances = matches.map((match) => shrinkPredictorMetersBetween(predictedPoint, match.predictedPoint));
+        const spreadWeights = matches.map((match) => match.score);
+        const confidenceRadiusMeters = shrinkPredictorClamp(
+          Math.max(
+            15,
+            shrinkPredictorWeightedPercentile(spreadDistances, spreadWeights, 0.72) || 0,
+            (matches[0]?.remainingDistanceMeters || 0) * 0.18
+          ),
+          15,
+          Math.max(45, Number(anchor.radiusMeters) || 45)
+        );
+
+        return {
+          mode: 'historical',
+          observation,
+          observedSteps,
+          predictedPoint,
+          confidenceRadiusMeters,
+          matches,
+          bestScore: matches[0]?.score || 0,
+          note: observedSteps.length <= 1
+            ? 'Only one observed shrink step was available, so the prediction leans heavily on historical shape matching and should be treated as directional.'
+            : `Weighted from ${matches.length} historical match${matches.length === 1 ? '' : 'es'} with known exact endpoints.`
+        };
+      }
+
+      function shrinkPredictorRenderSummary(observation, historyCount = 0) {
+        if (!shrinkPredictorSummaryEl) return;
+        if (!observation?.observedSteps?.length) {
+          shrinkPredictorSummaryEl.innerHTML = '';
+          return;
+        }
+
+        const lastStep = observation.observedSteps[observation.observedSteps.length - 1];
+        const chips = [
+          `${escapeHtml(observation.coinLabel || 'Selected circle')}`,
+          `${observation.observedSteps.length} observed shrink${observation.observedSteps.length === 1 ? '' : 's'}`,
+          `Current radius ${escapeHtml(coinDbFormatRadius(lastStep?.radiusMeters))}`,
+          `${historyCount} archived exact match${historyCount === 1 ? '' : 'es'}`
+        ];
+
+        shrinkPredictorSummaryEl.innerHTML = chips
+          .map((label) => `<span class="shrink-predictor-chip">${label}</span>`)
+          .join('');
+      }
+
+      function shrinkPredictorRenderResults(result) {
+        if (!shrinkPredictorResultsEl) return;
+        if (!result?.predictedPoint) {
+          shrinkPredictorResultsEl.innerHTML = '<div class="shrink-predictor-empty">Select a circle and run the predictor to see a likely endpoint.</div>';
+          return;
+        }
+
+        const confidenceLabel = shrinkPredictorConfidenceLabel(result);
+        const predictedCoordText = `${coinDbFormatCoord(result.predictedPoint.lat)}, ${coinDbFormatCoord(result.predictedPoint.lng)}`;
+        const bestMatch = result.matches[0];
+
+        const matchHtml = result.matches.length
+          ? result.matches.map((match, index) => {
+            const exactCoords = match.history?.exactCoords || {};
+            const scorePct = Math.max(1, Math.min(99, Math.round((match.score / (result.bestScore || match.score || 1)) * 100)));
+            return `
+              <div class="shrink-predictor-match">
+                <div class="shrink-predictor-match-top">
+                  <div class="shrink-predictor-match-title">${index + 1}. ${escapeHtml(coinDbCanonicalLabel(match.history?.entry?.coin_label || 'Historical match') || 'Historical match')}</div>
+                  <span class="shrink-predictor-match-score">${scorePct}% match</span>
+                </div>
+                <div class="shrink-predictor-match-meta">
+                  <span>${escapeHtml(String(match.history?.steps?.length || 0))} shrinks</span>
+                  <span>Remaining drift ${escapeHtml(shrinkPredictorFormatDistance(match.remainingDistanceMeters))}</span>
+                  <span>Exact ${escapeHtml(`${coinDbFormatCoord(exactCoords.lat)}, ${coinDbFormatCoord(exactCoords.lng)}`)}</span>
+                </div>
+              </div>
+            `;
+          }).join('')
+          : '<div class="shrink-predictor-empty">No historical exact-ended circles matched this shape yet.</div>';
+
+        shrinkPredictorResultsEl.innerHTML = `
+          <section class="shrink-predictor-primary">
+            <h4>Predicted Endpoint</h4>
+            <div class="shrink-predictor-grid">
+              <div class="shrink-predictor-stat">
+                <span class="shrink-predictor-stat-label">Predicted Lat/Lng</span>
+                <span class="shrink-predictor-stat-value">${escapeHtml(predictedCoordText)}</span>
+              </div>
+              <div class="shrink-predictor-stat">
+                <span class="shrink-predictor-stat-label">Confidence Radius</span>
+                <span class="shrink-predictor-stat-value">${escapeHtml(shrinkPredictorFormatDistance(result.confidenceRadiusMeters))}</span>
+              </div>
+              <div class="shrink-predictor-stat">
+                <span class="shrink-predictor-stat-label">Confidence</span>
+                <span class="shrink-predictor-stat-value">${escapeHtml(confidenceLabel)}</span>
+              </div>
+            </div>
+            <div class="shrink-predictor-note">${escapeHtml(result.note || '')}</div>
+          </section>
+          <section class="shrink-predictor-matches">
+            <h4>${result.matches.length ? 'Closest Historical Matches' : 'Historical Matches'}</h4>
+            <div class="shrink-predictor-match-list">${matchHtml}</div>
+            ${bestMatch ? `<div class="shrink-predictor-note">Best match shape score: ${escapeHtml(bestMatch.score.toFixed(2))}</div>` : ''}
+          </section>
+        `;
+      }
+
+      function clearShrinkPredictorOverlay() {
+        if (typeof mapgl !== 'undefined' && mapgl) {
+          for (const layerId of [
+            'shrink-predictor-confidence-fill',
+            'shrink-predictor-confidence-line',
+            'shrink-predictor-line',
+            'shrink-predictor-match-points',
+            'shrink-predictor-point'
+          ]) {
+            if (mapgl.getLayer?.(layerId)) {
+              try { mapgl.removeLayer(layerId); } catch { }
+            }
+          }
+          for (const sourceId of [
+            SHRINK_PREDICTOR_CONF_SRC,
+            SHRINK_PREDICTOR_LINE_SRC,
+            SHRINK_PREDICTOR_MATCH_SRC,
+            SHRINK_PREDICTOR_SRC
+          ]) {
+            if (mapgl.getSource?.(sourceId)) {
+              try { mapgl.removeSource(sourceId); } catch { }
+            }
+          }
+        }
+
+        if (mapleaf && shrinkPredictorLeafletLayer) {
+          try { mapleaf.removeLayer(shrinkPredictorLeafletLayer); } catch { }
+          shrinkPredictorLeafletLayer = null;
+        }
+      }
+
+      function renderShrinkPredictorOverlay(result) {
+        clearShrinkPredictorOverlay();
+        if (!result?.predictedPoint || !result?.observedSteps?.length) return;
+
+        const anchor = result.observedSteps[result.observedSteps.length - 1];
+        const predictedLngLat = [result.predictedPoint.lng, result.predictedPoint.lat];
+        const matchFeatures = (result.matches || []).slice(0, 4).map((match, index) => ({
+          type: 'Feature',
+          properties: { index: index + 1 },
+          geometry: { type: 'Point', coordinates: [match.predictedPoint.lng, match.predictedPoint.lat] }
+        }));
+        const lineFeature = {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: [[anchor.lng, anchor.lat], predictedLngLat]
+          }
+        };
+        const confidenceFeature = turf.circle(predictedLngLat, result.confidenceRadiusMeters, { steps: 72, units: 'meters' });
+
+        if (engine === 'gl' && mapgl?.getStyle?.()) {
+          if (!mapgl.getSource(SHRINK_PREDICTOR_SRC)) {
+            mapgl.addSource(SHRINK_PREDICTOR_SRC, {
+              type: 'geojson',
+              data: {
+                type: 'FeatureCollection',
+                features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: predictedLngLat } }]
+              }
+            });
+          } else {
+            mapgl.getSource(SHRINK_PREDICTOR_SRC).setData({
+              type: 'FeatureCollection',
+              features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: predictedLngLat } }]
+            });
+          }
+
+          if (!mapgl.getSource(SHRINK_PREDICTOR_MATCH_SRC)) {
+            mapgl.addSource(SHRINK_PREDICTOR_MATCH_SRC, { type: 'geojson', data: { type: 'FeatureCollection', features: matchFeatures } });
+          } else {
+            mapgl.getSource(SHRINK_PREDICTOR_MATCH_SRC).setData({ type: 'FeatureCollection', features: matchFeatures });
+          }
+
+          if (!mapgl.getSource(SHRINK_PREDICTOR_LINE_SRC)) {
+            mapgl.addSource(SHRINK_PREDICTOR_LINE_SRC, { type: 'geojson', data: lineFeature });
+          } else {
+            mapgl.getSource(SHRINK_PREDICTOR_LINE_SRC).setData(lineFeature);
+          }
+
+          if (!mapgl.getSource(SHRINK_PREDICTOR_CONF_SRC)) {
+            mapgl.addSource(SHRINK_PREDICTOR_CONF_SRC, { type: 'geojson', data: confidenceFeature });
+          } else {
+            mapgl.getSource(SHRINK_PREDICTOR_CONF_SRC).setData(confidenceFeature);
+          }
+
+          if (!mapgl.getLayer('shrink-predictor-confidence-fill')) {
+            mapgl.addLayer({
+              id: 'shrink-predictor-confidence-fill',
+              type: 'fill',
+              source: SHRINK_PREDICTOR_CONF_SRC,
+              paint: {
+                'fill-color': '#c084fc',
+                'fill-opacity': 0.14
+              }
+            });
+          }
+
+          if (!mapgl.getLayer('shrink-predictor-confidence-line')) {
+            mapgl.addLayer({
+              id: 'shrink-predictor-confidence-line',
+              type: 'line',
+              source: SHRINK_PREDICTOR_CONF_SRC,
+              paint: {
+                'line-color': '#d8b4fe',
+                'line-width': 2,
+                'line-opacity': 0.86,
+                'line-dasharray': [2, 1.5]
+              }
+            });
+          }
+
+          if (!mapgl.getLayer('shrink-predictor-line')) {
+            mapgl.addLayer({
+              id: 'shrink-predictor-line',
+              type: 'line',
+              source: SHRINK_PREDICTOR_LINE_SRC,
+              paint: {
+                'line-color': '#f5d0fe',
+                'line-width': 2.5,
+                'line-opacity': 0.82,
+                'line-dasharray': [1.2, 1.6]
+              }
+            });
+          }
+
+          if (!mapgl.getLayer('shrink-predictor-match-points')) {
+            mapgl.addLayer({
+              id: 'shrink-predictor-match-points',
+              type: 'circle',
+              source: SHRINK_PREDICTOR_MATCH_SRC,
+              paint: {
+                'circle-radius': 5,
+                'circle-color': '#fef3c7',
+                'circle-stroke-color': '#f59e0b',
+                'circle-stroke-width': 1.5,
+                'circle-opacity': 0.92
+              }
+            });
+          }
+
+          if (!mapgl.getLayer('shrink-predictor-point')) {
+            mapgl.addLayer({
+              id: 'shrink-predictor-point',
+              type: 'circle',
+              source: SHRINK_PREDICTOR_SRC,
+              paint: {
+                'circle-radius': 7,
+                'circle-color': '#22c55e',
+                'circle-stroke-color': '#ffffff',
+                'circle-stroke-width': 2,
+                'circle-opacity': 0.98
+              }
+            });
+          }
+        } else if (engine === 'leaf' && mapleaf) {
+          const layers = [];
+          layers.push(L.circle([result.predictedPoint.lat, result.predictedPoint.lng], {
+            radius: result.confidenceRadiusMeters,
+            color: '#d8b4fe',
+            weight: 2,
+            opacity: 0.9,
+            fillColor: '#c084fc',
+            fillOpacity: 0.14
+          }));
+          layers.push(L.polyline([[anchor.lat, anchor.lng], [result.predictedPoint.lat, result.predictedPoint.lng]], {
+            color: '#f5d0fe',
+            weight: 2.5,
+            opacity: 0.82,
+            dashArray: '6 6'
+          }));
+          layers.push(L.circleMarker([result.predictedPoint.lat, result.predictedPoint.lng], {
+            radius: 7,
+            color: '#ffffff',
+            weight: 2,
+            fillColor: '#22c55e',
+            fillOpacity: 0.95
+          }));
+          for (const match of (result.matches || []).slice(0, 4)) {
+            layers.push(L.circleMarker([match.predictedPoint.lat, match.predictedPoint.lng], {
+              radius: 5,
+              color: '#f59e0b',
+              weight: 1.5,
+              fillColor: '#fef3c7',
+              fillOpacity: 0.92
+            }));
+          }
+          shrinkPredictorLeafletLayer = L.layerGroup(layers).addTo(mapleaf);
+        }
+      }
+
+      async function runShrinkPredictor() {
+        if (!currentShrinkPredictorContext) return;
+
+        shrinkPredictorSetStatus('Loading archived exact-ended histories...');
+        shrinkPredictorRenderResults(null);
+
+        try {
+          const observation = shrinkPredictorFindCurrentObservation(
+            currentShrinkPredictorContext.fid,
+            currentShrinkPredictorContext.center,
+            currentShrinkPredictorContext.radiusMeters,
+            currentShrinkPredictorContext.featureProps
+          );
+          const histories = await shrinkPredictorLoadHistories();
+          shrinkPredictorRenderSummary(observation, histories.length);
+
+          const result = shrinkPredictorBuildResult(observation, histories);
+          if (!result) {
+            shrinkPredictorSetStatus('Could not build a prediction from the selected circle.', true);
+            shrinkPredictorRenderResults(null);
+            clearShrinkPredictorOverlay();
+            return;
+          }
+
+          shrinkPredictorRenderResults(result);
+          renderShrinkPredictorOverlay(result);
+          if (result.mode === 'fallback') {
+            shrinkPredictorSetStatus('Not enough archived exact-ended histories yet. Showing a baseline center estimate.', true);
+          } else {
+            shrinkPredictorSetStatus(`Prediction built from ${result.matches.length} historical match${result.matches.length === 1 ? '' : 'es'}.`);
+          }
+        } catch (error) {
+          clearShrinkPredictorOverlay();
+          shrinkPredictorRenderResults(null);
+          shrinkPredictorSetStatus(coinDbFriendlyError(error), true);
+        }
+      }
+
+      function openShrinkPredictorModal(fid, center, radiusMeters, feature, featureProps = {}) {
+        currentShrinkPredictorContext = {
+          fid: String(fid || ''),
+          center: Array.isArray(center) ? center : null,
+          radiusMeters: Number(radiusMeters) || 0,
+          featureProps: Utils.deepClone(featureProps || {}),
+          featureName: String(featureProps?.name || feature?.properties?.name || 'Selected circle')
+        };
+
+        shrinkPredictorModal?.classList.add('visible');
+        appEl.classList.add('blocked-by-modal');
+        shrinkPredictorSetStatus('Preparing prediction...');
+        runShrinkPredictor();
+      }
+
+      function closeShrinkPredictorModal() {
+        shrinkPredictorModal?.classList.remove('visible');
+        appEl.classList.remove('blocked-by-modal');
+      }
+
+      shrinkPredictorCloseBtn?.addEventListener('click', closeShrinkPredictorModal);
+      shrinkPredictorRunBtn?.addEventListener('click', runShrinkPredictor);
+      shrinkPredictorClearBtn?.addEventListener('click', () => {
+        clearShrinkPredictorOverlay();
+        shrinkPredictorSetStatus('Prediction overlay cleared.');
+      });
+      shrinkPredictorModal?.addEventListener('click', (e) => {
+        if (e.target === shrinkPredictorModal) closeShrinkPredictorModal();
+      });
 
       /* ================= Startup ================= */
       const runStartup = () => {

@@ -1521,6 +1521,191 @@
       min-height: 18px;
     }
 
+    .shrink-predictor-card {
+      width: min(720px, 96vw);
+      max-height: min(88vh, 860px);
+      overflow: auto;
+      display: grid;
+      gap: 14px;
+    }
+
+    .shrink-predictor-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .shrink-predictor-status {
+      min-height: 18px;
+    }
+
+    .shrink-predictor-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .shrink-predictor-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(96, 165, 250, 0.26);
+      background: rgba(96, 165, 250, 0.12);
+      color: #bfdbfe;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .shrink-predictor-results {
+      display: grid;
+      gap: 12px;
+    }
+
+    .shrink-predictor-empty {
+      padding: 16px;
+      border: 1px dashed var(--border);
+      border-radius: 14px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.02);
+      text-align: center;
+    }
+
+    .shrink-predictor-primary {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(96, 165, 250, 0.2);
+      background: linear-gradient(180deg, rgba(18, 25, 41, 0.9), rgba(8, 13, 22, 0.92));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+
+    .shrink-predictor-primary h4,
+    .shrink-predictor-matches h4 {
+      margin: 0;
+      font-size: 15px;
+    }
+
+    .shrink-predictor-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .shrink-predictor-stat {
+      padding: 10px 11px;
+      border-radius: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .shrink-predictor-stat-label {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .shrink-predictor-stat-value {
+      display: block;
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1.25;
+      word-break: break-word;
+    }
+
+    .shrink-predictor-note {
+      padding: 10px 11px;
+      border-radius: 12px;
+      background: rgba(96, 165, 250, 0.08);
+      border: 1px solid rgba(96, 165, 250, 0.18);
+      color: #dbeafe;
+      font-size: 12px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+
+    .shrink-predictor-matches {
+      display: grid;
+      gap: 10px;
+    }
+
+    .shrink-predictor-match-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .shrink-predictor-match {
+      display: grid;
+      gap: 8px;
+      padding: 11px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .shrink-predictor-match-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .shrink-predictor-match-title {
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .shrink-predictor-match-score {
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.24);
+      color: #bbf7d0;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .shrink-predictor-match-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .shrink-predictor-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    @media (max-width: 720px) {
+      .shrink-predictor-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .shrink-predictor-header {
+        flex-direction: column;
+      }
+
+      .shrink-predictor-actions {
+        justify-content: stretch;
+      }
+
+      .shrink-predictor-actions .btn {
+        flex: 1;
+      }
+    }
+
     .modal-row {
       display: grid;
       grid-template-columns: 1fr auto;
