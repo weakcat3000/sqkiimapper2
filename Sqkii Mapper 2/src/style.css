@@ -445,20 +445,29 @@
     }
 
     #brand-title-wrap {
-      position: relative;
-      display: inline-block;
+      display: grid;
+      grid-template-columns: minmax(0, auto) max-content;
+      align-items: start;
+      column-gap: 8px;
+      width: 100%;
+      max-width: 100%;
+    }
+
+    #brand-title {
+      min-width: 0;
     }
 
     #brand-version {
-      position: absolute;
-      left: calc(100% - 28px);
-      top: 2px;
+      position: static;
+      margin-top: 2px;
       font-size: 10px;
       line-height: 1;
       font-weight: 600;
       letter-spacing: 0.04em;
       color: rgba(148, 163, 184, 0.56);
       white-space: nowrap;
+      text-align: left;
+      justify-self: start;
       pointer-events: none;
       user-select: none;
     }
