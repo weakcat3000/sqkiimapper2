@@ -4541,13 +4541,20 @@
       const ROOM_PRESENCE_HEARTBEAT_MS = 15000;
       const ROOM_PRESENCE_REFRESH_MS = 10000;
       const ROOM_PRESENCE_STALE_MS = 45000;
+      const ROOM_PRESENCE_SOURCE = 'room-presence-users';
+      const ROOM_PRESENCE_LAYER = 'room-presence-users-layer';
+      const ROOM_PRESENCE_LABEL_LAYER = 'room-presence-users-label-layer';
+      const ROOM_PRESENCE_COLORS = ['#60a5fa', '#f97316', '#22c55e', '#e879f9', '#facc15', '#38bdf8', '#fb7185', '#a78bfa', '#34d399', '#f59e0b'];
       let currentRoomCode = null;
       const clientId = (() => crypto.getRandomValues(new Uint32Array(4)).join('-'))();
       const presenceSessionId = `${clientId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       let roomPresenceAvailable = true;
+      let roomPresenceLocationAvailable = true;
       let roomPresenceHeartbeatTimer = 0;
       let roomPresenceRefreshTimer = 0;
       let connectedUsers = 1; // Start with self
+      let roomPresenceShareLocation = false;
+      let roomPresenceLeafletLayer = null;
 
       initializeUserInfo();
 
@@ -4558,14 +4565,163 @@
         roomPresenceRefreshTimer = 0;
       }
 
+      function roomPresenceHash(text = '') {
+        const value = String(text || '');
+        let hash = 0;
+        for (let index = 0; index < value.length; index += 1) {
+          hash = ((hash << 5) - hash) + value.charCodeAt(index);
+          hash |= 0;
+        }
+        return Math.abs(hash);
+      }
+
+      function roomPresenceColorForUser(user = {}, fallbackIndex = 0) {
+        if (String(user?.client_id || '') === clientId) return '#60a5fa';
+        const seed = user?.session_id || user?.client_id || fallbackIndex;
+        return ROOM_PRESENCE_COLORS[roomPresenceHash(seed) % ROOM_PRESENCE_COLORS.length];
+      }
+
+      function roomPresenceUserName(user = {}, index = 0) {
+        return String(user?.client_id || '') === clientId ? 'You' : `Player ${index + 1}`;
+      }
+
+      function roomPresenceMarkerFeatures(users = []) {
+        return {
+          type: 'FeatureCollection',
+          features: (Array.isArray(users) ? users : [])
+            .filter((user) => Boolean(user?.share_location) && Number.isFinite(Number(user?.lat)) && Number.isFinite(Number(user?.lng)))
+            .map((user, index) => ({
+              type: 'Feature',
+              properties: {
+                name: roomPresenceUserName(user, index),
+                color: roomPresenceColorForUser(user, index),
+                isSelf: String(user?.client_id || '') === clientId ? 1 : 0
+              },
+              geometry: {
+                type: 'Point',
+                coordinates: [Number(user.lng), Number(user.lat)]
+              }
+            }))
+        };
+      }
+
+      function clearRoomPresenceMapOverlay() {
+        if (mapleaf && roomPresenceLeafletLayer) {
+          try { mapleaf.removeLayer(roomPresenceLeafletLayer); } catch { }
+        }
+        roomPresenceLeafletLayer = null;
+        if (mapgl?.getStyle?.()) {
+          if (mapgl.getLayer(ROOM_PRESENCE_LABEL_LAYER)) {
+            try { mapgl.removeLayer(ROOM_PRESENCE_LABEL_LAYER); } catch { }
+          }
+          if (mapgl.getLayer(ROOM_PRESENCE_LAYER)) {
+            try { mapgl.removeLayer(ROOM_PRESENCE_LAYER); } catch { }
+          }
+          if (mapgl.getSource(ROOM_PRESENCE_SOURCE)) {
+            try { mapgl.removeSource(ROOM_PRESENCE_SOURCE); } catch { }
+          }
+        }
+      }
+
+      function renderRoomPresenceMapOverlay(users = []) {
+        const data = roomPresenceMarkerFeatures(users);
+        if (!data.features.length) {
+          clearRoomPresenceMapOverlay();
+          return;
+        }
+
+        if (engine === 'gl' && mapgl?.getStyle?.()) {
+          if (mapleaf && roomPresenceLeafletLayer) {
+            try { mapleaf.removeLayer(roomPresenceLeafletLayer); } catch { }
+            roomPresenceLeafletLayer = null;
+          }
+          if (!mapgl.getSource(ROOM_PRESENCE_SOURCE)) {
+            mapgl.addSource(ROOM_PRESENCE_SOURCE, { type: 'geojson', data });
+          } else {
+            mapgl.getSource(ROOM_PRESENCE_SOURCE)?.setData(data);
+          }
+          if (!mapgl.getLayer(ROOM_PRESENCE_LAYER)) {
+            mapgl.addLayer({
+              id: ROOM_PRESENCE_LAYER,
+              type: 'circle',
+              source: ROOM_PRESENCE_SOURCE,
+              paint: {
+                'circle-radius': ['case', ['==', ['get', 'isSelf'], 1], 8, 6],
+                'circle-color': ['get', 'color'],
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#f8fafc',
+                'circle-opacity': 0.96
+              }
+            });
+          }
+          if (!mapgl.getLayer(ROOM_PRESENCE_LABEL_LAYER)) {
+            mapgl.addLayer({
+              id: ROOM_PRESENCE_LABEL_LAYER,
+              type: 'symbol',
+              source: ROOM_PRESENCE_SOURCE,
+              layout: {
+                'text-field': ['get', 'name'],
+                'text-size': 11,
+                'text-offset': [0, 1.45],
+                'text-anchor': 'top'
+              },
+              paint: {
+                'text-color': '#e2e8f0',
+                'text-halo-color': 'rgba(15,23,42,0.95)',
+                'text-halo-width': 1.2
+              }
+            });
+          }
+          return;
+        }
+
+        if (engine === 'leaf' && mapleaf) {
+          if (mapgl?.getStyle?.()) {
+            if (mapgl.getLayer(ROOM_PRESENCE_LABEL_LAYER)) {
+              try { mapgl.removeLayer(ROOM_PRESENCE_LABEL_LAYER); } catch { }
+            }
+            if (mapgl.getLayer(ROOM_PRESENCE_LAYER)) {
+              try { mapgl.removeLayer(ROOM_PRESENCE_LAYER); } catch { }
+            }
+            if (mapgl.getSource(ROOM_PRESENCE_SOURCE)) {
+              try { mapgl.removeSource(ROOM_PRESENCE_SOURCE); } catch { }
+            }
+          }
+          if (roomPresenceLeafletLayer) {
+            try { mapleaf.removeLayer(roomPresenceLeafletLayer); } catch { }
+          }
+          const layers = data.features.map((feature) => {
+            const [lng, lat] = feature.geometry.coordinates || [];
+            const color = feature.properties?.color || '#60a5fa';
+            return L.circleMarker([lat, lng], {
+              radius: feature.properties?.isSelf ? 8 : 6,
+              color: '#f8fafc',
+              weight: 2,
+              fillColor: color,
+              fillOpacity: 0.96
+            }).bindTooltip(String(feature.properties?.name || 'Player'), {
+              permanent: false,
+              direction: 'top',
+              offset: [0, -8]
+            });
+          });
+          roomPresenceLeafletLayer = L.layerGroup(layers).addTo(mapleaf);
+        }
+      }
+
       function setConnectedUsersList(users = []) {
-        window.connectedUsersList = users;
+        window.connectedUsersList = users.map((user, index) => ({
+          ...user,
+          __presenceColor: roomPresenceColorForUser(user, index),
+          __presenceName: roomPresenceUserName(user, index)
+        }));
         connectedUsers = currentRoomCode ? Math.max(1, users.length) : 0;
         updateConnectionIndicator();
+        renderRoomPresenceMapOverlay(window.connectedUsersList);
       }
 
       function roomPresencePayload() {
-        return {
+        const payload = {
           room_code: currentRoomCode,
           session_id: presenceSessionId,
           client_id: clientId,
@@ -4577,14 +4733,30 @@
           online_at: new Date().toISOString(),
           last_seen: new Date().toISOString()
         };
+        if (roomPresenceLocationAvailable) {
+          payload.share_location = !!(roomPresenceShareLocation && Array.isArray(lastUserPos) && Number.isFinite(Number(lastUserPos[0])) && Number.isFinite(Number(lastUserPos[1])));
+          payload.lng = payload.share_location ? Number(lastUserPos[0]) : null;
+          payload.lat = payload.share_location ? Number(lastUserPos[1]) : null;
+        }
+        return payload;
       }
 
       async function upsertRoomPresence() {
         if (!currentRoomCode || !roomPresenceAvailable) return false;
         const payload = roomPresencePayload();
-        const { error } = await supabase
+        let { error } = await supabase
           .from(ROOM_PRESENCE_TABLE)
           .upsert(payload, { onConflict: 'room_code,session_id' });
+        if (error && roomPresenceLocationAvailable && /share_location|column .*lat|column .*lng|schema cache/i.test(String(error.message || ''))) {
+          roomPresenceLocationAvailable = false;
+          const fallbackPayload = { ...payload };
+          delete fallbackPayload.share_location;
+          delete fallbackPayload.lat;
+          delete fallbackPayload.lng;
+          ({ error } = await supabase
+            .from(ROOM_PRESENCE_TABLE)
+            .upsert(fallbackPayload, { onConflict: 'room_code,session_id' }));
+        }
         if (error) {
           if (error.code === 'PGRST205') roomPresenceAvailable = false;
           throw error;
@@ -4598,22 +4770,54 @@
           return;
         }
         if (!roomPresenceAvailable) {
-          setConnectedUsersList([{ client_id: clientId, device: userInfo.device, browser: userInfo.browser, city: userInfo.city, country: userInfo.countryCode, ip: userInfo.ip }]);
+          setConnectedUsersList([{
+            client_id: clientId,
+            device: userInfo.device,
+            browser: userInfo.browser,
+            city: userInfo.city,
+            country: userInfo.countryCode,
+            ip: userInfo.ip,
+            share_location: roomPresenceShareLocation,
+            lat: Array.isArray(lastUserPos) ? Number(lastUserPos[1]) : null,
+            lng: Array.isArray(lastUserPos) ? Number(lastUserPos[0]) : null
+          }]);
           return;
         }
 
         const cutoff = new Date(Date.now() - ROOM_PRESENCE_STALE_MS).toISOString();
-        const { data, error } = await supabase
+        const selectFields = roomPresenceLocationAvailable
+          ? 'session_id, client_id, device, browser, city, country, ip, online_at, last_seen, share_location, lat, lng'
+          : 'session_id, client_id, device, browser, city, country, ip, online_at, last_seen';
+        let { data, error } = await supabase
           .from(ROOM_PRESENCE_TABLE)
-          .select('session_id, client_id, device, browser, city, country, ip, online_at, last_seen')
+          .select(selectFields)
           .eq('room_code', currentRoomCode)
           .gte('last_seen', cutoff)
           .order('last_seen', { ascending: false });
+        if (error && roomPresenceLocationAvailable && /share_location|column .*lat|column .*lng|schema cache/i.test(String(error.message || ''))) {
+          roomPresenceLocationAvailable = false;
+          ({ data, error } = await supabase
+            .from(ROOM_PRESENCE_TABLE)
+            .select('session_id, client_id, device, browser, city, country, ip, online_at, last_seen')
+            .eq('room_code', currentRoomCode)
+            .gte('last_seen', cutoff)
+            .order('last_seen', { ascending: false }));
+        }
 
         if (error) {
           if (error.code === 'PGRST205') roomPresenceAvailable = false;
           console.warn('Room presence refresh failed:', error);
-          setConnectedUsersList([{ client_id: clientId, device: userInfo.device, browser: userInfo.browser, city: userInfo.city, country: userInfo.countryCode, ip: userInfo.ip }]);
+          setConnectedUsersList([{
+            client_id: clientId,
+            device: userInfo.device,
+            browser: userInfo.browser,
+            city: userInfo.city,
+            country: userInfo.countryCode,
+            ip: userInfo.ip,
+            share_location: roomPresenceShareLocation,
+            lat: Array.isArray(lastUserPos) ? Number(lastUserPos[1]) : null,
+            lng: Array.isArray(lastUserPos) ? Number(lastUserPos[0]) : null
+          }]);
           return;
         }
 
@@ -4676,12 +4880,14 @@
         const indicator = document.getElementById('connection-indicator');
         const text = document.getElementById('connection-text');
         const details = document.getElementById('connection-details');
+        const players = document.getElementById('connection-players');
         const dropdown = document.getElementById('connection-dropdown');
 
         if (!currentRoomCode) {
           indicator.classList.add('disconnected');
           text.textContent = 'Not connected';
           details.innerHTML = '';
+          if (players) players.innerHTML = '';
           dropdown.innerHTML = '';
           return;
         }
@@ -4698,25 +4904,39 @@
 
         // Build dropdown with list of users
         if (window.connectedUsersList && window.connectedUsersList.length > 0) {
+          if (players) {
+            players.innerHTML = window.connectedUsersList.map((user, i) => {
+              const color = user.__presenceColor || roomPresenceColorForUser(user, i);
+              const name = user.__presenceName || roomPresenceUserName(user, i);
+              const chipClass = ['connection-player-chip', String(user.client_id || '') === clientId ? 'self' : '', user.share_location ? 'share' : ''].filter(Boolean).join(' ');
+              const suffix = user.share_location ? 'GPS on' : 'GPS off';
+              return `<span class="${chipClass}" title="${escapeHtml(`${name} • ${suffix}`)}" style="color:${escapeHtml(color)};"><span class="connection-player-swatch" style="background:${escapeHtml(color)};"></span><span>${escapeHtml(name)}</span></span>`;
+            }).join('');
+          }
           let html = '<div style="font-weight:700;margin-bottom:6px;color:#60a5fa;">Connected Users:</div>';
 
           window.connectedUsersList.forEach((user, i) => {
             const isYou = user.client_id === clientId;
             const userClass = isYou ? 'user-item self' : 'user-item';
-            const userName = isYou ? 'You' : `User ${i + 1}`;
+            const userName = user.__presenceName || roomPresenceUserName(user, i);
+            const userColor = user.__presenceColor || roomPresenceColorForUser(user, i);
 
             html += `<div class="${userClass}">`;
-            html += `<div class="user-item-name">${userName}</div>`;
+            html += `<div class="user-item-name-row"><span class="user-item-swatch" style="background:${escapeHtml(userColor)};"></span><div class="user-item-name" style="color:${escapeHtml(userColor)};">${escapeHtml(userName)}</div></div>`;
             html += `<div class="user-item-info">`;
             html += `${user.device || '💻 Desktop'} • ${user.browser || 'Unknown'}`;
             if (user.city && user.country) {
               html += ` • ${user.city}, ${user.country}`;
+            }
+            if (user.share_location && Number.isFinite(Number(user.lat)) && Number.isFinite(Number(user.lng))) {
+              html += ` â€¢ sharing GPS`;
             }
             html += `</div></div>`;
           });
 
           dropdown.innerHTML = html;
         } else {
+          if (players) players.innerHTML = '';
           dropdown.innerHTML = '<div style="color:rgba(229,231,235,0.6);font-size:11px;">No other users online</div>';
         }
       }
@@ -5629,8 +5849,16 @@
 
           // Add event listeners
           geolocate.on('geolocate', onFix);
-          geolocate.on('trackuserlocationstart', () => setGpsState('TRACKING'));
-          geolocate.on('trackuserlocationend', () => setGpsState('IDLE'));
+          geolocate.on('trackuserlocationstart', () => {
+            roomPresenceShareLocation = true;
+            setGpsState('TRACKING');
+            if (currentRoomCode) upsertRoomPresence().then(() => refreshRoomPresence()).catch((e) => console.warn('Room presence location start failed:', e));
+          });
+          geolocate.on('trackuserlocationend', () => {
+            roomPresenceShareLocation = false;
+            setGpsState('IDLE');
+            if (currentRoomCode) upsertRoomPresence().then(() => refreshRoomPresence()).catch((e) => console.warn('Room presence location stop failed:', e));
+          });
           geolocate.on('error', (e) => console.warn('Geolocate error:', e));
 
         } catch (e) {
@@ -5964,8 +6192,14 @@
         const lat = e?.coords?.latitude ?? e?.lat ?? e?.lngLat?.lat;
         if (typeof lng === 'number' && typeof lat === 'number') {
           lastUserPos = [lng, lat];
+          roomPresenceShareLocation = true;
           updateSonarEnabled();
           if (compassEnabled) scheduleCompassRender();
+          if (currentRoomCode) {
+            upsertRoomPresence()
+              .then(() => refreshRoomPresence())
+              .catch((err) => console.warn('Room presence location update failed:', err));
+          }
 
           // Auto-enable sonar button when GPS activates
           if (sonarBtn.classList.contains('disabled')) {
@@ -5991,9 +6225,11 @@
       mapgl.on('load', () => {
         ensureGeolocateControl();
         if (compassEnabled) scheduleCompassRender();
+        renderRoomPresenceMapOverlay(window.connectedUsersList || []);
       });
       mapgl.on('styledata', () => {
         if (compassEnabled) scheduleCompassRender();
+        renderRoomPresenceMapOverlay(window.connectedUsersList || []);
       });
       updateCompassButtonState();
 

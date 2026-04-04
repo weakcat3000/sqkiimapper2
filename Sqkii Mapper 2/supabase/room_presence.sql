@@ -13,6 +13,15 @@ create table if not exists public.room_presence (
   primary key (room_code, session_id)
 );
 
+alter table public.room_presence
+  add column if not exists share_location boolean not null default false;
+
+alter table public.room_presence
+  add column if not exists lat double precision;
+
+alter table public.room_presence
+  add column if not exists lng double precision;
+
 create index if not exists room_presence_room_code_last_seen_idx
   on public.room_presence (room_code, last_seen desc);
 
