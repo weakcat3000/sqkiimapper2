@@ -11083,8 +11083,8 @@
             ? `Best backtest mean error ${shrinkPredictorFormatDistance(backtestMean)}${Number.isFinite(backtestExactStateMean) ? `, state-aligned ${shrinkPredictorFormatDistance(backtestExactStateMean)}` : ''}.`
             : `Best historical match score ${bestMatch ? bestMatch.score.toFixed(2) : 'n/a'}.`,
           Number.isFinite(result.estimatedFloorRadiusMeters) && result.estimatedFloorRadiusMeters > 0
-            ? `Estimated floor radius ${shrinkPredictorFormatDistance(result.estimatedFloorRadiusMeters)}, current progress ${progressPct}% toward floor.`
-            : 'Estimated floor radius unavailable from current historical neighbors.',
+            ? `Estimated smallest public circle size ${shrinkPredictorFormatDistance(result.estimatedFloorRadiusMeters)}, current progress ${progressPct}% toward smallest public circle size.`
+            : 'Estimated smallest public circle size unavailable from current historical neighbors.',
           `${confidenceAreaLine}${result.confidenceUsesCurrentCircle && Number.isFinite(uncertaintyMeters) ? ` Raw model uncertainty +/-${Math.round(uncertaintyMeters)}m.` : ''}`
         ];
         const candidateHtml = result.candidateSpots?.length
