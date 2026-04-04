@@ -2902,9 +2902,39 @@
         else mapleaf.getContainer().style.cursor = '';
 
         // Stop dragging
+        circleDragQueuedMove = null;
+        if (circleDragRafId) {
+          cancelAnimationFrame(circleDragRafId);
+          circleDragRafId = 0;
+        }
         circleDragCtx = null;
       });
 
+
+      function refreshLeafletFeature(entry, fid, feature = null) {
+        const layers = entry?.lfLayers?.get?.(fid);
+        const feat = feature || entry?.data?.features?.find?.((item) => item?.properties?.fid === fid);
+        if (!layers || !feat) return;
+
+        if (feat.geometry?.type === 'Point') {
+          const [lng, lat] = feat.geometry.coordinates || [];
+          layers.forEach((layer) => {
+            if (layer?.setLatLng && Number.isFinite(lng) && Number.isFinite(lat)) {
+              layer.setLatLng([lat, lng]);
+            }
+          });
+          return;
+        }
+
+        layers.forEach((layer) => {
+          if (layer?.clearLayers && layer?.addData) {
+            try {
+              layer.clearLayers();
+              layer.addData(feat);
+            } catch { }
+          }
+        });
+      }
 
       function refreshGroupBoth(entry) {
         refreshGroupGL(entry);
@@ -3646,6 +3676,8 @@
 
       let editCtx = null, editingEnabled = false;
       let circleDragCtx = null; // { entry, fid } while dragging
+      let circleDragRafId = 0;
+      let circleDragQueuedMove = null;
       let suppressPopupUntil = 0;
       let editToggleLockUntil = 0;
 
@@ -4558,6 +4590,7 @@
       let roomPresenceLastLocationSyncAt = 0;
       let roomPresenceLastSyncedPos = null;
       let roomPresenceLastUsersSignature = '';
+      let roomPresenceDropdownSignature = '';
       let connectedUsers = 1; // Start with self
       let roomPresenceShareLocation = false;
       let roomPresenceLeafletLayer = null;
@@ -4630,6 +4663,36 @@
             String(user?.last_seen || '')
           ].join('|');
         }).join('||');
+      }
+
+      function roomPresenceDropdownHtml(users = []) {
+        if (!Array.isArray(users) || !users.length) {
+          return '<div style="color:rgba(229,231,235,0.6);font-size:11px;">No other users online</div>';
+        }
+
+        let html = '<div style="font-weight:700;margin-bottom:6px;color:#60a5fa;">Connected Users:</div>';
+        users.forEach((user, i) => {
+          const isYou = user.client_id === clientId;
+          const userClass = isYou ? 'user-item self' : 'user-item';
+          const userName = user.__presenceName || roomPresenceUserName(user, i);
+          const userColor = user.__presenceColor || roomPresenceColorForUser(user, i);
+
+          html += `<div class="${userClass}">`;
+          html += `<div class="user-item-name-row"><span class="user-item-swatch" style="background:${escapeHtml(userColor)};"></span><div class="user-item-name" style="color:${escapeHtml(userColor)};">${escapeHtml(userName)}</div></div>`;
+          html += `<div class="user-item-info">`;
+          html += `${escapeHtml(String(user.device || 'Desktop'))} &bull; ${escapeHtml(String(user.browser || 'Unknown'))}`;
+          if (user.city && user.country) {
+            html += ` &bull; ${escapeHtml(String(user.city))}, ${escapeHtml(String(user.country))}`;
+          }
+          if (user.ip && user.ip !== 'Loading...') {
+            html += ` &bull; IP: ${escapeHtml(String(user.ip))}`;
+          }
+          if (user.share_location && Number.isFinite(Number(user.lat)) && Number.isFinite(Number(user.lng))) {
+            html += ` &bull; sharing GPS`;
+          }
+          html += `</div></div>`;
+        });
+        return html;
       }
 
       function roomPresenceMarkerFeatures(users = []) {
@@ -4970,6 +5033,7 @@
           details.innerHTML = '';
           if (players) players.innerHTML = '';
           dropdown.innerHTML = '';
+          roomPresenceDropdownSignature = '';
           return;
         }
 
@@ -4994,33 +5058,20 @@
             }).join('');
           }
 
-          let html = '<div style="font-weight:700;margin-bottom:6px;color:#60a5fa;">Connected Users:</div>';
-          window.connectedUsersList.forEach((user, i) => {
-            const isYou = user.client_id === clientId;
-            const userClass = isYou ? 'user-item self' : 'user-item';
-            const userName = user.__presenceName || roomPresenceUserName(user, i);
-            const userColor = user.__presenceColor || roomPresenceColorForUser(user, i);
-
-            html += `<div class="${userClass}">`;
-            html += `<div class="user-item-name-row"><span class="user-item-swatch" style="background:${escapeHtml(userColor)};"></span><div class="user-item-name" style="color:${escapeHtml(userColor)};">${escapeHtml(userName)}</div></div>`;
-            html += `<div class="user-item-info">`;
-            html += `${escapeHtml(String(user.device || 'Desktop'))} &bull; ${escapeHtml(String(user.browser || 'Unknown'))}`;
-            if (user.city && user.country) {
-              html += ` &bull; ${escapeHtml(String(user.city))}, ${escapeHtml(String(user.country))}`;
+          const isExpanded = indicator.classList.contains('expanded');
+          if (isExpanded) {
+            const dropdownSignature = roomPresenceUsersSignature(window.connectedUsersList);
+            if (dropdownSignature !== roomPresenceDropdownSignature) {
+              dropdown.innerHTML = roomPresenceDropdownHtml(window.connectedUsersList);
+              roomPresenceDropdownSignature = dropdownSignature;
             }
-            if (user.ip && user.ip !== 'Loading...') {
-              html += ` &bull; IP: ${escapeHtml(String(user.ip))}`;
-            }
-            if (user.share_location && Number.isFinite(Number(user.lat)) && Number.isFinite(Number(user.lng))) {
-              html += ` &bull; sharing GPS`;
-            }
-            html += `</div></div>`;
-          });
-
-          dropdown.innerHTML = html;
+          }
         } else {
           if (players) players.innerHTML = '';
-          dropdown.innerHTML = '<div style="color:rgba(229,231,235,0.6);font-size:11px;">No other users online</div>';
+          if (indicator.classList.contains('expanded') || !roomPresenceDropdownSignature) {
+            dropdown.innerHTML = roomPresenceDropdownHtml([]);
+            roomPresenceDropdownSignature = '';
+          }
         }
       }
 
@@ -5072,6 +5123,10 @@
         const indicator = document.getElementById('connection-indicator');
         if (currentRoomCode && connectedUsers >= 1) {
           indicator.classList.toggle('expanded');
+          if (indicator.classList.contains('expanded')) {
+            roomPresenceDropdownSignature = '';
+            updateConnectionIndicator();
+          }
         }
       });
 
@@ -7595,13 +7650,37 @@
         p._circleCenter = [lng, lat];
         feat.properties = p;
 
-        refreshGroupBoth(entry);
-        renderLayers();
+        refreshGroupGL(entry);
+        refreshLeafletFeature(entry, fid, feat);
+      }
+
+      function flushQueuedCircleDragMove() {
+        if (circleDragRafId) {
+          cancelAnimationFrame(circleDragRafId);
+          circleDragRafId = 0;
+        }
+        if (!circleDragQueuedMove) return;
+        const { entry, fid, lng, lat } = circleDragQueuedMove;
+        circleDragQueuedMove = null;
+        moveCircleFeature(entry, fid, lng, lat);
+      }
+
+      function scheduleCircleDragMove(entry, fid, lng, lat) {
+        circleDragQueuedMove = { entry, fid, lng, lat };
+        if (circleDragRafId) return;
+        circleDragRafId = requestAnimationFrame(() => {
+          circleDragRafId = 0;
+          if (!circleDragQueuedMove) return;
+          const { entry: nextEntry, fid: nextFid, lng: nextLng, lat: nextLat } = circleDragQueuedMove;
+          circleDragQueuedMove = null;
+          moveCircleFeature(nextEntry, nextFid, nextLng, nextLat);
+        });
       }
 
       function endCircleDrag(save = true) {
         if (!circleDragCtx) return;
         suppressPopups();
+        flushQueuedCircleDragMove();
 
         // Re-enable normal map panning
         if (engine === 'gl') {
@@ -7620,6 +7699,11 @@
       // OPTIONAL: tap-to-drop (nice on mobile)
       function dropAt(lng, lat) {
         if (!circleDragCtx) return;
+        circleDragQueuedMove = null;
+        if (circleDragRafId) {
+          cancelAnimationFrame(circleDragRafId);
+          circleDragRafId = 0;
+        }
         moveCircleFeature(circleDragCtx.entry, circleDragCtx.fid, lng, lat);
         endCircleDrag(true);
       }
@@ -7627,14 +7711,14 @@
       // MapLibre GL handlers (always bind; check engine at runtime)
       mapgl.on('mousemove', (e) => {
         if (engine !== 'gl' || !circleDragCtx) return;
-        moveCircleFeature(circleDragCtx.entry, circleDragCtx.fid, e.lngLat.lng, e.lngLat.lat);
+        scheduleCircleDragMove(circleDragCtx.entry, circleDragCtx.fid, e.lngLat.lng, e.lngLat.lat);
       });
 
       mapgl.on('touchmove', (e) => {
         if (engine !== 'gl' || !circleDragCtx) return;
         if (e.originalEvent?.touches?.length > 1) return; // allow pinch-zoom etc.
         e.originalEvent?.preventDefault?.();
-        moveCircleFeature(circleDragCtx.entry, circleDragCtx.fid, e.lngLat.lng, e.lngLat.lat);
+        scheduleCircleDragMove(circleDragCtx.entry, circleDragCtx.fid, e.lngLat.lng, e.lngLat.lat);
       });
 
       mapgl.on('mouseup', () => {
@@ -7664,14 +7748,14 @@
       // Leaflet handlers
       mapleaf.on('mousemove', (e) => {
         if (engine !== 'leaf' || !circleDragCtx) return;
-        moveCircleFeature(circleDragCtx.entry, circleDragCtx.fid, e.latlng.lng, e.latlng.lat);
+        scheduleCircleDragMove(circleDragCtx.entry, circleDragCtx.fid, e.latlng.lng, e.latlng.lat);
       });
 
       mapleaf.on('touchmove', (e) => {
         if (engine !== 'leaf' || !circleDragCtx) return;
         if (e.originalEvent?.touches?.length > 1) return;
         if (e.originalEvent?.cancelable) e.originalEvent.preventDefault();
-        moveCircleFeature(circleDragCtx.entry, circleDragCtx.fid, e.latlng.lng, e.latlng.lat);
+        scheduleCircleDragMove(circleDragCtx.entry, circleDragCtx.fid, e.latlng.lng, e.latlng.lat);
       });
 
       mapleaf.on('mouseup', () => {
