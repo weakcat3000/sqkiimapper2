@@ -9165,6 +9165,7 @@
       const shrinkPredictorToolPickerEl = byId('shrink-predictor-tool-picker');
       const shrinkPredictorToolQuickBtn = byId('shrink-predictor-tool-quick');
       const shrinkPredictorToolFullBtn = byId('shrink-predictor-tool-full');
+      const shrinkPredictorToolHelperEl = byId('shrink-predictor-tool-helper');
       const shrinkPredictorResultsEl = byId('shrink-predictor-results');
       const SHRINK_PREDICTOR_SRC = 'shrink-predictor-src';
       const SHRINK_PREDICTOR_ANCHOR_SRC = 'shrink-predictor-anchor-src';
@@ -9201,6 +9202,13 @@
         shrinkPredictorSelectedMode = mode === 'quick' || mode === 'full' ? mode : '';
         shrinkPredictorToolQuickBtn?.classList.toggle('active', shrinkPredictorSelectedMode === 'quick');
         shrinkPredictorToolFullBtn?.classList.toggle('active', shrinkPredictorSelectedMode === 'full');
+        if (shrinkPredictorToolHelperEl) {
+          shrinkPredictorToolHelperEl.textContent = shrinkPredictorSelectedMode === 'quick'
+            ? 'Quick Predict selected. Uses the saved GitHub formula for the fastest run.'
+            : (shrinkPredictorSelectedMode === 'full'
+              ? 'Full Predict selected. Runs the deeper in-browser backtest before predicting.'
+              : 'Select a mode, then run prediction.');
+        }
         if (shrinkPredictorRunBtn) {
           shrinkPredictorRunBtn.textContent = shrinkPredictorSelectedMode
             ? `Run ${shrinkPredictorGetModeLabel(shrinkPredictorSelectedMode)}`
@@ -11033,9 +11041,13 @@
         const chips = [
           `${escapeHtml(observation.coinLabel || 'Selected circle')}`,
           `${observation.observedSteps.length} observed shrink${observation.observedSteps.length === 1 ? '' : 's'}`,
-          `Current radius ${escapeHtml(coinDbFormatRadius(lastStep?.radiusMeters))}`,
-          `${historyCount} archived exact match${historyCount === 1 ? '' : 'es'}`
+          `Current radius ${escapeHtml(coinDbFormatRadius(lastStep?.radiusMeters))}`
         ];
+        if (historyCount > 0) {
+          chips.push(`${historyCount} archived exact match${historyCount === 1 ? '' : 'es'}`);
+        } else {
+          chips.push('Archive loads on run');
+        }
         const modeLabel = shrinkPredictorGetModeLabel(shrinkPredictorSelectedMode);
         if (modeLabel) chips.push(modeLabel);
 
@@ -11047,7 +11059,8 @@
       function shrinkPredictorRenderResults(result) {
         if (!shrinkPredictorResultsEl) return;
         if (!result?.predictedPoint) {
-          shrinkPredictorResultsEl.innerHTML = '<div class="shrink-predictor-empty">Select a circle and run the predictor to see a likely endpoint.</div>';
+          const modeLabel = shrinkPredictorGetModeLabel(shrinkPredictorSelectedMode);
+          shrinkPredictorResultsEl.innerHTML = `<div class="shrink-predictor-empty">${escapeHtml(modeLabel ? `${modeLabel} is ready. Press the run button to build the prediction overlay.` : 'Choose Quick Predict or Full Predict above, then run the predictor to see a likely endpoint.')}</div>`;
           return;
         }
 
@@ -11578,8 +11591,16 @@
 
       shrinkPredictorCloseBtn?.addEventListener('click', closeShrinkPredictorModal);
       shrinkPredictorRunBtn?.addEventListener('click', runShrinkPredictor);
-      shrinkPredictorToolQuickBtn?.addEventListener('click', () => runShrinkPredictor('quick'));
-      shrinkPredictorToolFullBtn?.addEventListener('click', () => runShrinkPredictor('full'));
+      shrinkPredictorToolQuickBtn?.addEventListener('click', () => {
+        shrinkPredictorSetMode('quick');
+        shrinkPredictorRenderResults(null);
+        shrinkPredictorSetStatus('Quick Predict selected. Press run when ready.');
+      });
+      shrinkPredictorToolFullBtn?.addEventListener('click', () => {
+        shrinkPredictorSetMode('full');
+        shrinkPredictorRenderResults(null);
+        shrinkPredictorSetStatus('Full Predict selected. Press run when ready.');
+      });
       shrinkPredictorClearBtn?.addEventListener('click', () => {
         clearShrinkPredictorOverlay();
         shrinkPredictorHideProgress();

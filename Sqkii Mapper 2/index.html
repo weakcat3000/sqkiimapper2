@@ -510,19 +510,23 @@
         <div id="shrink-predictor-summary" class="shrink-predictor-summary"></div>
         <div id="shrink-predictor-tool-picker" class="shrink-predictor-tool-picker">
           <div class="shrink-predictor-tool-picker-header">
+            <div class="shrink-predictor-tool-kicker">Step 1</div>
             <h4>Choose Prediction Tool</h4>
-            <small class="hint">Pick a faster website-ready formula, or the full backtest search.</small>
+            <small class="hint">Pick a fast formula-based run, or the deeper full backtest search.</small>
           </div>
           <div class="shrink-predictor-tool-grid">
             <button id="shrink-predictor-tool-quick" class="shrink-predictor-tool-btn" type="button">
+              <span class="shrink-predictor-tool-badge">Fast</span>
               <span class="shrink-predictor-tool-title">Quick Predict</span>
               <span class="shrink-predictor-tool-copy">Uses the exported <code>shrink_formula.latest.json</code> from GitHub. Faster, lighter, same website UI.</span>
             </button>
             <button id="shrink-predictor-tool-full" class="shrink-predictor-tool-btn" type="button">
+              <span class="shrink-predictor-tool-badge">Deep</span>
               <span class="shrink-predictor-tool-title">Full Predict</span>
               <span class="shrink-predictor-tool-copy">Runs the full in-browser backtest and calibration search before predicting.</span>
             </button>
           </div>
+          <div id="shrink-predictor-tool-helper" class="shrink-predictor-tool-helper">Select a mode, then run prediction.</div>
         </div>
         <div id="shrink-predictor-results" class="shrink-predictor-results"></div>
 
