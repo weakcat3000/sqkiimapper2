@@ -4706,6 +4706,7 @@
               id: ROOM_PRESENCE_LABEL_LAYER,
               type: 'symbol',
               source: ROOM_PRESENCE_SOURCE,
+              minzoom: 15,
               layout: {
                 'text-field': ['get', 'name'],
                 'text-size': 11,
@@ -4975,14 +4976,12 @@
         indicator.classList.remove('disconnected');
         text.textContent = `${connectedUsers} online`;
 
-        // Show Room, Location, IP in details line
         const detailsParts = [];
         if (currentRoomCode) detailsParts.push(`Room: ${currentRoomCode}`);
-        if (userInfo.city !== 'Unknown') detailsParts.push(`📍 ${userInfo.city}, ${userInfo.countryCode}`);
+        if (userInfo.city !== 'Unknown') detailsParts.push(`Location: ${userInfo.city}, ${userInfo.countryCode}`);
         if (userInfo.ip !== 'Loading...') detailsParts.push(`IP: ${formatConnectionIp(userInfo.ip)}`);
-        details.innerHTML = detailsParts.join(' <span style="opacity:0.4;">•</span> ');
+        details.innerHTML = detailsParts.join(' <span style="opacity:0.4;">&bull;</span> ');
 
-        // Build dropdown with list of users
         if (window.connectedUsersList && window.connectedUsersList.length > 0) {
           if (players) {
             players.innerHTML = window.connectedUsersList.map((user, i) => {
@@ -4991,11 +4990,11 @@
               const chipClass = ['connection-player-chip', String(user.client_id || '') === clientId ? 'self' : '', user.share_location ? 'share' : '', user.share_location ? 'clickable' : ''].filter(Boolean).join(' ');
               const suffix = user.share_location ? 'GPS on' : 'GPS off';
               const disabledAttr = user.share_location ? '' : 'disabled aria-disabled="true"';
-              return `<button type="button" class="${chipClass}" data-presence-session="${escapeHtml(String(user.session_id || ''))}" title="${escapeHtml(`${name} • ${suffix}`)}" style="color:${escapeHtml(color)};" ${disabledAttr}><span class="connection-player-swatch" style="background:${escapeHtml(color)};"></span><span>${escapeHtml(name)}</span></button>`;
+              return `<button type="button" class="${chipClass}" data-presence-session="${escapeHtml(String(user.session_id || ''))}" title="${escapeHtml(`${name} - ${suffix}`)}" style="color:${escapeHtml(color)};" ${disabledAttr}><span class="connection-player-swatch" style="background:${escapeHtml(color)};"></span><span>${escapeHtml(name)}</span></button>`;
             }).join('');
           }
-          let html = '<div style="font-weight:700;margin-bottom:6px;color:#60a5fa;">Connected Users:</div>';
 
+          let html = '<div style="font-weight:700;margin-bottom:6px;color:#60a5fa;">Connected Users:</div>';
           window.connectedUsersList.forEach((user, i) => {
             const isYou = user.client_id === clientId;
             const userClass = isYou ? 'user-item self' : 'user-item';
@@ -5005,12 +5004,15 @@
             html += `<div class="${userClass}">`;
             html += `<div class="user-item-name-row"><span class="user-item-swatch" style="background:${escapeHtml(userColor)};"></span><div class="user-item-name" style="color:${escapeHtml(userColor)};">${escapeHtml(userName)}</div></div>`;
             html += `<div class="user-item-info">`;
-            html += `${user.device || '💻 Desktop'} • ${user.browser || 'Unknown'}`;
+            html += `${escapeHtml(String(user.device || 'Desktop'))} &bull; ${escapeHtml(String(user.browser || 'Unknown'))}`;
             if (user.city && user.country) {
-              html += ` • ${user.city}, ${user.country}`;
+              html += ` &bull; ${escapeHtml(String(user.city))}, ${escapeHtml(String(user.country))}`;
+            }
+            if (user.ip && user.ip !== 'Loading...') {
+              html += ` &bull; IP: ${escapeHtml(String(user.ip))}`;
             }
             if (user.share_location && Number.isFinite(Number(user.lat)) && Number.isFinite(Number(user.lng))) {
-              html += ` â€¢ sharing GPS`;
+              html += ` &bull; sharing GPS`;
             }
             html += `</div></div>`;
           });
@@ -8016,37 +8018,6 @@
       document.getElementById('recon-modal')?.addEventListener('click', (e) => {
         if (e.target.id === 'recon-modal') closeReconModal();
       });
-      if (engine === 'gl') {
-        mapgl.on('mousemove', (e) => {
-          if (!circleDragCtx) return;
-          moveCircleFeature(circleDragCtx.entry, circleDragCtx.fid, e.lngLat.lng, e.lngLat.lat);
-        });
-
-        mapgl.on('mouseup', () => {
-          if (!circleDragCtx) return;
-          mapgl.getCanvas().style.cursor = '';
-          circleDragCtx = null;
-          saveState();
-        });
-      }
-
-
-      if (engine !== 'gl') {
-        mapleaf.on('mousemove', (e) => {
-          if (!circleDragCtx) return;
-          moveCircleFeature(circleDragCtx.entry, circleDragCtx.fid, e.latlng.lng, e.latlng.lat);
-        });
-
-        mapleaf.on('mouseup', () => {
-          if (!circleDragCtx) return;
-          mapleaf.getContainer().style.cursor = '';
-          circleDragCtx = null;
-          saveState();
-        });
-      }
-
-
-
       /* ====================== GOOGLE SHEETS INTEGRATION ====================== */
       const sheetsBtn = byId('sheets-btn');
       const sheetsView = byId('sheets-view');
