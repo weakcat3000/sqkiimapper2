@@ -2995,6 +2995,11 @@
       animation-play-state: paused !important;
     }
 
+    .app.power-saving #cat-lottie,
+    .app.power-saving #darkveil {
+      display: none !important;
+    }
+
     /* Connection indicator (top-center) with dropdown */
     #connection-indicator {
       position: fixed;
