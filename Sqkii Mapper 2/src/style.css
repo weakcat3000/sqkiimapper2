@@ -437,6 +437,7 @@
 
     /* --- Lottie cat under "Sqkii Mapper" --- */
     #brand-stack {
+      position: relative;
       display: flex;
       flex-direction: column;
       align-items: flex-start;
@@ -445,12 +446,12 @@
     }
 
     #brand-title-wrap {
-      display: grid;
-      grid-template-columns: minmax(0, auto) max-content;
-      align-items: start;
-      column-gap: 8px;
+      position: relative;
+      display: block;
       width: 100%;
       max-width: 100%;
+      padding-top: 2px;
+      padding-right: 72px;
     }
 
     #brand-title {
@@ -458,16 +459,15 @@
     }
 
     #brand-version {
-      position: static;
-      margin-top: 2px;
+      position: absolute;
+      top: -6px;
+      left: 52px;
       font-size: 10px;
       line-height: 1;
       font-weight: 600;
       letter-spacing: 0.04em;
       color: rgba(148, 163, 184, 0.56);
       white-space: nowrap;
-      text-align: left;
-      justify-self: start;
       pointer-events: none;
       user-select: none;
     }
