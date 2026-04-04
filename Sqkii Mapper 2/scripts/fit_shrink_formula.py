@@ -224,6 +224,14 @@ def destination(origin: Tuple[float, float], east_m: float, north_m: float) -> T
     return lat, lng
 
 
+def wrap_angle_rad(value: float) -> float:
+    while value <= -math.pi:
+        value += 2 * math.pi
+    while value > math.pi:
+        value -= 2 * math.pi
+    return value
+
+
 def resample_series(values: Sequence[float], out_len: int = EMBED_LEN) -> List[float]:
     if out_len <= 0:
         return []
@@ -305,6 +313,7 @@ def build_sequence_profile(steps: Sequence[Step]) -> Dict[str, float]:
     if start_ts is not None and end_ts is not None and end_ts >= start_ts:
         duration_s = (end_ts - start_ts) / 1000.0
     shrink_amount = max(0.0, start_radius - end.radius_m)
+    bundle_profile = build_direction_bundle_profile(steps)
     return {
         "stepCount": float(len(steps)),
         "radiusRatio": end.radius_m / start_radius,
@@ -313,6 +322,7 @@ def build_sequence_profile(steps: Sequence[Step]) -> Dict[str, float]:
         "durationNorm": duration_s / max(60.0, start_radius),
         "shrinkRateNorm": shrink_amount / max(1.0, duration_s, start_radius),
         "radiusStdRatio": statistics.pstdev(r / start_radius for r in radii) if len(radii) > 1 else 0.0,
+        **bundle_profile,
     }
 
 
@@ -337,23 +347,119 @@ def build_normalized_signature(steps: Sequence[Step]) -> List[Dict[str, float]]:
     return signature
 
 
+def build_direction_bundle_profile(steps: Sequence[Step]) -> Dict[str, float]:
+    move_count = max(0, len(steps) - 1)
+    if move_count <= 0:
+        return {
+            "bundleCountRatio": 0.0,
+            "meanBundleRunRatio": 0.0,
+            "maxBundleRunRatio": 0.0,
+            "finalBundleRunRatio": 0.0,
+            "turnDensity": 0.0,
+            "headingChangeNorm": 0.0,
+            "finalHeadingEastNorm": 0.0,
+            "finalHeadingNorthNorm": 0.0,
+        }
+
+    bundle_lengths: List[int] = []
+    heading_changes: List[float] = []
+    current_bundle_len = 0
+    prev_heading: Optional[float] = None
+    final_heading_east = 0.0
+    final_heading_north = 0.0
+    threshold_rad = math.radians(26.0)
+
+    for prev, current in zip(steps, steps[1:]):
+        east, north = signed_offset_m((prev.lat, prev.lng), (current.lat, current.lng))
+        dist = math.hypot(east, north)
+        if dist <= 1e-6:
+            heading = prev_heading if prev_heading is not None else 0.0
+        else:
+            heading = math.atan2(north, east)
+        angle_delta = 0.0 if prev_heading is None else abs(wrap_angle_rad(heading - prev_heading))
+        if prev_heading is None or angle_delta <= threshold_rad:
+            current_bundle_len += 1
+        else:
+            bundle_lengths.append(max(1, current_bundle_len))
+            current_bundle_len = 1
+            heading_changes.append(angle_delta / math.pi)
+        prev_heading = heading
+        final_heading_east = math.cos(heading)
+        final_heading_north = math.sin(heading)
+
+    bundle_lengths.append(max(1, current_bundle_len))
+    bundle_count = len(bundle_lengths)
+    mean_bundle = mean(bundle_lengths) if bundle_lengths else 0.0
+    max_bundle = max(bundle_lengths) if bundle_lengths else 0.0
+    final_bundle = bundle_lengths[-1] if bundle_lengths else 0.0
+    return {
+        "bundleCountRatio": bundle_count / max(1.0, move_count),
+        "meanBundleRunRatio": mean_bundle / max(1.0, move_count),
+        "maxBundleRunRatio": max_bundle / max(1.0, move_count),
+        "finalBundleRunRatio": final_bundle / max(1.0, move_count),
+        "turnDensity": max(0.0, bundle_count - 1) / max(1.0, move_count),
+        "headingChangeNorm": mean(heading_changes) if heading_changes else 0.0,
+        "finalHeadingEastNorm": final_heading_east,
+        "finalHeadingNorthNorm": final_heading_north,
+    }
+
+
+def build_bundle_signature_series(steps: Sequence[Step]) -> List[Dict[str, float]]:
+    move_count = max(0, len(steps) - 1)
+    if move_count <= 0:
+        return []
+
+    series: List[Dict[str, float]] = []
+    current_bundle_len = 0
+    prev_heading: Optional[float] = None
+    threshold_rad = math.radians(26.0)
+
+    for prev, current in zip(steps, steps[1:]):
+        east, north = signed_offset_m((prev.lat, prev.lng), (current.lat, current.lng))
+        dist = math.hypot(east, north)
+        if dist <= 1e-6:
+            heading = prev_heading if prev_heading is not None else 0.0
+        else:
+            heading = math.atan2(north, east)
+        angle_delta = 0.0 if prev_heading is None else abs(wrap_angle_rad(heading - prev_heading))
+        turn_flag = 0.0
+        if prev_heading is None or angle_delta <= threshold_rad:
+            current_bundle_len += 1
+        else:
+            current_bundle_len = 1
+            turn_flag = 1.0
+        prev_heading = heading
+        series.append({
+            "headingCos": math.cos(heading),
+            "headingSin": math.sin(heading),
+            "bundleRunRatio": current_bundle_len / max(1.0, move_count),
+            "turnFlag": turn_flag,
+        })
+    return series
+
+
 def build_signature_vector(steps: Sequence[Step], out_len: int = EMBED_LEN) -> List[float]:
     signature = build_normalized_signature(steps)
+    bundle_series = build_bundle_signature_series(steps)
     if not signature:
-        return [0.0] * (out_len * 5)
+        return [0.0] * (out_len * 9)
     return [
         *resample_series([item["radiusRatio"] for item in signature], out_len),
         *resample_series([item["eastRatio"] for item in signature], out_len),
         *resample_series([item["northRatio"] for item in signature], out_len),
         *resample_series([item["driftRatio"] for item in signature], out_len),
         *resample_series([item["stepDistanceRatio"] for item in signature], out_len),
+        *resample_series([item["headingCos"] for item in bundle_series], out_len),
+        *resample_series([item["headingSin"] for item in bundle_series], out_len),
+        *resample_series([item["bundleRunRatio"] for item in bundle_series], out_len),
+        *resample_series([item["turnFlag"] for item in bundle_series], out_len),
     ]
 
 
 def build_embedding_from_steps(steps: Sequence[Step], out_len: int = EMBED_LEN) -> List[float]:
     signature = build_normalized_signature(steps)
     if not signature:
-        return [0.0] * (out_len * 5)
+        return [0.0] * (out_len * 9)
     return build_signature_vector(steps, out_len)
 
 
@@ -517,12 +623,26 @@ def get_indices() -> Dict[str, Optional[List[int]]]:
     return {
         "full": None,
         "shape": [index for index in range(stride * 3)],
-        "motion": [stride * 3 + index for index in range(stride * 2)],
+        "motion": [stride * 3 + index for index in range(stride * 6)],
     }
 
 
 def profile_distance(query_profile: Dict[str, float], sample_profile: Dict[str, float]) -> float:
-    keys = ["radiusRatio", "driftRatio", "meanStepDistanceRatio", "durationNorm", "shrinkRateNorm"]
+    keys = [
+        "radiusRatio",
+        "driftRatio",
+        "meanStepDistanceRatio",
+        "durationNorm",
+        "shrinkRateNorm",
+        "bundleCountRatio",
+        "meanBundleRunRatio",
+        "maxBundleRunRatio",
+        "finalBundleRunRatio",
+        "turnDensity",
+        "headingChangeNorm",
+        "finalHeadingEastNorm",
+        "finalHeadingNorthNorm",
+    ]
     total = 0.0
     for key in keys:
         total += (float(query_profile.get(key, 0.0)) - float(sample_profile.get(key, 0.0))) ** 2
@@ -556,7 +676,7 @@ def get_base_config_library() -> List[Dict[str, Any]]:
         {
             "id": "algo-balanced",
             "label": "Balanced",
-            "penalties": {"radius": 3.2, "drift": 2.2, "cadence": 1.25, "size": 1.45, "duration": 1.75, "shrinkRate": 1.55, "signature": 0.95},
+            "penalties": {"radius": 3.2, "drift": 2.2, "cadence": 1.25, "size": 1.45, "duration": 1.75, "shrinkRate": 1.55, "signature": 0.95, "bundle": 1.15},
             "roomFactor": 0.84,
             "ensemble": {"fullRaw": 0.22, "fullScaled": 0.28, "shapeRaw": 0.15, "shapeScaled": 0.19, "motionRaw": 0.07, "motionScaled": 0.09},
             "blend": {"full": 0.52, "shape": 0.28, "motion": 0.20},
@@ -566,7 +686,7 @@ def get_base_config_library() -> List[Dict[str, Any]]:
         {
             "id": "algo-shape",
             "label": "Shape-first",
-            "penalties": {"radius": 4.8, "drift": 3.1, "cadence": 1.4, "size": 1.6, "duration": 2.05, "shrinkRate": 1.8, "signature": 1.10},
+            "penalties": {"radius": 4.8, "drift": 3.1, "cadence": 1.4, "size": 1.6, "duration": 2.05, "shrinkRate": 1.8, "signature": 1.10, "bundle": 1.35},
             "roomFactor": 0.86,
             "ensemble": {"fullRaw": 0.16, "fullScaled": 0.23, "shapeRaw": 0.20, "shapeScaled": 0.24, "motionRaw": 0.05, "motionScaled": 0.12},
             "blend": {"full": 0.35, "shape": 0.45, "motion": 0.20},
@@ -576,7 +696,7 @@ def get_base_config_library() -> List[Dict[str, Any]]:
         {
             "id": "algo-room",
             "label": "Room-aware",
-            "penalties": {"radius": 3.0, "drift": 2.0, "cadence": 1.1, "size": 1.35, "duration": 1.65, "shrinkRate": 1.5, "signature": 0.85},
+            "penalties": {"radius": 3.0, "drift": 2.0, "cadence": 1.1, "size": 1.35, "duration": 1.65, "shrinkRate": 1.5, "signature": 0.85, "bundle": 1.05},
             "roomFactor": 0.74,
             "ensemble": {"fullRaw": 0.20, "fullScaled": 0.27, "shapeRaw": 0.13, "shapeScaled": 0.18, "motionRaw": 0.08, "motionScaled": 0.14},
             "blend": {"full": 0.58, "shape": 0.22, "motion": 0.20},
@@ -586,7 +706,7 @@ def get_base_config_library() -> List[Dict[str, Any]]:
         {
             "id": "algo-drift",
             "label": "Drift-first",
-            "penalties": {"radius": 2.6, "drift": 3.8, "cadence": 1.55, "size": 1.2, "duration": 1.6, "shrinkRate": 1.9, "signature": 1.0},
+            "penalties": {"radius": 2.6, "drift": 3.8, "cadence": 1.55, "size": 1.2, "duration": 1.6, "shrinkRate": 1.9, "signature": 1.0, "bundle": 1.2},
             "roomFactor": 0.84,
             "ensemble": {"fullRaw": 0.24, "fullScaled": 0.23, "shapeRaw": 0.12, "shapeScaled": 0.16, "motionRaw": 0.10, "motionScaled": 0.15},
             "blend": {"full": 0.42, "shape": 0.22, "motion": 0.36},
@@ -694,8 +814,18 @@ def predict_neighbors(model: Dict[str, Any], query_steps: Sequence[Step], query_
         size_penalty = abs(float(query_profile.get("stepCount", 0.0)) - float(sample.profile.get("stepCount", 0.0))) / 10.0 * float(penalties["size"])
         duration_penalty = abs(float(query_profile.get("durationNorm", 0.0)) - float(sample.profile.get("durationNorm", 0.0))) * float(penalties["duration"])
         shrink_penalty = abs(float(query_profile.get("shrinkRateNorm", 0.0)) - float(sample.profile.get("shrinkRateNorm", 0.0))) * float(penalties["shrinkRate"])
+        bundle_penalty = (
+            abs(float(query_profile.get("bundleCountRatio", 0.0)) - float(sample.profile.get("bundleCountRatio", 0.0))) * 0.7
+            + abs(float(query_profile.get("meanBundleRunRatio", 0.0)) - float(sample.profile.get("meanBundleRunRatio", 0.0))) * 1.0
+            + abs(float(query_profile.get("maxBundleRunRatio", 0.0)) - float(sample.profile.get("maxBundleRunRatio", 0.0))) * 0.8
+            + abs(float(query_profile.get("finalBundleRunRatio", 0.0)) - float(sample.profile.get("finalBundleRunRatio", 0.0))) * 1.2
+            + abs(float(query_profile.get("turnDensity", 0.0)) - float(sample.profile.get("turnDensity", 0.0))) * 0.85
+            + abs(float(query_profile.get("headingChangeNorm", 0.0)) - float(sample.profile.get("headingChangeNorm", 0.0))) * 0.7
+            + abs(float(query_profile.get("finalHeadingEastNorm", 0.0)) - float(sample.profile.get("finalHeadingEastNorm", 0.0))) * 0.45
+            + abs(float(query_profile.get("finalHeadingNorthNorm", 0.0)) - float(sample.profile.get("finalHeadingNorthNorm", 0.0))) * 0.45
+        ) * float(penalties.get("bundle", 1.0))
         signature_penalty = distance(query_signature, sample.signature) * float(penalties.get("signature", 0.95))
-        total = embed_distance + radius_penalty + drift_penalty + cadence_penalty + size_penalty + duration_penalty + shrink_penalty + signature_penalty
+        total = embed_distance + radius_penalty + drift_penalty + cadence_penalty + size_penalty + duration_penalty + shrink_penalty + bundle_penalty + signature_penalty
         if room_code and sample.room_code and sample.room_code == room_code:
             total *= room_factor
         scored.append((total, sample))
@@ -884,7 +1014,7 @@ def formula_string(config: Dict[str, Any]) -> str:
     return (
         f"roomFactor={config['roomFactor']:.3f}; "
         f"penalties(radius={penalties['radius']:.3f}, drift={penalties['drift']:.3f}, cadence={penalties['cadence']:.3f}, "
-        f"size={penalties['size']:.3f}, duration={penalties['duration']:.3f}, shrinkRate={penalties['shrinkRate']:.3f}, signature={penalties['signature']:.3f}); "
+        f"size={penalties['size']:.3f}, duration={penalties['duration']:.3f}, shrinkRate={penalties['shrinkRate']:.3f}, signature={penalties['signature']:.3f}, bundle={penalties['bundle']:.3f}); "
         f"progressScale=[{config['progressScaleBounds'][0]:.3f},{config['progressScaleBounds'][1]:.3f}]; "
         f"remainingScale=[{config['remainingScaleBounds'][0]:.3f},{config['remainingScaleBounds'][1]:.3f}]"
     )

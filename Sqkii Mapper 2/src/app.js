@@ -9204,9 +9204,9 @@
         shrinkPredictorToolFullBtn?.classList.toggle('active', shrinkPredictorSelectedMode === 'full');
         if (shrinkPredictorToolHelperEl) {
           shrinkPredictorToolHelperEl.textContent = shrinkPredictorSelectedMode === 'quick'
-            ? 'Quick Predict selected. Uses the saved GitHub formula for the fastest run.'
+            ? 'Quick Predict selected.'
             : (shrinkPredictorSelectedMode === 'full'
-              ? 'Full Predict selected. Runs the deeper in-browser backtest before predicting.'
+              ? 'Full Predict selected.'
               : 'Select a mode, then run prediction.');
         }
         if (shrinkPredictorRunBtn) {
@@ -11060,7 +11060,7 @@
         if (!shrinkPredictorResultsEl) return;
         if (!result?.predictedPoint) {
           const modeLabel = shrinkPredictorGetModeLabel(shrinkPredictorSelectedMode);
-          shrinkPredictorResultsEl.innerHTML = `<div class="shrink-predictor-empty">${escapeHtml(modeLabel ? `${modeLabel} is ready. Press the run button to build the prediction overlay.` : 'Choose Quick Predict or Full Predict above, then run the predictor to see a likely endpoint.')}</div>`;
+          shrinkPredictorResultsEl.innerHTML = `<div class="shrink-predictor-empty">${escapeHtml(modeLabel ? `${modeLabel} is ready. Press the run button to build the prediction overlay.` : 'Choose Quick Predict or Full Predict above, then run the predictor to see a likely prediction coin location.')}</div>`;
           return;
         }
 
@@ -11131,7 +11131,7 @@
 
         shrinkPredictorResultsEl.innerHTML = `
           <section class="shrink-predictor-primary">
-            <h4>Predicted Endpoint</h4>
+          <h4>Prediction Coin Location</h4>
             <div class="shrink-predictor-grid">
               <div class="shrink-predictor-stat">
                 <span class="shrink-predictor-stat-label">Predicted Lat/Lng</span>
@@ -11468,7 +11468,7 @@
 
       async function runShrinkPredictor(modeOverride = '') {
         if (!currentShrinkPredictorContext || shrinkPredictorIsRunning) return;
-        if (modeOverride) shrinkPredictorSetMode(modeOverride);
+        if (typeof modeOverride === 'string' && modeOverride) shrinkPredictorSetMode(modeOverride);
         if (!shrinkPredictorSelectedMode) {
           shrinkPredictorSetStatus('Choose Quick Predict or Full Predict first.');
           return;
@@ -11590,7 +11590,7 @@
       }
 
       shrinkPredictorCloseBtn?.addEventListener('click', closeShrinkPredictorModal);
-      shrinkPredictorRunBtn?.addEventListener('click', runShrinkPredictor);
+      shrinkPredictorRunBtn?.addEventListener('click', () => runShrinkPredictor());
       shrinkPredictorToolQuickBtn?.addEventListener('click', () => {
         shrinkPredictorSetMode('quick');
         shrinkPredictorRenderResults(null);
