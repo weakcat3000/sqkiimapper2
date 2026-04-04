@@ -4540,6 +4540,8 @@
       const ROOM_PRESENCE_TABLE = 'room_presence';
       const ROOM_PRESENCE_HEARTBEAT_MS = 15000;
       const ROOM_PRESENCE_REFRESH_MS = 10000;
+      const ROOM_PRESENCE_LOCATION_SYNC_MS = 4000;
+      const ROOM_PRESENCE_LOCATION_MIN_MOVE_METERS = 8;
       const ROOM_PRESENCE_STALE_MS = 45000;
       const ROOM_PRESENCE_SOURCE = 'room-presence-users';
       const ROOM_PRESENCE_LAYER = 'room-presence-users-layer';
@@ -4552,6 +4554,10 @@
       let roomPresenceLocationAvailable = true;
       let roomPresenceHeartbeatTimer = 0;
       let roomPresenceRefreshTimer = 0;
+      let roomPresenceLocationSyncTimer = 0;
+      let roomPresenceLastLocationSyncAt = 0;
+      let roomPresenceLastSyncedPos = null;
+      let roomPresenceLastUsersSignature = '';
       let connectedUsers = 1; // Start with self
       let roomPresenceShareLocation = false;
       let roomPresenceLeafletLayer = null;
@@ -4561,8 +4567,10 @@
       function clearRoomPresenceTimers() {
         clearInterval(roomPresenceHeartbeatTimer);
         clearInterval(roomPresenceRefreshTimer);
+        clearTimeout(roomPresenceLocationSyncTimer);
         roomPresenceHeartbeatTimer = 0;
         roomPresenceRefreshTimer = 0;
+        roomPresenceLocationSyncTimer = 0;
       }
 
       function roomPresenceHash(text = '') {
@@ -4585,6 +4593,13 @@
         return String(user?.client_id || '') === clientId ? 'You' : `Player ${index + 1}`;
       }
 
+      function formatConnectionIp(ip) {
+        const value = String(ip || '').trim();
+        if (!value || value === 'Loading...') return value;
+        if (value.length <= 20) return value;
+        return `${value.slice(0, 12)}…${value.slice(-6)}`;
+      }
+
       function roomPresenceHasValidPosition(position = lastUserPos) {
         return Array.isArray(position)
           && Number.isFinite(Number(position[0]))
@@ -4593,6 +4608,28 @@
 
       function roomPresenceShouldShareLocation() {
         return roomPresenceHasValidPosition();
+      }
+
+      function roomPresencePositionDistanceMeters(a, b) {
+        if (!roomPresenceHasValidPosition(a) || !roomPresenceHasValidPosition(b)) return Infinity;
+        const [lngA, latA] = [Number(a[0]), Number(a[1])];
+        const [lngB, latB] = [Number(b[0]), Number(b[1])];
+        return turf.distance([lngA, latA], [lngB, latB], { units: 'kilometers' }) * 1000;
+      }
+
+      function roomPresenceUsersSignature(users = []) {
+        return (Array.isArray(users) ? users : []).map((user) => {
+          const lat = Number(user?.lat);
+          const lng = Number(user?.lng);
+          return [
+            String(user?.session_id || ''),
+            String(user?.client_id || ''),
+            user?.share_location ? 1 : 0,
+            Number.isFinite(lat) ? lat.toFixed(5) : '',
+            Number.isFinite(lng) ? lng.toFixed(5) : '',
+            String(user?.last_seen || '')
+          ].join('|');
+        }).join('||');
       }
 
       function roomPresenceMarkerFeatures(users = []) {
@@ -4720,14 +4757,45 @@
       }
 
       function setConnectedUsersList(users = []) {
-        window.connectedUsersList = users.map((user, index) => ({
+        const normalizedUsers = users.map((user, index) => ({
           ...user,
           __presenceColor: roomPresenceColorForUser(user, index),
           __presenceName: roomPresenceUserName(user, index)
         }));
-        connectedUsers = currentRoomCode ? Math.max(1, users.length) : 0;
+        const nextConnectedUsers = currentRoomCode ? Math.max(1, normalizedUsers.length) : 0;
+        const nextSignature = roomPresenceUsersSignature(normalizedUsers);
+        if (nextConnectedUsers === connectedUsers && nextSignature === roomPresenceLastUsersSignature) return;
+        window.connectedUsersList = normalizedUsers;
+        connectedUsers = nextConnectedUsers;
+        roomPresenceLastUsersSignature = nextSignature;
         updateConnectionIndicator();
         renderRoomPresenceMapOverlay(window.connectedUsersList);
+      }
+
+      async function flushRoomPresenceLocationSync() {
+        roomPresenceLocationSyncTimer = 0;
+        if (!currentRoomCode || !roomPresenceAvailable || !roomPresenceShouldShareLocation()) return;
+        try {
+          await upsertRoomPresence();
+          roomPresenceLastLocationSyncAt = Date.now();
+          roomPresenceLastSyncedPos = Array.isArray(lastUserPos) ? [Number(lastUserPos[0]), Number(lastUserPos[1])] : null;
+        } catch (error) {
+          console.warn('Room presence location update failed:', error);
+        }
+      }
+
+      function scheduleRoomPresenceLocationSync({ immediate = false } = {}) {
+        if (!currentRoomCode || !roomPresenceAvailable || !roomPresenceShouldShareLocation()) return;
+        const now = Date.now();
+        const movedMeters = roomPresencePositionDistanceMeters(lastUserPos, roomPresenceLastSyncedPos);
+        const dueByTime = (now - roomPresenceLastLocationSyncAt) >= ROOM_PRESENCE_LOCATION_SYNC_MS;
+        const dueByMove = movedMeters >= ROOM_PRESENCE_LOCATION_MIN_MOVE_METERS;
+        if (!immediate && !dueByTime && !dueByMove) return;
+        clearTimeout(roomPresenceLocationSyncTimer);
+        const delay = immediate ? 0 : Math.max(0, ROOM_PRESENCE_LOCATION_SYNC_MS - (now - roomPresenceLastLocationSyncAt));
+        roomPresenceLocationSyncTimer = setTimeout(() => {
+          flushRoomPresenceLocationSync().catch((error) => console.warn('Room presence location flush failed:', error));
+        }, delay);
       }
 
       function roomPresencePayload() {
@@ -4776,6 +4844,7 @@
 
       async function refreshRoomPresence() {
         if (!currentRoomCode) {
+          roomPresenceLastUsersSignature = '';
           setConnectedUsersList([]);
           return;
         }
@@ -4845,6 +4914,7 @@
       async function startRoomPresence(roomCode) {
         clearRoomPresenceTimers();
         if (!roomCode) {
+          roomPresenceLastUsersSignature = '';
           setConnectedUsersList([]);
           return;
         }
@@ -4909,7 +4979,7 @@
         const detailsParts = [];
         if (currentRoomCode) detailsParts.push(`Room: ${currentRoomCode}`);
         if (userInfo.city !== 'Unknown') detailsParts.push(`📍 ${userInfo.city}, ${userInfo.countryCode}`);
-        if (userInfo.ip !== 'Loading...') detailsParts.push(`IP: ${userInfo.ip}`);
+        if (userInfo.ip !== 'Loading...') detailsParts.push(`IP: ${formatConnectionIp(userInfo.ip)}`);
         details.innerHTML = detailsParts.join(' <span style="opacity:0.4;">•</span> ');
 
         // Build dropdown with list of users
@@ -6258,9 +6328,7 @@
           updateSonarEnabled();
           if (compassEnabled) scheduleCompassRender();
           if (currentRoomCode) {
-            upsertRoomPresence()
-              .then(() => refreshRoomPresence())
-              .catch((err) => console.warn('Room presence location update failed:', err));
+            scheduleRoomPresenceLocationSync();
           }
 
           // Auto-enable sonar button when GPS activates

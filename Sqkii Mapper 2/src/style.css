@@ -3056,6 +3056,11 @@
       display: flex;
       align-items: center;
       gap: 8px;
+      min-width: 0;
+      max-width: min(34vw, 320px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     #connection-players {
@@ -3085,6 +3090,9 @@
       color: rgba(241, 245, 249, 0.92);
       white-space: nowrap;
       flex: 0 0 auto;
+      appearance: none;
+      cursor: default;
+      transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
     }
 
     .connection-player-chip.self {
@@ -3094,6 +3102,28 @@
 
     .connection-player-chip.share {
       box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+    }
+
+    .connection-player-chip.clickable {
+      cursor: pointer;
+    }
+
+    .connection-player-chip.clickable:hover,
+    .connection-player-chip.clickable:focus-visible {
+      transform: translateY(-1px);
+      border-color: rgba(255, 255, 255, 0.22);
+      box-shadow: 0 10px 22px rgba(15, 23, 42, 0.22);
+      outline: none;
+    }
+
+    .connection-player-chip.loading {
+      opacity: 0.75;
+      pointer-events: none;
+    }
+
+    .connection-player-chip:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
 
     .connection-player-swatch {
