@@ -9162,6 +9162,9 @@
       const shrinkPredictorProgressValueEl = byId('shrink-predictor-progress-value');
       const shrinkPredictorProgressFillEl = byId('shrink-predictor-progress-fill');
       const shrinkPredictorSummaryEl = byId('shrink-predictor-summary');
+      const shrinkPredictorToolPickerEl = byId('shrink-predictor-tool-picker');
+      const shrinkPredictorToolQuickBtn = byId('shrink-predictor-tool-quick');
+      const shrinkPredictorToolFullBtn = byId('shrink-predictor-tool-full');
       const shrinkPredictorResultsEl = byId('shrink-predictor-results');
       const SHRINK_PREDICTOR_SRC = 'shrink-predictor-src';
       const SHRINK_PREDICTOR_ANCHOR_SRC = 'shrink-predictor-anchor-src';
@@ -9178,7 +9181,9 @@
       let shrinkPredictorSpinFrame = null;
       let shrinkPredictorSpinState = null;
       let shrinkPredictorMlModelPromise = null;
+      let shrinkPredictorFormulaPromise = null;
       let shrinkPredictorIsRunning = false;
+      let shrinkPredictorSelectedMode = '';
 
       function shrinkPredictorSetStatus(message, isError = false) {
         if (!shrinkPredictorStatusEl) return;
@@ -9186,11 +9191,31 @@
         shrinkPredictorStatusEl.style.color = isError ? '#fca5a5' : 'var(--muted)';
       }
 
+      function shrinkPredictorGetModeLabel(mode = '') {
+        return mode === 'quick'
+          ? 'Quick Predict'
+          : (mode === 'full' ? 'Full Predict' : '');
+      }
+
+      function shrinkPredictorSetMode(mode = '') {
+        shrinkPredictorSelectedMode = mode === 'quick' || mode === 'full' ? mode : '';
+        shrinkPredictorToolQuickBtn?.classList.toggle('active', shrinkPredictorSelectedMode === 'quick');
+        shrinkPredictorToolFullBtn?.classList.toggle('active', shrinkPredictorSelectedMode === 'full');
+        if (shrinkPredictorRunBtn) {
+          shrinkPredictorRunBtn.textContent = shrinkPredictorSelectedMode
+            ? `Run ${shrinkPredictorGetModeLabel(shrinkPredictorSelectedMode)}`
+            : 'Run Prediction';
+          shrinkPredictorRunBtn.disabled = shrinkPredictorIsRunning || !shrinkPredictorSelectedMode;
+        }
+      }
+
       function shrinkPredictorSetRunningState(isRunning) {
         shrinkPredictorIsRunning = !!isRunning;
-        if (shrinkPredictorRunBtn) shrinkPredictorRunBtn.disabled = shrinkPredictorIsRunning;
+        if (shrinkPredictorRunBtn) shrinkPredictorRunBtn.disabled = shrinkPredictorIsRunning || !shrinkPredictorSelectedMode;
         if (shrinkPredictorClearBtn) shrinkPredictorClearBtn.disabled = shrinkPredictorIsRunning;
         if (shrinkPredictorCloseBtn) shrinkPredictorCloseBtn.disabled = shrinkPredictorIsRunning;
+        if (shrinkPredictorToolQuickBtn) shrinkPredictorToolQuickBtn.disabled = shrinkPredictorIsRunning;
+        if (shrinkPredictorToolFullBtn) shrinkPredictorToolFullBtn.disabled = shrinkPredictorIsRunning;
       }
 
       function shrinkPredictorSetProgress(percent = 0, label = '', visible = true) {
@@ -10128,6 +10153,22 @@
         return shrinkPredictorGetBaseConfigLibrary()[0];
       }
 
+      function shrinkPredictorHydrateConfig(sourceConfig = {}, fallback = null) {
+        const base = fallback || shrinkPredictorGetDefaultConfig();
+        return {
+          ...base,
+          ...sourceConfig,
+          id: String(sourceConfig?.id || base.id || 'predictor-config'),
+          label: String(sourceConfig?.label || base.label || 'Predictor Config'),
+          penalties: {
+            ...base.penalties,
+            ...(sourceConfig?.penalties || {})
+          },
+          ensemble: shrinkPredictorNormalizeWeightMap(sourceConfig?.ensemble || base.ensemble, base.ensemble),
+          blend: shrinkPredictorNormalizeWeightMap(sourceConfig?.blend || base.blend, base.blend)
+        };
+      }
+
       function shrinkPredictorSelectCalibrationSamples(model, observation) {
         const allSamples = Array.isArray(model?.samples) ? model.samples : [];
         const roomCode = String(observation?.matchedGroup?.roomCode || currentRoomCode || '').trim().toLowerCase();
@@ -10366,6 +10407,49 @@
         });
 
         return shrinkPredictorMlModelPromise;
+      }
+
+      async function shrinkPredictorLoadQuickFormula() {
+        if (shrinkPredictorFormulaPromise) return shrinkPredictorFormulaPromise;
+        shrinkPredictorFormulaPromise = (async () => {
+          const formulaUrl = new URL('shrink_formula.latest.json', document.baseURI).toString();
+          const response = await fetch(formulaUrl, { cache: 'no-cache' });
+          if (!response.ok) throw new Error(`Quick Predict could not load shrink_formula.latest.json (${response.status}).`);
+          const payload = await response.json();
+          if (!payload?.config || typeof payload.config !== 'object') {
+            throw new Error('Quick Predict could not read a valid config from shrink_formula.latest.json.');
+          }
+          return payload;
+        })().catch((error) => {
+          shrinkPredictorFormulaPromise = null;
+          throw error;
+        });
+        return shrinkPredictorFormulaPromise;
+      }
+
+      function shrinkPredictorBuildQuickCalibration(payload = {}, model = null) {
+        const config = shrinkPredictorHydrateConfig({
+          ...(payload?.config || {}),
+          label: payload?.config?.label || 'Quick Predict'
+        });
+        const fitMetrics = payload?.fitMetrics || {};
+        return {
+          mode: 'quick',
+          modeLabel: 'Quick Predict',
+          config,
+          candidateCount: 1,
+          sampleCount: Number(payload?.source?.prefixSampleCount) || Number(model?.samples?.length) || 0,
+          searchPasses: 0,
+          exportedFormulaVersion: Number(payload?.version) || 0,
+          formulaString: String(payload?.formulaString || ''),
+          backtest: {
+            meanErrorMeters: Number(fitMetrics.meanErrorM),
+            medianErrorMeters: Number(fitMetrics.medianErrorM),
+            exactStateMeanErrorMeters: Number(fitMetrics.coinMeanErrorM),
+            p70ErrorMeters: Number(fitMetrics.p70ErrorM),
+            maxErrorMeters: Number(fitMetrics.maxErrorM)
+          }
+        };
       }
 
       function shrinkPredictorPredictNeighbors(model, queryStd, indices = null, limit = SHRINK_PREDICTOR_K, options = {}) {
@@ -10905,6 +10989,7 @@
           ? { lat: anchor.lat, lng: anchor.lng }
           : solved.predictedPoint;
 
+        const predictorModeLabel = calibration?.modeLabel || 'Full Predict';
         return {
           mode: 'ml',
           observation,
@@ -10931,7 +11016,9 @@
           calibration,
           note: observedSteps.length <= 1
             ? 'Only one observed shrink step was available, so the browser model is extrapolating mostly from historical offset neighbors and should be treated as directional.'
-            : `Memory-style predictor using ${model.samples.length} archived prefix sample${model.samples.length === 1 ? '' : 's'} from ${model.entries.length} exact-ended coin${model.entries.length === 1 ? '' : 's'}. It now does a multi-pass search across ${calibration?.candidateCount || 1} candidate algorithm settings in ${calibration?.searchPasses || 1} pass${(calibration?.searchPasses || 1) === 1 ? '' : 'es'}, backtesting them across ${calibration?.sampleCount || 0} exact-ended prefix sample${(calibration?.sampleCount || 0) === 1 ? '' : 's'} and refining around the best settings found so far before predicting the live coin. Then it asks: based on this shrink pattern, where did remembered coins end up? The green dot is placed at the hottest remembered endpoint cluster. Agreement ${(solved.agreement * 100).toFixed(0)}%, uncertainty +/-${Math.round(solved.uncertaintyMeters)}m.`
+            : calibration?.mode === 'quick'
+              ? `${predictorModeLabel} uses the exported shrink formula from GitHub to skip the heavy in-browser search and predict directly from the archived exact-ended memory bank. It still uses ${model.samples.length} archived prefix sample${model.samples.length === 1 ? '' : 's'} from ${model.entries.length} exact-ended coin${model.entries.length === 1 ? '' : 's'}, but runs with the pre-fit formula instead of recalibrating locally. Agreement ${(solved.agreement * 100).toFixed(0)}%, uncertainty +/-${Math.round(solved.uncertaintyMeters)}m.`
+              : `${predictorModeLabel} uses ${model.samples.length} archived prefix sample${model.samples.length === 1 ? '' : 's'} from ${model.entries.length} exact-ended coin${model.entries.length === 1 ? '' : 's'}. It does a multi-pass in-browser search across ${calibration?.candidateCount || 1} candidate algorithm settings in ${calibration?.searchPasses || 1} pass${(calibration?.searchPasses || 1) === 1 ? '' : 'es'}, backtesting them across ${calibration?.sampleCount || 0} exact-ended prefix sample${(calibration?.sampleCount || 0) === 1 ? '' : 's'} before predicting the live coin. The green dot is placed at the hottest remembered endpoint cluster. Agreement ${(solved.agreement * 100).toFixed(0)}%, uncertainty +/-${Math.round(solved.uncertaintyMeters)}m.`
         };
       }
 
@@ -10949,6 +11036,8 @@
           `Current radius ${escapeHtml(coinDbFormatRadius(lastStep?.radiusMeters))}`,
           `${historyCount} archived exact match${historyCount === 1 ? '' : 'es'}`
         ];
+        const modeLabel = shrinkPredictorGetModeLabel(shrinkPredictorSelectedMode);
+        if (modeLabel) chips.push(modeLabel);
 
         shrinkPredictorSummaryEl.innerHTML = chips
           .map((label) => `<span class="shrink-predictor-chip">${label}</span>`)
@@ -11364,8 +11453,13 @@
         }
       }
 
-      async function runShrinkPredictor() {
+      async function runShrinkPredictor(modeOverride = '') {
         if (!currentShrinkPredictorContext || shrinkPredictorIsRunning) return;
+        if (modeOverride) shrinkPredictorSetMode(modeOverride);
+        if (!shrinkPredictorSelectedMode) {
+          shrinkPredictorSetStatus('Choose Quick Predict or Full Predict first.');
+          return;
+        }
 
         shrinkPredictorSetRunningState(true);
         shrinkPredictorSetProgress(4, 'Reading selected circle...', true);
@@ -11392,18 +11486,28 @@
           await shrinkPredictorYieldFrame();
           const model = await shrinkPredictorLoadMlModel();
           shrinkPredictorRenderSummary(observation, model.entries?.length || 0);
-          shrinkPredictorSetProgress(28, 'Preparing algorithm search...', true);
-          shrinkPredictorSetStatus('Backtesting algorithm profiles against archived exact-ended circles...');
-          await shrinkPredictorYieldFrame();
-          const calibration = await shrinkPredictorCalibrateModel(model, observation, (progress) => {
-            const percent = 28 + (shrinkPredictorClamp(Number(progress?.overallPercent) || 0, 0, 1) * 58);
-            const bestMean = Number(progress?.best?.backtest?.meanErrorMeters);
-            const bestText = Number.isFinite(bestMean) ? ` Best ${shrinkPredictorFormatDistance(bestMean)}.` : '';
-            const phaseLabel = String(progress?.phaseLabel || 'searching');
-            const phaseDone = Math.max(0, Number(progress?.phaseDone) || 0);
-            const phaseTotal = Math.max(1, Number(progress?.phaseTotal) || 1);
-            shrinkPredictorSetProgress(percent, `${phaseLabel} ${phaseDone}/${phaseTotal}.${bestText}`, true);
-          });
+          let calibration = null;
+          if (shrinkPredictorSelectedMode === 'quick') {
+            shrinkPredictorSetProgress(28, 'Loading quick formula...', true);
+            shrinkPredictorSetStatus('Loading shrink_formula.latest.json from the website...');
+            await shrinkPredictorYieldFrame();
+            const quickFormula = await shrinkPredictorLoadQuickFormula();
+            calibration = shrinkPredictorBuildQuickCalibration(quickFormula, model);
+            shrinkPredictorSetProgress(82, 'Applying exported quick formula...', true);
+          } else {
+            shrinkPredictorSetProgress(28, 'Preparing algorithm search...', true);
+            shrinkPredictorSetStatus('Backtesting algorithm profiles against archived exact-ended circles...');
+            await shrinkPredictorYieldFrame();
+            calibration = await shrinkPredictorCalibrateModel(model, observation, (progress) => {
+              const percent = 28 + (shrinkPredictorClamp(Number(progress?.overallPercent) || 0, 0, 1) * 58);
+              const bestMean = Number(progress?.best?.backtest?.meanErrorMeters);
+              const bestText = Number.isFinite(bestMean) ? ` Best ${shrinkPredictorFormatDistance(bestMean)}.` : '';
+              const phaseLabel = String(progress?.phaseLabel || 'searching');
+              const phaseDone = Math.max(0, Number(progress?.phaseDone) || 0);
+              const phaseTotal = Math.max(1, Number(progress?.phaseTotal) || 1);
+              shrinkPredictorSetProgress(percent, `${phaseLabel} ${phaseDone}/${phaseTotal}.${bestText}`, true);
+            });
+          }
 
           shrinkPredictorSetProgress(90, 'Building prediction overlay...', true);
           await shrinkPredictorYieldFrame();
@@ -11425,9 +11529,11 @@
             const profileLabel = result.calibration?.config?.label || result.calibration?.config?.id || 'calibrated';
             const candidateCount = Number(result.calibration?.candidateCount || 0);
             const sampleCount = Number(result.calibration?.sampleCount || 0);
-            const backtestMsg = Number.isFinite(backtestMean)
-              ? ` Searched ${candidateCount} settings over ${sampleCount} samples; best mean error ${shrinkPredictorFormatDistance(backtestMean)} with ${profileLabel}.`
-              : '';
+            const backtestMsg = shrinkPredictorSelectedMode === 'quick'
+              ? ` Loaded shrink_formula.latest.json and predicted with ${profileLabel}.${Number.isFinite(backtestMean) ? ` Offline mean error ${shrinkPredictorFormatDistance(backtestMean)} over ${sampleCount} samples.` : ''}`
+              : (Number.isFinite(backtestMean)
+                ? ` Searched ${candidateCount} settings over ${sampleCount} samples; best mean error ${shrinkPredictorFormatDistance(backtestMean)} with ${profileLabel}.`
+                : '');
             shrinkPredictorSetStatus(`Prediction ready.${backtestMsg}`);
           }
         } catch (error) {
@@ -11456,9 +11562,11 @@
 
         shrinkPredictorModal?.classList.add('visible');
         appEl.classList.add('blocked-by-modal');
+        shrinkPredictorSetMode('');
         shrinkPredictorHideProgress();
-        shrinkPredictorSetStatus('Preparing prediction...');
-        runShrinkPredictor();
+        shrinkPredictorRenderSummary(previewObservation, 0);
+        shrinkPredictorRenderResults(null);
+        shrinkPredictorSetStatus('Choose Quick Predict or Full Predict to begin.');
       }
 
       function closeShrinkPredictorModal() {
@@ -11470,6 +11578,8 @@
 
       shrinkPredictorCloseBtn?.addEventListener('click', closeShrinkPredictorModal);
       shrinkPredictorRunBtn?.addEventListener('click', runShrinkPredictor);
+      shrinkPredictorToolQuickBtn?.addEventListener('click', () => runShrinkPredictor('quick'));
+      shrinkPredictorToolFullBtn?.addEventListener('click', () => runShrinkPredictor('full'));
       shrinkPredictorClearBtn?.addEventListener('click', () => {
         clearShrinkPredictorOverlay();
         shrinkPredictorHideProgress();

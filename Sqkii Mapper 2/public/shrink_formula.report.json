@@ -1,0 +1,318 @@
+{
+  "version": 1,
+  "generatedAt": "2026-04-04T14:42:48.414990+00:00",
+  "source": {
+    "table": "coin_history_archive",
+    "room": "",
+    "exactEndedCoinCount": 10,
+    "prefixSampleCount": 634
+  },
+  "target": {
+    "errorMeters": 200.0,
+    "confidenceMeters": 200.0
+  },
+  "search": {
+    "timeBudgetSec": 14400.0,
+    "maxIterations": 20000,
+    "seed": 42,
+    "elapsedSec": 14407.985890799988
+  },
+  "config": {
+    "id": "algo-drift-balanced-rf90-du135-sr180-mut14207-mut97670-mut94874-mut87278-mut13379-mut91490-mut92691-mut26750-mut64600-mut26545-mut92203-mut87015-mut13515-mut96772-mut55706-mut72180-mut48712-mut32898-mut59592-mut34931-mut15796-mut75991-mut87091-mut23762-mut28892-mut86626-mut98978-mut78327-mut83618",
+    "label": "Drift-first balanced-rf90-du135-sr180 mut14207 mut97670 mut94874 mut87278 mut13379 mut91490 mut92691 mut26750 mut64600 mut26545 mut92203 mut87015 mut13515 mut96772 mut55706 mut72180 mut48712 mut32898 mut59592 mut34931 mut15796 mut75991 mut87091 mut23762 mut28892 mut86626 mut98978 mut78327 mut83618",
+    "penalties": {
+      "radius": 9.282978706487318,
+      "drift": 2.4472541868940576,
+      "cadence": 4.729967387118043,
+      "size": 0.7964081909986155,
+      "duration": 0.7932119475773931,
+      "shrinkRate": 1.6963669464433841,
+      "signature": 1.5954231701638077
+    },
+    "roomFactor": 0.8251184127316111,
+    "ensemble": {
+      "fullRaw": 0.30540126497875125,
+      "fullScaled": 0.08578466684628086,
+      "shapeRaw": 0.2711348971116754,
+      "shapeScaled": 0.0,
+      "motionRaw": 0.0,
+      "motionScaled": 0.33767917106329254
+    },
+    "blend": {
+      "full": 0.46644025600699845,
+      "shape": 0.2272152143681356,
+      "motion": 0.3063445296248659
+    },
+    "progressScaleBounds": [
+      0.35,
+      1.4240158956298732
+    ],
+    "remainingScaleBounds": [
+      0.7907099140004069,
+      1.0
+    ]
+  },
+  "formulaString": "roomFactor=0.825; penalties(radius=9.283, drift=2.447, cadence=4.730, size=0.796, duration=0.793, shrinkRate=1.696, signature=1.595); progressScale=[0.350,1.424]; remainingScale=[0.791,1.000]",
+  "fitMetrics": {
+    "sampleCount": 634,
+    "coinCount": 10,
+    "meanErrorM": 504.8474502870071,
+    "medianErrorM": 532.6016110369113,
+    "p70ErrorM": 590.509609118325,
+    "maxErrorM": 889.9735598965892,
+    "meanConfidenceM": 229.3152083199978,
+    "medianConfidenceM": 62.295852613531004,
+    "maxConfidenceM": 1158.2817405274282,
+    "coinMeanErrorM": 430.24764832253516,
+    "coinMeanConfidenceM": 318.2649009614351,
+    "failCount": 580,
+    "failErrorExcessM": 198998.80513899104,
+    "failConfidenceExcessM": 74674.8044936058,
+    "allWithinTarget": false,
+    "abortedEarly": false,
+    "score": 1090040106.1519194
+  },
+  "leaderboard": [
+    {
+      "rank": 1,
+      "configId": "algo-drift-balanced-rf90-du135-sr180-mut14207-mut97670-mut94874-mut87278-mut13379-mut91490-mut92691-mut26750-mut64600-mut26545-mut92203-mut87015-mut13515-mut96772-mut55706-mut72180-mut48712-mut32898-mut59592-mut34931-mut15796-mut75991-mut87091-mut23762-mut28892-mut86626-mut98978-mut78327-mut83618",
+      "formulaString": "roomFactor=0.825; penalties(radius=9.283, drift=2.447, cadence=4.730, size=0.796, duration=0.793, shrinkRate=1.696, signature=1.595); progressScale=[0.350,1.424]; remainingScale=[0.791,1.000]",
+      "metrics": {
+        "sampleCount": 634,
+        "coinCount": 10,
+        "meanErrorM": 504.8474502870071,
+        "medianErrorM": 532.6016110369113,
+        "p70ErrorM": 590.509609118325,
+        "maxErrorM": 889.9735598965892,
+        "meanConfidenceM": 229.3152083199978,
+        "medianConfidenceM": 62.295852613531004,
+        "maxConfidenceM": 1158.2817405274282,
+        "coinMeanErrorM": 430.24764832253516,
+        "coinMeanConfidenceM": 318.2649009614351,
+        "failCount": 580,
+        "failErrorExcessM": 198998.80513899104,
+        "failConfidenceExcessM": 74674.8044936058,
+        "allWithinTarget": false,
+        "abortedEarly": false,
+        "score": 1090040106.1519194
+      }
+    },
+    {
+      "rank": 2,
+      "configId": "algo-drift-balanced-rf90-du135-sr180-mut14207-mut97670-mut94874-mut87278-mut13379-mut91490-mut92691-mut26750-mut64600-mut26545-mut92203-mut87015-mut13515-mut96772-mut55706-mut72180-mut48712-mut32898-mut59592-mut34931-mut15796-mut75991-mut87091-mut23762-mut28892-mut86626-mut98978-mut47653-mut54996",
+      "formulaString": "roomFactor=0.793; penalties(radius=7.682, drift=2.676, cadence=5.191, size=0.742, duration=0.709, shrinkRate=1.816, signature=1.582); progressScale=[0.350,1.404]; remainingScale=[0.766,1.000]",
+      "metrics": {
+        "sampleCount": 634,
+        "coinCount": 10,
+        "meanErrorM": 505.60974139009056,
+        "medianErrorM": 538.7748660912214,
+        "p70ErrorM": 590.9158794596358,
+        "maxErrorM": 891.448965317592,
+        "meanConfidenceM": 231.437418159595,
+        "medianConfidenceM": 65.74497112320886,
+        "maxConfidenceM": 1106.2464151381726,
+        "coinMeanErrorM": 431.0833993334184,
+        "coinMeanConfidenceM": 318.68603574467295,
+        "failCount": 584,
+        "failErrorExcessM": 199572.09115787494,
+        "failConfidenceExcessM": 74496.28197770195,
+        "allWithinTarget": false,
+        "abortedEarly": false,
+        "score": 1094918678.0842323
+      }
+    },
+    {
+      "rank": 3,
+      "configId": "algo-drift-balanced-rf90-du135-sr180-mut14207-mut97670-mut94874-mut87278-mut13379-mut91490-mut92691-mut26750-mut64600-mut26545-mut92203-mut87015-mut13515-mut96772-mut55706-mut72180-mut48712-mut32898-mut59592-mut34931-mut15796-mut75991-mut87091-mut23762-mut28892-mut86626-mut98978-mut47653",
+      "formulaString": "roomFactor=0.831; penalties(radius=7.412, drift=2.651, cadence=4.835, size=0.691, duration=0.771, shrinkRate=1.759, signature=1.461); progressScale=[0.350,1.419]; remainingScale=[0.734,1.000]",
+      "metrics": {
+        "sampleCount": 634,
+        "coinCount": 10,
+        "meanErrorM": 507.20558760311087,
+        "medianErrorM": 543.0012462396425,
+        "p70ErrorM": 590.4711758865257,
+        "maxErrorM": 887.4327676183682,
+        "meanConfidenceM": 232.14852217362755,
+        "medianConfidenceM": 76.18756028916343,
+        "maxConfidenceM": 1089.9155910800189,
+        "coinMeanErrorM": 432.92416694941846,
+        "coinMeanConfidenceM": 315.81998460481856,
+        "failCount": 584,
+        "failErrorExcessM": 200409.42593823024,
+        "failConfidenceExcessM": 73746.45240488085,
+        "allWithinTarget": false,
+        "abortedEarly": false,
+        "score": 1095468521.2385223
+      }
+    },
+    {
+      "rank": 4,
+      "configId": "algo-drift-balanced-rf90-du135-sr180-mut14207-mut97670-mut94874-mut87278-mut13379-mut91490-mut92691-mut26750-mut64600-mut26545-mut92203-mut87015-mut13515-mut96772-mut55706-mut72180-mut48712-mut32898-mut59592-mut34931-mut15796-mut75991-mut87091-mut23762-mut28892-mut86626-mut98978-mut78327",
+      "formulaString": "roomFactor=0.819; penalties(radius=8.157, drift=2.565, cadence=4.388, size=0.695, duration=0.845, shrinkRate=1.970, signature=1.535); progressScale=[0.369,1.485]; remainingScale=[0.725,1.000]",
+      "metrics": {
+        "sampleCount": 634,
+        "coinCount": 10,
+        "meanErrorM": 508.86210977671493,
+        "medianErrorM": 545.1184968784302,
+        "p70ErrorM": 590.5387945172259,
+        "maxErrorM": 887.0731117471311,
+        "meanConfidenceM": 229.0800090202816,
+        "medianConfidenceM": 70.62949694151352,
+        "maxConfidenceM": 1096.3174697139543,
+        "coinMeanErrorM": 434.7829482855832,
+        "coinMeanConfidenceM": 315.3636176324691,
+        "failCount": 584,
+        "failErrorExcessM": 201249.56614796355,
+        "failConfidenceExcessM": 72627.65313617596,
+        "allWithinTarget": false,
+        "abortedEarly": false,
+        "score": 1095470647.2826283
+      }
+    },
+    {
+      "rank": 5,
+      "configId": "algo-drift-balanced-rf90-du135-sr180-mut14207-mut97670-mut94874-mut87278-mut13379-mut91490-mut92691-mut26750-mut64600-mut26545-mut92203-mut87015-mut13515-mut96772-mut55706-mut72180-mut48712-mut32898-mut59592-mut34931-mut15796-mut75991-mut87091-mut23762-mut28892-mut86626-mut98978-mut37194-mut72064-mut80622",
+      "formulaString": "roomFactor=0.851; penalties(radius=9.636, drift=2.834, cadence=6.162, size=0.742, duration=0.737, shrinkRate=1.402, signature=1.543); progressScale=[0.494,1.547]; remainingScale=[0.797,1.000]",
+      "metrics": {
+        "sampleCount": 634,
+        "coinCount": 10,
+        "meanErrorM": 505.4941047735781,
+        "medianErrorM": 532.2796231527575,
+        "p70ErrorM": 590.4741243214633,
+        "maxErrorM": 884.2372096801895,
+        "meanConfidenceM": 234.76620229220745,
+        "medianConfidenceM": 64.35744083260006,
+        "maxConfidenceM": 1172.2956876782707,
+        "coinMeanErrorM": 432.98515819161656,
+        "coinMeanConfidenceM": 328.64352753852233,
+        "failCount": 581,
+        "failErrorExcessM": 199328.26469143416,
+        "failConfidenceExcessM": 77400.60843940204,
+        "allWithinTarget": false,
+        "abortedEarly": false,
+        "score": 1095787800.6386397
+      }
+    },
+    {
+      "rank": 6,
+      "configId": "algo-drift-balanced-rf90-du135-sr180-mut14207-mut97670-mut94874-mut87278-mut13379-mut91490-mut92691-mut26750-mut64600-mut26545-mut92203-mut87015-mut13515-mut96772-mut55706-mut72180-mut48712-mut32898-mut59592-mut34931-mut15796-mut75991-mut87091-mut23762-mut28892-mut86626-mut98978-mut47653-mut43390",
+      "formulaString": "roomFactor=0.838; penalties(radius=6.966, drift=2.386, cadence=5.135, size=0.699, duration=0.730, shrinkRate=1.512, signature=1.446); progressScale=[0.350,1.388]; remainingScale=[0.754,1.000]",
+      "metrics": {
+        "sampleCount": 634,
+        "coinCount": 10,
+        "meanErrorM": 506.7290995795847,
+        "medianErrorM": 538.8405274744202,
+        "p70ErrorM": 590.5363657467526,
+        "maxErrorM": 895.0467043228654,
+        "meanConfidenceM": 236.59094067279875,
+        "medianConfidenceM": 104.6933853826107,
+        "maxConfidenceM": 1122.881266130129,
+        "coinMeanErrorM": 432.608007625768,
+        "coinMeanConfidenceM": 322.4138913544168,
+        "failCount": 581,
+        "failErrorExcessM": 200276.03795713306,
+        "failConfidenceExcessM": 76289.62306965592,
+        "allWithinTarget": false,
+        "abortedEarly": false,
+        "score": 1096016744.7900083
+      }
+    },
+    {
+      "rank": 7,
+      "configId": "algo-drift-balanced-rf90-du135-sr180-mut14207-mut97670-mut94874-mut87278-mut13379-mut91490-mut92691-mut26750-mut64600-mut26545-mut92203-mut87015-mut13515-mut96772-mut55706-mut72180-mut48712-mut32898-mut59592-mut34931-mut15796-mut75991-mut87091-mut23762-mut28892-mut86626-mut98978-mut37194-mut72064",
+      "formulaString": "roomFactor=0.852; penalties(radius=10.080, drift=3.136, cadence=5.354, size=0.805, duration=0.713, shrinkRate=1.232, signature=1.744); progressScale=[0.444,1.474]; remainingScale=[0.737,1.000]",
+      "metrics": {
+        "sampleCount": 634,
+        "coinCount": 10,
+        "meanErrorM": 505.53812714074127,
+        "medianErrorM": 535.4389767270031,
+        "p70ErrorM": 590.3929047897449,
+        "maxErrorM": 892.8158829800848,
+        "meanConfidenceM": 231.17129477771925,
+        "medianConfidenceM": 63.42263963295052,
+        "maxConfidenceM": 1157.5095761536636,
+        "coinMeanErrorM": 430.32102876732824,
+        "coinMeanConfidenceM": 324.8919157507088,
+        "failCount": 584,
+        "failErrorExcessM": 199193.26846881091,
+        "failConfidenceExcessM": 75811.66099974194,
+        "allWithinTarget": false,
+        "abortedEarly": false,
+        "score": 1096134360.2315383
+      }
+    },
+    {
+      "rank": 8,
+      "configId": "algo-drift-balanced-rf90-du135-sr180-mut14207-mut97670-mut94874-mut87278-mut13379-mut91490-mut92691-mut26750-mut64600-mut26545-mut92203-mut87015-mut13515-mut96772-mut55706-mut72180-mut48712-mut32898-mut59592-mut34931-mut15796-mut75991-mut87091-mut23762-mut28892-mut86626-mut98978-mut37194-mut72064-mut69956",
+      "formulaString": "roomFactor=0.892; penalties(radius=9.886, drift=3.382, cadence=5.621, size=0.808, duration=0.676, shrinkRate=1.427, signature=1.569); progressScale=[0.426,1.398]; remainingScale=[0.744,1.000]",
+      "metrics": {
+        "sampleCount": 634,
+        "coinCount": 10,
+        "meanErrorM": 504.177198021167,
+        "medianErrorM": 533.892284977374,
+        "p70ErrorM": 590.3568612134254,
+        "maxErrorM": 890.5363083345201,
+        "meanConfidenceM": 235.68301968536278,
+        "medianConfidenceM": 63.64880217433518,
+        "maxConfidenceM": 1186.675330219909,
+        "coinMeanErrorM": 427.577614516683,
+        "coinMeanConfidenceM": 331.73751744751524,
+        "failCount": 582,
+        "failErrorExcessM": 198397.1328538182,
+        "failConfidenceExcessM": 78286.45145664267,
+        "allWithinTarget": false,
+        "abortedEarly": false,
+        "score": 1096254401.7704086
+      }
+    },
+    {
+      "rank": 9,
+      "configId": "algo-drift-balanced-rf90-du135-sr180-mut14207-mut97670-mut94874-mut87278-mut13379-mut91490-mut92691-mut26750-mut64600-mut26545-mut92203-mut87015-mut13515-mut96772-mut55706-mut72180-mut48712-mut32898-mut59592-mut34931-mut15796-mut75991-mut87091-mut23762-mut28892-mut86626-mut98978-mut47653-mut43390-mut58608",
+      "formulaString": "roomFactor=0.846; penalties(radius=6.167, drift=2.190, cadence=5.107, size=0.647, duration=0.690, shrinkRate=1.606, signature=1.427); progressScale=[0.350,1.331]; remainingScale=[0.758,1.000]",
+      "metrics": {
+        "sampleCount": 634,
+        "coinCount": 10,
+        "meanErrorM": 506.7777835699852,
+        "medianErrorM": 539.1030193654032,
+        "p70ErrorM": 590.400586986381,
+        "maxErrorM": 886.7019300189346,
+        "meanConfidenceM": 240.16211073152223,
+        "medianConfidenceM": 117.98780624405525,
+        "maxConfidenceM": 1114.5779763839569,
+        "coinMeanErrorM": 432.4971384073344,
+        "coinMeanConfidenceM": 322.5168609550261,
+        "failCount": 581,
+        "failErrorExcessM": 200367.84283208108,
+        "failConfidenceExcessM": 76351.37610354573,
+        "allWithinTarget": false,
+        "abortedEarly": false,
+        "score": 1096292896.8590083
+      }
+    },
+    {
+      "rank": 10,
+      "configId": "algo-drift-balanced-rf90-du135-sr180-mut14207-mut97670-mut94874-mut87278-mut13379-mut91490-mut92691-mut26750-mut64600-mut26545-mut92203-mut87015-mut13515-mut96772-mut55706-mut72180-mut48712-mut32898-mut59592-mut34931-mut15796-mut75991-mut87091-mut23762-mut28892-mut86626-mut98978-mut37194-mut72064-mut93115",
+      "formulaString": "roomFactor=0.806; penalties(radius=9.046, drift=3.034, cadence=5.384, size=0.703, duration=0.783, shrinkRate=1.171, signature=1.874); progressScale=[0.455,1.461]; remainingScale=[0.666,1.000]",
+      "metrics": {
+        "sampleCount": 634,
+        "coinCount": 10,
+        "meanErrorM": 505.51501907945925,
+        "medianErrorM": 538.6516412151502,
+        "p70ErrorM": 589.9993520103859,
+        "maxErrorM": 874.5845513277703,
+        "meanConfidenceM": 230.6202048213672,
+        "medianConfidenceM": 75.18128912338841,
+        "maxConfidenceM": 1100.3418385854893,
+        "coinMeanErrorM": 425.72536322507995,
+        "coinMeanConfidenceM": 318.43809364754804,
+        "failCount": 588,
+        "failErrorExcessM": 198797.14328436347,
+        "failConfidenceExcessM": 73839.79385050673,
+        "allWithinTarget": false,
+        "abortedEarly": false,
+        "score": 1096383869.7452214
+      }
+    }
+  ],
+  "note": "The fitter searches until it either finds a config whose backtests keep every prefix sample within 200m error and 200m confidence, or it hits the configured time/iteration budget and exports the best config found so far."
+}

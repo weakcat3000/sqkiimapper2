@@ -508,10 +508,26 @@
           </div>
         </div>
         <div id="shrink-predictor-summary" class="shrink-predictor-summary"></div>
+        <div id="shrink-predictor-tool-picker" class="shrink-predictor-tool-picker">
+          <div class="shrink-predictor-tool-picker-header">
+            <h4>Choose Prediction Tool</h4>
+            <small class="hint">Pick a faster website-ready formula, or the full backtest search.</small>
+          </div>
+          <div class="shrink-predictor-tool-grid">
+            <button id="shrink-predictor-tool-quick" class="shrink-predictor-tool-btn" type="button">
+              <span class="shrink-predictor-tool-title">Quick Predict</span>
+              <span class="shrink-predictor-tool-copy">Uses the exported <code>shrink_formula.latest.json</code> from GitHub. Faster, lighter, same website UI.</span>
+            </button>
+            <button id="shrink-predictor-tool-full" class="shrink-predictor-tool-btn" type="button">
+              <span class="shrink-predictor-tool-title">Full Predict</span>
+              <span class="shrink-predictor-tool-copy">Runs the full in-browser backtest and calibration search before predicting.</span>
+            </button>
+          </div>
+        </div>
         <div id="shrink-predictor-results" class="shrink-predictor-results"></div>
 
         <div class="shrink-predictor-actions">
-          <button id="shrink-predictor-run" class="btn small">Run Prediction</button>
+          <button id="shrink-predictor-run" class="btn small" disabled>Run Prediction</button>
           <button id="shrink-predictor-clear" class="btn small">Clear Overlay</button>
         </div>
       </div>
