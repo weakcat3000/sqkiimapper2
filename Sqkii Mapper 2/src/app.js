@@ -11539,15 +11539,10 @@
             shrinkPredictorSetStatus('Not enough archived exact-ended training data yet. Showing a baseline center estimate.', true);
           } else {
             const backtestMean = Number(result.calibration?.backtest?.meanErrorMeters);
-            const profileLabel = result.calibration?.config?.label || result.calibration?.config?.id || 'calibrated';
-            const candidateCount = Number(result.calibration?.candidateCount || 0);
-            const sampleCount = Number(result.calibration?.sampleCount || 0);
-            const backtestMsg = shrinkPredictorSelectedMode === 'quick'
-              ? ` Loaded shrink_formula.latest.json and predicted with ${profileLabel}.${Number.isFinite(backtestMean) ? ` Offline mean error ${shrinkPredictorFormatDistance(backtestMean)} over ${sampleCount} samples.` : ''}`
-              : (Number.isFinite(backtestMean)
-                ? ` Searched ${candidateCount} settings over ${sampleCount} samples; best mean error ${shrinkPredictorFormatDistance(backtestMean)} with ${profileLabel}.`
-                : '');
-            shrinkPredictorSetStatus(`Prediction ready.${backtestMsg}`);
+            const backtestMsg = Number.isFinite(backtestMean)
+              ? `Prediction ready. Mean error ${shrinkPredictorFormatDistance(backtestMean)}.`
+              : 'Prediction ready.';
+            shrinkPredictorSetStatus(backtestMsg);
           }
         } catch (error) {
           clearShrinkPredictorOverlay();
