@@ -5989,7 +5989,9 @@
       syncPowerSaveUi();
       syncHtmIconsUi();
       syncHtmIconsSettingsUi();
-      setPowerSavingMode(powerSavingEnabled, { persist: false });
+      const applyBootPowerSavingMode = () => setPowerSavingMode(powerSavingEnabled, { persist: false });
+      if (typeof queueMicrotask === 'function') queueMicrotask(applyBootPowerSavingMode);
+      else Promise.resolve().then(applyBootPowerSavingMode);
       powerSaveBtn?.addEventListener('click', () => setPowerSavingMode(!powerSavingEnabled));
       htmIconsBtn?.addEventListener('click', openHtmIconsSettings);
       htmIconsCloseBtn?.addEventListener('click', closeHtmIconsSettings);
