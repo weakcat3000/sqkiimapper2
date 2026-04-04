@@ -474,6 +474,21 @@
       backface-visibility: hidden;
     }
 
+    .app.cat-lottie-collapsed #brand-stack {
+      gap: 2px;
+    }
+
+    .app.cat-lottie-collapsed #cat-lottie {
+      display: none !important;
+      width: 0;
+      height: 0;
+    }
+
+    .app.cat-lottie-collapsed .header-icon-stack {
+      margin-top: 0;
+      align-self: flex-start;
+    }
+
 
 
     /* Layers list */

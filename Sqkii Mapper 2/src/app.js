@@ -1487,7 +1487,13 @@
       let htmSilverLabelHandlersBound = false;
       let htmSilverLabelUpdateQueued = false;
       const htmSilverLabelMarkers = new Map();
-      document.getElementById('app')?.classList.toggle('power-saving', powerSavingEnabled);
+      let catLottieUnavailable = !window.lottie;
+      const appRoot = document.getElementById('app');
+      function syncCatLottieLayout() {
+        appRoot?.classList.toggle('cat-lottie-collapsed', !!powerSavingEnabled || !!catLottieUnavailable);
+      }
+      appRoot?.classList.toggle('power-saving', powerSavingEnabled);
+      syncCatLottieLayout();
 
       const mapgl = new maptilersdk.Map({
         container: 'mapgl',
@@ -1510,12 +1516,26 @@
       let ensureCatLottieLoaded = () => { };
       (() => {
         const cat = document.getElementById('cat-lottie');
-        if (!cat || !window.lottie) return;
+        const markCatLottieUnavailable = () => {
+          catLottieUnavailable = true;
+          if (cat) cat.style.display = 'none';
+          syncCatLottieLayout();
+        };
+        const markCatLottieAvailable = () => {
+          catLottieUnavailable = false;
+          if (cat && !powerSavingEnabled) cat.style.display = '';
+          syncCatLottieLayout();
+        };
+        if (!cat || !window.lottie) {
+          markCatLottieUnavailable();
+          return;
+        }
         const catLottieSrc = `${BASE_URL}cat-fishing-on-moon.json`;
         let catAnimation = null;
 
         ensureCatLottieLoaded = () => {
           if (catAnimation) {
+            markCatLottieAvailable();
             if (!powerSavingEnabled && !document.hidden) catAnimation.play();
             else catAnimation.pause();
             return;
@@ -1533,18 +1553,22 @@
                 preserveAspectRatio: 'xMidYMid meet',
               },
             });
+            markCatLottieAvailable();
             catAnimation.setSpeed(0.5);
             cat._lottieAnimation = catAnimation;
             if (powerSavingEnabled || document.hidden) catAnimation.pause();
             catAnimation.addEventListener('data_failed', (e) => {
               console.warn('cat-lottie failed to load', e);
+              markCatLottieUnavailable();
             });
           } catch (e) {
             console.warn('cat-lottie failed to initialize', e);
+            markCatLottieUnavailable();
           }
         };
 
         if (!powerSavingEnabled) ensureCatLottieLoaded();
+        else syncCatLottieLayout();
       })();
 
       const _glReadyQueue = [];
@@ -5772,6 +5796,7 @@
         if (veil) veil.style.display = 'none';
         const cat = document.getElementById('cat-lottie');
         if (cat) cat.style.display = 'none';
+        syncCatLottieLayout();
         document.getElementById('cat-lottie')?._lottieAnimation?.pause?.();
         if (typeof stopReconHaloPulse === 'function') stopReconHaloPulse();
         if (typeof cancelLampPostSearchPulse === 'function') cancelLampPostSearchPulse();
@@ -5783,7 +5808,8 @@
         const veil = document.getElementById('darkveil');
         if (veil) veil.style.display = '';
         const cat = document.getElementById('cat-lottie');
-        if (cat) cat.style.display = '';
+        if (cat && !catLottieUnavailable) cat.style.display = '';
+        syncCatLottieLayout();
         ensureCatLottieLoaded();
         if (!reconAnalysisInProgress) window.__resumeVeil?.();
         document.getElementById('cat-lottie')?._lottieAnimation?.play?.();
