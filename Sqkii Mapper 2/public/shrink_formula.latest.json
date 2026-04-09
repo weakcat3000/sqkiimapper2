@@ -1,75 +1,77 @@
 {
   "version": 1,
-  "generatedAt": "2026-04-04T14:42:48.414990+00:00",
+  "generatedAt": "2026-04-08T17:04:14.172742+00:00",
   "source": {
-    "table": "coin_history_archive",
-    "room": "",
-    "exactEndedCoinCount": 10,
-    "prefixSampleCount": 634
+    "type": "excel",
+    "path": "C:\\Users\\yeoww\\OneDrive\\Desktop\\sqkii tele alerts\\SQKII BOT FINAL\\shrink logs\\shrink_log - Copy.xlsx",
+    "sheet": "Shrinks",
+    "exactEndedCoinCount": 57,
+    "prefixSampleCount": 669
   },
   "target": {
     "errorMeters": 200.0,
     "confidenceMeters": 200.0
   },
   "search": {
-    "timeBudgetSec": 14400.0,
-    "maxIterations": 20000,
+    "timeBudgetSec": 3600.0,
+    "maxIterations": 120,
     "seed": 42,
-    "elapsedSec": 14407.985890799988
+    "elapsedSec": 3638.864989100024
   },
   "config": {
-    "id": "algo-drift-balanced-rf90-du135-sr180-mut14207-mut97670-mut94874-mut87278-mut13379-mut91490-mut92691-mut26750-mut64600-mut26545-mut92203-mut87015-mut13515-mut96772-mut55706-mut72180-mut48712-mut32898-mut59592-mut34931-mut15796-mut75991-mut87091-mut23762-mut28892-mut86626-mut98978-mut78327-mut83618",
-    "label": "Drift-first balanced-rf90-du135-sr180 mut14207 mut97670 mut94874 mut87278 mut13379 mut91490 mut92691 mut26750 mut64600 mut26545 mut92203 mut87015 mut13515 mut96772 mut55706 mut72180 mut48712 mut32898 mut59592 mut34931 mut15796 mut75991 mut87091 mut23762 mut28892 mut86626 mut98978 mut78327 mut83618",
+    "id": "algo-shape-balanced-rf76-du135-sr140",
+    "label": "Shape-first balanced-rf76-du135-sr140",
     "penalties": {
-      "radius": 9.282978706487318,
-      "drift": 2.4472541868940576,
-      "cadence": 4.729967387118043,
-      "size": 0.7964081909986155,
-      "duration": 0.7932119475773931,
-      "shrinkRate": 1.6963669464433841,
-      "signature": 1.5954231701638077
+      "radius": 4.8,
+      "drift": 3.1,
+      "cadence": 1.4,
+      "size": 1.6,
+      "duration": 1.35,
+      "shrinkRate": 1.4,
+      "signature": 1.1,
+      "bundle": 1.35
     },
-    "roomFactor": 0.8251184127316111,
+    "roomFactor": 0.76,
     "ensemble": {
-      "fullRaw": 0.30540126497875125,
-      "fullScaled": 0.08578466684628086,
-      "shapeRaw": 0.2711348971116754,
-      "shapeScaled": 0.0,
-      "motionRaw": 0.0,
-      "motionScaled": 0.33767917106329254
+      "fullRaw": 0.16,
+      "fullScaled": 0.23,
+      "shapeRaw": 0.2,
+      "shapeScaled": 0.24,
+      "motionRaw": 0.05,
+      "motionScaled": 0.12
     },
     "blend": {
-      "full": 0.46644025600699845,
-      "shape": 0.2272152143681356,
-      "motion": 0.3063445296248659
+      "full": 0.35,
+      "shape": 0.45,
+      "motion": 0.2
     },
     "progressScaleBounds": [
-      0.35,
-      1.4240158956298732
+      0.65,
+      1.45
     ],
     "remainingScaleBounds": [
-      0.7907099140004069,
-      1.0
+      0.55,
+      1.75
     ]
   },
-  "formulaString": "roomFactor=0.825; penalties(radius=9.283, drift=2.447, cadence=4.730, size=0.796, duration=0.793, shrinkRate=1.696, signature=1.595); progressScale=[0.350,1.424]; remainingScale=[0.791,1.000]",
+  "formulaString": "roomFactor=0.760; penalties(radius=4.800, drift=3.100, cadence=1.400, size=1.600, duration=1.350, shrinkRate=1.400, signature=1.100, bundle=1.350); progressScale=[0.650,1.450]; remainingScale=[0.550,1.750]",
   "fitMetrics": {
-    "sampleCount": 634,
-    "coinCount": 10,
-    "meanErrorM": 504.8474502870071,
-    "medianErrorM": 532.6016110369113,
-    "p70ErrorM": 590.509609118325,
-    "maxErrorM": 889.9735598965892,
-    "meanConfidenceM": 229.3152083199978,
-    "medianConfidenceM": 62.295852613531004,
-    "maxConfidenceM": 1158.2817405274282,
-    "coinMeanErrorM": 430.24764832253516,
-    "coinMeanConfidenceM": 318.2649009614351,
-    "failCount": 580,
-    "failErrorExcessM": 198998.80513899104,
-    "failConfidenceExcessM": 74674.8044936058,
+    "sampleCount": 669,
+    "coinCount": 57,
+    "meanErrorM": 692.8740333254589,
+    "medianErrorM": 561.5282848322876,
+    "p70ErrorM": 894.5562569227188,
+    "maxErrorM": 2020.464143924286,
+    "meanConfidenceM": 1380.3672273955253,
+    "medianConfidenceM": 1278.2371081978038,
+    "maxConfidenceM": 3640.4523223221663,
+    "coinMeanErrorM": 691.1943522050569,
+    "coinMeanConfidenceM": 1383.9848376796735,
+    "failCount": 669,
+    "failErrorExcessM": 335174.7221818682,
+    "failConfidenceExcessM": 789665.675127606,
     "allWithinTarget": false,
     "abortedEarly": false,
-    "score": 1090040106.1519194
+    "score": 2523913408.2765083
   }
 }

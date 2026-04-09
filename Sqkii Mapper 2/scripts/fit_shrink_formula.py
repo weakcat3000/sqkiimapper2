@@ -5,6 +5,7 @@ import json
 import math
 import os
 import random
+import re
 import statistics
 import time
 from dataclasses import dataclass
@@ -12,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
+import openpyxl
 import requests
 
 
@@ -94,7 +96,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--time-budget-sec", type=float, default=180.0)
     parser.add_argument("--max-iterations", type=int, default=4000)
     parser.add_argument("--max-stale-iterations", type=int, default=600)
+    parser.add_argument(
+        "--max-prefix-samples-per-coin",
+        type=int,
+        default=0,
+        help="Optional cap on prefix samples per coin using normalized progress anchors plus turns/resets. 0 keeps all prefixes.",
+    )
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--excel-path",
+        default="",
+        help="Optional path to a shrink-log Excel workbook. If provided, training uses the workbook instead of Supabase.",
+    )
     parser.add_argument(
         "--output-formula",
         default=str(public_dir / "shrink_formula.latest.json"),
@@ -316,7 +329,10 @@ def build_sequence_profile(steps: Sequence[Step]) -> Dict[str, float]:
     bundle_profile = build_direction_bundle_profile(steps)
     return {
         "stepCount": float(len(steps)),
+        "startRadiusKm": start_radius / 1000.0,
+        "currentRadiusKm": end.radius_m / 1000.0,
         "radiusRatio": end.radius_m / start_radius,
+        "shrinkFraction": shrink_amount / start_radius,
         "driftRatio": drift_series[-1] if drift_series else 0.0,
         "meanStepDistanceRatio": mean(step_distances) if step_distances else 0.0,
         "durationNorm": duration_s / max(60.0, start_radius),
@@ -539,6 +555,89 @@ def fetch_exact_records(supabase_url: str, supabase_key: str, limit: int, room: 
     return response.json()
 
 
+def parse_true_location(raw: Any) -> Optional[Tuple[float, float]]:
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    parts = re.findall(r"[-+]?\d*\.?\d+", text)
+    if len(parts) < 2:
+        return None
+    try:
+        return float(parts[0]), float(parts[1])
+    except Exception:
+        return None
+
+
+def load_excel_records(workbook_path: Path, min_prefix_steps: int) -> List[Record]:
+    wb = openpyxl.load_workbook(workbook_path, data_only=True, read_only=True)
+    if "Shrinks" not in wb.sheetnames:
+        raise RuntimeError(f"Workbook does not contain a 'Shrinks' sheet: {workbook_path}")
+    ws = wb["Shrinks"]
+    block_width = 8
+    grouped_rows: Dict[str, List[Dict[str, Any]]] = {}
+
+    for row in ws.iter_rows(values_only=True):
+        values = list(row)
+        for start in range(0, len(values), block_width):
+            block = values[start : start + block_width]
+            if len(block) < 7:
+                continue
+            coin_id, coin_label, shrink_time, lat, lng, radius, true_location = block[:7]
+            if coin_id == "Coin ID" or coin_id is None:
+                continue
+            try:
+                lat_f = float(lat)
+                lng_f = float(lng)
+                radius_f = float(radius)
+            except Exception:
+                continue
+            grouped_rows.setdefault(str(coin_id).strip(), []).append(
+                {
+                    "coin_label": str(coin_label or "").strip(),
+                    "shrink_time": shrink_time,
+                    "lat": lat_f,
+                    "lng": lng_f,
+                    "radius_m": radius_f,
+                    "true_location": parse_true_location(true_location),
+                }
+            )
+
+    records: List[Record] = []
+    for coin_id, rows in grouped_rows.items():
+        rows.sort(key=lambda item: timestamp_ms(item["shrink_time"]) or 2**62)
+        exact_candidates = [item["true_location"] for item in rows if item["true_location"]]
+        if not exact_candidates:
+            continue
+        steps = [
+            Step(
+                lat=float(item["lat"]),
+                lng=float(item["lng"]),
+                radius_m=max(1.0, float(item["radius_m"])),
+                timestamp_ms=timestamp_ms(item["shrink_time"]),
+            )
+            for item in rows
+        ]
+        if len(steps) < min_prefix_steps:
+            continue
+        exact_lat, exact_lng = exact_candidates[-1]
+        coin_label = rows[0]["coin_label"] or coin_id
+        records.append(
+            Record(
+                entry_id=coin_id,
+                room_code="excel",
+                coin_label=coin_label,
+                created_at=str(rows[0]["shrink_time"] or "").strip(),
+                exact_lat=exact_lat,
+                exact_lng=exact_lng,
+                steps=steps,
+                metrics=build_record_metrics(steps, (exact_lat, exact_lng)),
+            )
+        )
+    return records
+
+
 def build_records(raw_entries: Sequence[Dict[str, Any]], min_prefix_steps: int) -> List[Record]:
     records: List[Record] = []
     for entry in raw_entries:
@@ -566,14 +665,81 @@ def build_records(raw_entries: Sequence[Dict[str, Any]], min_prefix_steps: int) 
     return records
 
 
-def build_samples(records: Sequence[Record], min_prefix_steps: int) -> Tuple[List[Sample], FeatureStats]:
+def select_prefix_end_indices(record: Record, min_prefix_steps: int, max_prefix_samples_per_coin: int) -> List[int]:
+    available = list(range(min_prefix_steps, len(record.steps) + 1))
+    if max_prefix_samples_per_coin <= 0 or len(available) <= max_prefix_samples_per_coin:
+        return available
+
+    start_radius = max(1.0, record.metrics.start_radius_m)
+    shrinkable_radius = max(1.0, record.metrics.start_radius_m - record.metrics.floor_radius_m)
+    threshold_rad = math.radians(26.0)
+    progress_by_end: Dict[int, float] = {}
+    event_indices: set[int] = set()
+    prev_heading: Optional[float] = None
+
+    for end in available:
+        step = record.steps[end - 1]
+        progress_by_end[end] = clamp(
+            (start_radius - step.radius_m) / shrinkable_radius,
+            0.0,
+            1.0,
+        )
+
+    for idx in range(1, len(record.steps)):
+        end = idx + 1
+        if end < min_prefix_steps:
+            continue
+        prev_step = record.steps[idx - 1]
+        step = record.steps[idx]
+        if step.radius_m > prev_step.radius_m + 0.5:
+            event_indices.add(end)
+        east, north = signed_offset_m((prev_step.lat, prev_step.lng), (step.lat, step.lng))
+        if math.hypot(east, north) > 1e-6:
+            heading = math.atan2(north, east)
+            if prev_heading is not None:
+                delta = abs(wrap_angle_rad(heading - prev_heading))
+                if delta > threshold_rad:
+                    event_indices.add(end)
+            prev_heading = heading
+
+    selected = {available[0], available[-1], *event_indices}
+    if len(selected) > max_prefix_samples_per_coin:
+        sorted_selected = sorted(selected, key=lambda end: progress_by_end.get(end, 0.0))
+        targets = [
+            i / max(1, max_prefix_samples_per_coin - 1)
+            for i in range(max_prefix_samples_per_coin)
+        ]
+        reduced: set[int] = set()
+        for target in targets:
+            choice = min(sorted_selected, key=lambda end: abs(progress_by_end.get(end, 0.0) - target))
+            reduced.add(choice)
+        selected = reduced
+
+    remaining_slots = max_prefix_samples_per_coin - len(selected)
+    if remaining_slots > 0:
+        targets = [
+            i / max(1, remaining_slots - 1)
+            for i in range(remaining_slots)
+        ] if remaining_slots > 1 else [0.5]
+        candidates = [end for end in available if end not in selected]
+        for target in targets:
+            if not candidates:
+                break
+            choice = min(candidates, key=lambda end: abs(progress_by_end.get(end, 0.0) - target))
+            selected.add(choice)
+            candidates.remove(choice)
+
+    return sorted(selected)
+
+
+def build_samples(records: Sequence[Record], min_prefix_steps: int, max_prefix_samples_per_coin: int = 0) -> Tuple[List[Sample], FeatureStats]:
     samples: List[Sample] = []
     for record in records:
         start_ts = record.steps[0].timestamp_ms
         end_ts = record.steps[-1].timestamp_ms
         total_duration = record.metrics.total_duration_s
         shrinkable_radius = max(1.0, record.metrics.start_radius_m - record.metrics.floor_radius_m)
-        for end in range(min_prefix_steps, len(record.steps) + 1):
+        for end in select_prefix_end_indices(record, min_prefix_steps, max_prefix_samples_per_coin):
             prefix = record.steps[:end]
             last = prefix[-1]
             east_m, north_m = signed_offset_m((last.lat, last.lng), (record.exact_lat, record.exact_lng))
@@ -630,6 +796,9 @@ def get_indices() -> Dict[str, Optional[List[int]]]:
 def profile_distance(query_profile: Dict[str, float], sample_profile: Dict[str, float]) -> float:
     keys = [
         "radiusRatio",
+        "startRadiusKm",
+        "currentRadiusKm",
+        "shrinkFraction",
         "driftRatio",
         "meanStepDistanceRatio",
         "durationNorm",
@@ -1085,13 +1254,27 @@ def write_json(path: Path, payload: Dict[str, Any]) -> None:
 
 def main() -> None:
     args = parse_args()
-    load_env_file(Path(args.env_file))
-    supabase_url = require_env("SUPABASE_URL")
-    supabase_key = require_env("SUPABASE_ANON_KEY")
-
-    raw_entries = fetch_exact_records(supabase_url, supabase_key, args.limit, args.room.strip().lower())
-    records = build_records(raw_entries, args.min_prefix_steps)
-    samples, feature_stats = build_samples(records, args.min_prefix_steps)
+    source_meta: Dict[str, Any]
+    excel_path = Path(args.excel_path).expanduser() if args.excel_path else None
+    if excel_path:
+        records = load_excel_records(excel_path, args.min_prefix_steps)
+        source_meta = {
+            "type": "excel",
+            "path": str(excel_path),
+            "sheet": "Shrinks",
+        }
+    else:
+        load_env_file(Path(args.env_file))
+        supabase_url = require_env("SUPABASE_URL")
+        supabase_key = require_env("SUPABASE_ANON_KEY")
+        raw_entries = fetch_exact_records(supabase_url, supabase_key, args.limit, args.room.strip().lower())
+        records = build_records(raw_entries, args.min_prefix_steps)
+        source_meta = {
+            "type": "supabase",
+            "table": API_TABLE,
+            "room": args.room.strip().lower(),
+        }
+    samples, feature_stats = build_samples(records, args.min_prefix_steps, args.max_prefix_samples_per_coin)
     if not records or not samples:
         raise RuntimeError("No exact-ended records with enough shrink steps were found.")
 
@@ -1111,8 +1294,7 @@ def main() -> None:
         "version": FORMULA_VERSION,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "source": {
-            "table": API_TABLE,
-            "room": args.room.strip().lower(),
+            **source_meta,
             "exactEndedCoinCount": len(records),
             "prefixSampleCount": len(samples),
         },
