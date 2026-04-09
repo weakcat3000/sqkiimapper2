@@ -9641,6 +9641,7 @@
       const SHRINK_PREDICTOR_MIN_PREFIX_STEPS = 2;
       const SHRINK_PREDICTOR_MIN_OBSERVED_STEPS = 10;
       const SHRINK_PREDICTOR_K = 10;
+      const SHRINK_PREDICTOR_MIN_CONFIDENCE_RADIUS_METERS = 500;
       let currentShrinkPredictorContext = null;
       let shrinkPredictorLeafletLayer = null;
       let shrinkPredictorSpinFrame = null;
@@ -11433,21 +11434,24 @@
           Number(solved.predictedOffsetMeters?.[0]) || 0,
           Number(solved.predictedOffsetMeters?.[1]) || 0
         );
+        const currentRadiusMeters = Number(anchor.radiusMeters) || 0;
         const insideCurrentCircleMax = Math.max(
           0,
-          (Number(anchor.radiusMeters) || 0) - predictedDriftMeters
+          currentRadiusMeters - predictedDriftMeters
         );
+        const minDesiredConfidenceRadius = currentRadiusMeters > 0
+          ? Math.min(currentRadiusMeters, SHRINK_PREDICTOR_MIN_CONFIDENCE_RADIUS_METERS)
+          : SHRINK_PREDICTOR_MIN_CONFIDENCE_RADIUS_METERS;
         const rawConfidenceRadiusMeters = Math.max(
           0,
           Math.max(
-            12,
+            minDesiredConfidenceRadius,
             shrinkPredictorWeightedPercentile(spreadDistances, spreadWeights, 0.72) || 0,
             solved.uncertaintyMeters * 1.18,
             solved.heatmapPeak.heatRadiusMeters * 0.92,
             (matches[0]?.remainingDistanceMeters || 0) * 0.14
           )
         );
-        const currentRadiusMeters = Number(anchor.radiusMeters) || 0;
         const maxInnerConfidenceRadius = insideCurrentCircleMax > 0
           ? insideCurrentCircleMax * 0.998
           : 0;
