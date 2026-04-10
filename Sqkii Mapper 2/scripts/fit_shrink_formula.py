@@ -21,7 +21,7 @@ EMBED_LEN = 12
 MIN_PREFIX_STEPS = 10
 K_NEIGHBORS = 8
 API_TABLE = "coin_history_archive"
-FORMULA_VERSION = 2
+FORMULA_VERSION = 3
 
 
 @dataclass
@@ -52,7 +52,6 @@ class Record:
     exact_lng: float
     steps: List[Step]
     metrics: RecordMetrics
-    family_id: str = ""
 
 
 @dataclass
@@ -75,7 +74,6 @@ class Sample:
     signature: List[float]
     exact_coords: Tuple[float, float]
     record_metrics: RecordMetrics
-    family_id: str
     public_offset_m: Tuple[float, float]
     residual_offset_m: Tuple[float, float]
     next_step_offset_m: Tuple[float, float]
@@ -350,133 +348,6 @@ def build_sequence_profile(steps: Sequence[Step]) -> Dict[str, float]:
     }
 
 
-FAMILY_PROFILE_KEYS = [
-    "startRadiusKm",
-    "shrinkFraction",
-    "meanStepDistanceRatio",
-    "durationNorm",
-    "shrinkRateNorm",
-    "radiusStdRatio",
-    "bundleCountRatio",
-    "meanBundleRunRatio",
-    "maxBundleRunRatio",
-    "finalBundleRunRatio",
-    "turnDensity",
-    "headingChangeNorm",
-    "finalHeadingEastNorm",
-    "finalHeadingNorthNorm",
-]
-
-
-def build_family_vector(profile: Dict[str, float]) -> List[float]:
-    return [float(profile.get(key, 0.0)) for key in FAMILY_PROFILE_KEYS]
-
-
-def standardize_vectors(vectors: Sequence[Sequence[float]]) -> Tuple[List[List[float]], FeatureStats]:
-    stats = build_feature_stats(vectors)
-    return [standardize_vector(vector, stats) for vector in vectors], stats
-
-
-def choose_family_count(record_count: int) -> int:
-    if record_count <= 10:
-        return 2
-    if record_count <= 24:
-        return 3
-    if record_count <= 48:
-        return 4
-    return 5
-
-
-def nearest_centroid(vector: Sequence[float], centroids: Sequence[Sequence[float]]) -> int:
-    return min(range(len(centroids)), key=lambda index: distance(vector, centroids[index]))
-
-
-def build_family_model(records: Sequence[Record], seed: int = 42) -> Dict[str, Any]:
-    if not records:
-        return {
-            "keys": FAMILY_PROFILE_KEYS,
-            "means": [],
-            "stds": [],
-            "centroids": [],
-            "summaries": [],
-        }
-
-    raw_vectors = [build_family_vector(build_sequence_profile(record.steps)) for record in records]
-    standardized, stats = standardize_vectors(raw_vectors)
-    k = min(choose_family_count(len(records)), len(records))
-    rng = random.Random(seed)
-    init_indices = list(range(len(records)))
-    rng.shuffle(init_indices)
-    centroids = [list(standardized[index]) for index in init_indices[:k]]
-    assignments = [0] * len(records)
-
-    for _ in range(24):
-        changed = False
-        for index, vector in enumerate(standardized):
-            family_idx = nearest_centroid(vector, centroids)
-            if family_idx != assignments[index]:
-                assignments[index] = family_idx
-                changed = True
-        for family_idx in range(k):
-            members = [standardized[index] for index, assigned in enumerate(assignments) if assigned == family_idx]
-            if members:
-                centroids[family_idx] = [
-                    mean([member[col] for member in members])
-                    for col in range(len(centroids[family_idx]))
-                ]
-            else:
-                replacement = standardized[rng.randrange(len(standardized))]
-                centroids[family_idx] = list(replacement)
-                changed = True
-        if not changed:
-            break
-
-    summaries = []
-    for family_idx in range(k):
-        members = [record for record, assigned in zip(records, assignments) if assigned == family_idx]
-        family_id = f"family-{family_idx + 1}"
-        for record in members:
-            record.family_id = family_id
-        start_radii = [record.metrics.start_radius_m for record in members]
-        floor_radii = [record.metrics.floor_radius_m for record in members]
-        durations = [record.metrics.total_duration_s for record in members]
-        summaries.append({
-            "familyId": family_id,
-            "count": len(members),
-            "avgStartRadiusM": mean(start_radii) if start_radii else 0.0,
-            "avgSmallestPublicCircleSizeM": mean(floor_radii) if floor_radii else 0.0,
-            "avgDurationHours": (mean(durations) / 3600.0) if durations else 0.0,
-            "centroid": centroids[family_idx],
-            "labels": [record.coin_label for record in members[:8]],
-        })
-
-    return {
-        "keys": FAMILY_PROFILE_KEYS,
-        "means": stats.means,
-        "stds": stats.stds,
-        "centroids": centroids,
-        "summaries": summaries,
-    }
-
-
-def classify_family(profile: Dict[str, float], family_model: Dict[str, Any]) -> Dict[str, Any]:
-    centroids = family_model.get("centroids") or []
-    if not centroids:
-        return {"familyId": "", "scores": {}, "vector": []}
-    raw_vector = build_family_vector(profile)
-    vector = standardize_vector(raw_vector, FeatureStats(
-        means=list(family_model.get("means") or []),
-        stds=list(family_model.get("stds") or []),
-    ))
-    distances = [distance(vector, centroid) for centroid in centroids]
-    inv = [1.0 / max(1e-6, value + 0.25) for value in distances]
-    total = sum(inv) or 1.0
-    scores = {
-        (family_model.get("summaries") or [{}])[index].get("familyId", f"family-{index + 1}"): inv[index] / total
-        for index in range(len(inv))
-    }
-    family_id = max(scores.items(), key=lambda item: item[1])[0] if scores else ""
-    return {"familyId": family_id, "scores": scores, "vector": vector}
 
 
 def build_normalized_signature(steps: Sequence[Step]) -> List[Dict[str, float]]:
@@ -708,14 +579,19 @@ def parse_true_location(raw: Any) -> Optional[Tuple[float, float]]:
 
 
 def load_excel_records(workbook_path: Path, min_prefix_steps: int) -> List[Record]:
+    print(f"Loading workbook: {workbook_path}")
     wb = openpyxl.load_workbook(workbook_path, data_only=True, read_only=True)
     if "Shrinks" not in wb.sheetnames:
         raise RuntimeError(f"Workbook does not contain a 'Shrinks' sheet: {workbook_path}")
     ws = wb["Shrinks"]
     block_width = 8
     grouped_rows: Dict[str, List[Dict[str, Any]]] = {}
+    row_counter = 0
 
     for row in ws.iter_rows(values_only=True):
+        row_counter += 1
+        if row_counter % 500 == 0:
+            print(f"  scanned {row_counter} workbook rows...")
         values = list(row)
         for start in range(0, len(values), block_width):
             block = values[start : start + block_width]
@@ -742,6 +618,7 @@ def load_excel_records(workbook_path: Path, min_prefix_steps: int) -> List[Recor
             )
 
     records: List[Record] = []
+    print(f"Workbook grouped into {len(grouped_rows)} coin blocks. Building exact-ended records...")
     for coin_id, rows in grouped_rows.items():
         rows.sort(key=lambda item: timestamp_ms(item["shrink_time"]) or 2**62)
         exact_candidates = [item["true_location"] for item in rows if item["true_location"]]
@@ -772,6 +649,9 @@ def load_excel_records(workbook_path: Path, min_prefix_steps: int) -> List[Recor
                 metrics=build_record_metrics(steps, (exact_lat, exact_lng)),
             )
         )
+        if len(records) % 25 == 0:
+            print(f"  built {len(records)} exact-ended records so far...")
+    print(f"Workbook load complete: {len(records)} exact-ended records ready.")
     return records
 
 
@@ -871,7 +751,8 @@ def select_prefix_end_indices(record: Record, min_prefix_steps: int, max_prefix_
 
 def build_samples(records: Sequence[Record], min_prefix_steps: int, max_prefix_samples_per_coin: int = 0) -> Tuple[List[Sample], FeatureStats]:
     samples: List[Sample] = []
-    for record in records:
+    print(f"Building prefix samples from {len(records)} records (max per coin = {max_prefix_samples_per_coin or 'ALL'})...")
+    for record_index, record in enumerate(records, start=1):
         start_ts = record.steps[0].timestamp_ms
         end_ts = record.steps[-1].timestamp_ms
         total_duration = record.metrics.total_duration_s
@@ -936,7 +817,6 @@ def build_samples(records: Sequence[Record], min_prefix_steps: int, max_prefix_s
                     signature=build_signature_vector(prefix),
                     exact_coords=(record.exact_lat, record.exact_lng),
                     record_metrics=record.metrics,
-                    family_id=record.family_id,
                     public_offset_m=(public_east_m, public_north_m),
                     residual_offset_m=(residual_east_m, residual_north_m),
                     next_step_offset_m=next_step_offset_m,
@@ -945,9 +825,12 @@ def build_samples(records: Sequence[Record], min_prefix_steps: int, max_prefix_s
                     remaining_steps=max(0, len(record.steps) - end),
                 )
             )
+        if record_index % 10 == 0 or record_index == len(records):
+            print(f"  processed {record_index}/{len(records)} records -> {len(samples)} prefix samples")
     feature_stats = build_feature_stats([sample.embedding for sample in samples])
     for sample in samples:
         sample.embedding = standardize_vector(sample.embedding, feature_stats)
+    print(f"Sample build complete: {len(samples)} total prefix samples.")
     return samples, feature_stats
 
 
@@ -1014,7 +897,6 @@ def get_base_config_library() -> List[Dict[str, Any]]:
             "label": "Balanced",
             "penalties": {"radius": 3.2, "drift": 2.2, "cadence": 1.25, "size": 1.45, "duration": 1.75, "shrinkRate": 1.55, "signature": 0.95, "bundle": 1.15},
             "roomFactor": 0.84,
-            "familyBoost": 0.26,
             "ensemble": {"fullRaw": 0.22, "fullScaled": 0.28, "shapeRaw": 0.15, "shapeScaled": 0.19, "motionRaw": 0.07, "motionScaled": 0.09},
             "blend": {"full": 0.52, "shape": 0.28, "motion": 0.20},
             "reverseBlend": {"direct": 0.34, "decomposed": 0.42, "generator": 0.24},
@@ -1026,7 +908,6 @@ def get_base_config_library() -> List[Dict[str, Any]]:
             "label": "Shape-first",
             "penalties": {"radius": 4.8, "drift": 3.1, "cadence": 1.4, "size": 1.6, "duration": 2.05, "shrinkRate": 1.8, "signature": 1.10, "bundle": 1.35},
             "roomFactor": 0.86,
-            "familyBoost": 0.34,
             "ensemble": {"fullRaw": 0.16, "fullScaled": 0.23, "shapeRaw": 0.20, "shapeScaled": 0.24, "motionRaw": 0.05, "motionScaled": 0.12},
             "blend": {"full": 0.35, "shape": 0.45, "motion": 0.20},
             "reverseBlend": {"direct": 0.28, "decomposed": 0.47, "generator": 0.25},
@@ -1038,7 +919,6 @@ def get_base_config_library() -> List[Dict[str, Any]]:
             "label": "Room-aware",
             "penalties": {"radius": 3.0, "drift": 2.0, "cadence": 1.1, "size": 1.35, "duration": 1.65, "shrinkRate": 1.5, "signature": 0.85, "bundle": 1.05},
             "roomFactor": 0.74,
-            "familyBoost": 0.24,
             "ensemble": {"fullRaw": 0.20, "fullScaled": 0.27, "shapeRaw": 0.13, "shapeScaled": 0.18, "motionRaw": 0.08, "motionScaled": 0.14},
             "blend": {"full": 0.58, "shape": 0.22, "motion": 0.20},
             "reverseBlend": {"direct": 0.36, "decomposed": 0.41, "generator": 0.23},
@@ -1050,7 +930,6 @@ def get_base_config_library() -> List[Dict[str, Any]]:
             "label": "Drift-first",
             "penalties": {"radius": 2.6, "drift": 3.8, "cadence": 1.55, "size": 1.2, "duration": 1.6, "shrinkRate": 1.9, "signature": 1.0, "bundle": 1.2},
             "roomFactor": 0.84,
-            "familyBoost": 0.28,
             "ensemble": {"fullRaw": 0.24, "fullScaled": 0.23, "shapeRaw": 0.12, "shapeScaled": 0.16, "motionRaw": 0.10, "motionScaled": 0.15},
             "blend": {"full": 0.42, "shape": 0.22, "motion": 0.36},
             "reverseBlend": {"direct": 0.31, "decomposed": 0.36, "generator": 0.33},
@@ -1112,7 +991,6 @@ def build_initial_candidates() -> List[Dict[str, Any]]:
 def config_fingerprint(config: Dict[str, Any]) -> str:
     return json.dumps({
         "roomFactor": round(float(config["roomFactor"]), 5),
-        "familyBoost": round(float(config.get("familyBoost", 0.28)), 5),
         "penalties": {key: round(float(value), 5) for key, value in sorted(config["penalties"].items())},
         "ensemble": {key: round(float(value), 6) for key, value in sorted(config["ensemble"].items())},
         "blend": {key: round(float(value), 6) for key, value in sorted(config["blend"].items())},
@@ -1140,7 +1018,6 @@ def mutate_config(base: Dict[str, Any], rng: random.Random) -> Dict[str, Any]:
         f"mut{rng.randint(10_000, 99_999)}",
         {
             "roomFactor": clamp(float(base["roomFactor"]) + rng.uniform(-0.06, 0.06), 0.58, 0.98),
-            "familyBoost": clamp(float(base.get("familyBoost", 0.28)) + rng.uniform(-0.08, 0.08), 0.0, 0.55),
             "penalties": penalties,
             "ensemble": ensemble,
             "blend": blend,
@@ -1155,18 +1032,20 @@ def predict_neighbors(model: Dict[str, Any], query_steps: Sequence[Step], query_
     scored = []
     penalties = config["penalties"]
     room_factor = clamp(float(config["roomFactor"]), 0.55, 1.0)
-    family_guess = classify_family(query_profile, model["familyModel"])
-    family_boost = clamp(float(config.get("familyBoost", 0.28)), 0.0, 0.6)
+    radius_ratio = float(query_profile.get("radiusRatio", 0.0))
+    shrink_fraction = float(query_profile.get("shrinkFraction", 0.0))
     for sample in model["samples"]:
         if exclude_entry_id and sample.entry_id == exclude_entry_id:
             continue
         embed_distance = distance(query_embedding, sample.embedding, indices)
-        radius_penalty = abs(float(query_profile.get("radiusRatio", 0.0)) - float(sample.profile.get("radiusRatio", 0.0))) * float(penalties["radius"])
+        radius_penalty = abs(radius_ratio - float(sample.profile.get("radiusRatio", 0.0))) * float(penalties["radius"])
         drift_penalty = abs(float(query_profile.get("driftRatio", 0.0)) - float(sample.profile.get("driftRatio", 0.0))) * float(penalties["drift"])
         cadence_penalty = abs(float(query_profile.get("meanStepDistanceRatio", 0.0)) - float(sample.profile.get("meanStepDistanceRatio", 0.0))) * float(penalties["cadence"])
         size_penalty = abs(float(query_profile.get("stepCount", 0.0)) - float(sample.profile.get("stepCount", 0.0))) / 10.0 * float(penalties["size"])
         duration_penalty = abs(float(query_profile.get("durationNorm", 0.0)) - float(sample.profile.get("durationNorm", 0.0))) * float(penalties["duration"])
         shrink_penalty = abs(float(query_profile.get("shrinkRateNorm", 0.0)) - float(sample.profile.get("shrinkRateNorm", 0.0))) * float(penalties["shrinkRate"])
+        phase_penalty = abs(shrink_fraction - float(sample.profile.get("shrinkFraction", 0.0))) * float(penalties["radius"]) * 0.55
+        size_norm_penalty = abs(radius_ratio - float(sample.profile.get("currentRadiusKm", 0.0)) / max(0.001, float(sample.profile.get("startRadiusKm", 1.0)))) * 0.35
         bundle_penalty = (
             abs(float(query_profile.get("bundleCountRatio", 0.0)) - float(sample.profile.get("bundleCountRatio", 0.0))) * 0.7
             + abs(float(query_profile.get("meanBundleRunRatio", 0.0)) - float(sample.profile.get("meanBundleRunRatio", 0.0))) * 1.0
@@ -1178,12 +1057,9 @@ def predict_neighbors(model: Dict[str, Any], query_steps: Sequence[Step], query_
             + abs(float(query_profile.get("finalHeadingNorthNorm", 0.0)) - float(sample.profile.get("finalHeadingNorthNorm", 0.0))) * 0.45
         ) * float(penalties.get("bundle", 1.0))
         signature_penalty = distance(query_signature, sample.signature) * float(penalties.get("signature", 0.95))
-        total = embed_distance + radius_penalty + drift_penalty + cadence_penalty + size_penalty + duration_penalty + shrink_penalty + bundle_penalty + signature_penalty
+        total = embed_distance + radius_penalty + drift_penalty + cadence_penalty + size_penalty + duration_penalty + shrink_penalty + phase_penalty + size_norm_penalty + bundle_penalty + signature_penalty
         if room_code and sample.room_code and sample.room_code == room_code:
             total *= room_factor
-        if sample.family_id:
-            same_family_score = float(family_guess["scores"].get(sample.family_id, 0.0))
-            total *= clamp(1.0 - (same_family_score * family_boost), 0.58, 1.08)
         scored.append((total, sample))
     scored.sort(key=lambda item: item[0])
     neighbors = scored[: max(1, limit)]
@@ -1270,7 +1146,6 @@ def predict_neighbors(model: Dict[str, Any], query_steps: Sequence[Step], query_
         "spread": spread,
         "floorState": floor_state,
         "progressScale": progress_scale,
-        "familyGuess": family_guess,
     }
 
 
@@ -1388,34 +1263,16 @@ def solve_core(model: Dict[str, Any], query_sample: Sample, config: Dict[str, An
         ((offset[0] - predicted_offset[0]) ** 2) + ((offset[1] - predicted_offset[1]) ** 2)
         for offset in hypothesis_offsets
     ]))
-    family_confidence = max(
-        float(full_model.get("familyGuess", {}).get("scores", {}).get(full_model.get("familyGuess", {}).get("familyId", ""), 0.0)),
-        float(shape_model.get("familyGuess", {}).get("scores", {}).get(shape_model.get("familyGuess", {}).get("familyId", ""), 0.0)),
-        float(motion_model.get("familyGuess", {}).get("scores", {}).get(motion_model.get("familyGuess", {}).get("familyId", ""), 0.0)),
-        0.05,
-    )
     uncertainty_m = max(
         12.0,
         direct_neighbor_spread
         + full_model["spread"]
         + model_std * max(0.65, full_model.get("progressScale", 1.0))
-        + hypothesis_spread * (1.15 - family_confidence),
+        + hypothesis_spread * 0.85,
     )
     return {
         "predictedOffsetM": predicted_offset,
         "uncertaintyM": uncertainty_m,
-        "familyId": max(
-            [
-                full_model.get("familyGuess", {}).get("familyId", ""),
-                shape_model.get("familyGuess", {}).get("familyId", ""),
-                motion_model.get("familyGuess", {}).get("familyId", ""),
-            ],
-            key=lambda family_id: (
-                float(full_model.get("familyGuess", {}).get("scores", {}).get(family_id, 0.0))
-                + float(shape_model.get("familyGuess", {}).get("scores", {}).get(family_id, 0.0))
-                + float(motion_model.get("familyGuess", {}).get("scores", {}).get(family_id, 0.0))
-            ),
-        ),
         "components": {
             "directNeighbor": direct_neighbor_offset,
             "decomposed": decomposed_exact_offset,
@@ -1513,7 +1370,6 @@ def formula_string(config: Dict[str, Any]) -> str:
     reverse_blend = config.get("reverseBlend") or {}
     return (
         f"roomFactor={config['roomFactor']:.3f}; "
-        f"familyBoost={float(config.get('familyBoost', 0.28)):.3f}; "
         f"penalties(radius={penalties['radius']:.3f}, drift={penalties['drift']:.3f}, cadence={penalties['cadence']:.3f}, "
         f"size={penalties['size']:.3f}, duration={penalties['duration']:.3f}, shrinkRate={penalties['shrinkRate']:.3f}, signature={penalties['signature']:.3f}, bundle={penalties['bundle']:.3f}); "
         f"reverseBlend(direct={float(reverse_blend.get('direct', 0.34)):.3f}, decomposed={float(reverse_blend.get('decomposed', 0.42)):.3f}, generator={float(reverse_blend.get('generator', 0.24)):.3f}); "
@@ -1607,7 +1463,6 @@ def main() -> None:
             "table": API_TABLE,
             "room": args.room.strip().lower(),
         }
-    family_model = build_family_model(records, args.seed)
     samples, feature_stats = build_samples(records, args.min_prefix_steps, args.max_prefix_samples_per_coin)
     if not records or not samples:
         raise RuntimeError("No exact-ended records with enough shrink steps were found.")
@@ -1618,7 +1473,6 @@ def main() -> None:
         "samples": samples,
         "feature_stats": feature_stats,
         "indices": get_indices(),
-        "familyModel": family_model,
     }
 
     started_at = time.perf_counter()
@@ -1646,7 +1500,6 @@ def main() -> None:
         "config": best_config,
         "formulaString": formula_string(best_config),
         "fitMetrics": best_metrics,
-        "familyModel": family_model,
     }
     report_payload = {
         **formula_payload,
