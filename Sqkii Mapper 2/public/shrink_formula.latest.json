@@ -59,7 +59,7 @@
       1.75
     ]
   },
-  "formulaString": "roomFactor=0.760; penalties(radius=4.800, drift=3.100, cadence=1.400, size=1.600, duration=1.350, shrinkRate=1.800, signature=1.100, bundle=1.350); reverseBlend(direct=0.280, decomposed=0.470, generator=0.250); progressScale=[0.650,1.450]; remainingScale=[0.550,1.750]",
+  "formulaString": "roomFactor=1.000; penalties(radius=4.800, drift=3.100, cadence=1.400, size=1.600, duration=1.350, shrinkRate=1.800, signature=1.100, bundle=1.350); reverseBlend(direct=0.280, decomposed=0.470, generator=0.250); progressScale=[0.650,1.450]; remainingScale=[0.550,1.750]",
   "fitMetrics": {
     "sampleCount": 2453,
     "coinCount": 57,
