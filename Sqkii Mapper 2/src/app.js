@@ -6383,7 +6383,6 @@
                 </div>
                 <div class="silver-ai-result-copy">${escapeHtml(item?.searchInstruction || '')}</div>
                 ${item?.reasoning ? `<div class="silver-ai-result-copy">${escapeHtml(item.reasoning)}</div>` : ''}
-                ${item?.caution ? `<div class="silver-ai-result-copy">${escapeHtml(item.caution)}</div>` : ''}
               </div>
             `;
           }).join('')}
