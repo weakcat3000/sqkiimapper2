@@ -5784,6 +5784,7 @@
       const silverAiNotes = document.getElementById('silver-ai-notes');
       const silverAiFilesEl = document.getElementById('silver-ai-files');
       const silverAiLocationEl = document.getElementById('silver-ai-location');
+      const silverAiLocationTextEl = silverAiLocationEl?.querySelector('.silver-ai-location-text') || null;
       const silverAiPreviewEl = document.getElementById('silver-ai-preview');
       const silverAiStatusEl = document.getElementById('silver-ai-status');
       const silverAiResultsEl = document.getElementById('silver-ai-results');
@@ -5805,6 +5806,7 @@
       let silverAiDatasetPromise = null;
       let silverAiSelectedFiles = [];
       let silverAiPreviewUrl = null;
+      let silverAiLastMediaPayloads = [];
       let lastUserPos = null; // [lng, lat]
       let lastUserAccuracyMeters = null;
       function setAudioIcon(on) {
@@ -5971,7 +5973,8 @@
       function updateSilverAiLocationUi() {
         if (!silverAiLocationEl) return;
         const hasLocation = !!getSilverAiLocationContext();
-        silverAiLocationEl.textContent = describeSilverAiLocationContext();
+        if (silverAiLocationTextEl) silverAiLocationTextEl.textContent = describeSilverAiLocationContext();
+        else silverAiLocationEl.textContent = describeSilverAiLocationContext();
         silverAiLocationEl.dataset.state = hasLocation ? 'live' : 'pending';
       }
       function getSilverAiLocationContext() {
@@ -6027,6 +6030,7 @@
       }
       function resetSilverAiState({ keepNotes = false } = {}) {
         silverAiSelectedFiles = [];
+        silverAiLastMediaPayloads = [];
         if (silverAiInput) silverAiInput.value = '';
         if (!keepNotes && silverAiNotes) silverAiNotes.value = '';
         if (silverAiResultsEl) silverAiResultsEl.innerHTML = '';
@@ -6247,6 +6251,8 @@
               dataBase64: dataUrl.split(',')[1],
               label: file.name || 'photo.jpg',
               sourceKind: 'image',
+              width: dims.width,
+              height: dims.height,
             };
           } finally {
             URL.revokeObjectURL(objectUrl);
@@ -6258,6 +6264,8 @@
             dataBase64: String(dataUrl).split(',')[1] || '',
             label: file.name || 'photo',
             sourceKind: 'image',
+            width: null,
+            height: null,
           };
         }
       }
@@ -6335,6 +6343,8 @@
               label: `${file.name || 'video'} frame ${index + 1}`,
               sourceKind: 'video_frame',
               frameTimeSec: timeSec,
+              width: dims.width,
+              height: dims.height,
             });
           }
           return frames;
@@ -6357,7 +6367,72 @@
             payloads.push(...frames);
           }
         }
-        return payloads.slice(0, 8);
+        const trimmed = payloads.slice(0, 8);
+        silverAiLastMediaPayloads = trimmed.map((item, index) => ({
+          ...item,
+          slot: index + 1,
+          dataUrl: `data:${item.mimeType};base64,${item.dataBase64}`,
+        }));
+        return trimmed;
+      }
+      function clampSilverAiRegionValue(value, min, max) {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return min;
+        return Math.min(max, Math.max(min, n));
+      }
+      function normalizeSilverAiFocusRegion(region) {
+        const mediaSlot = Math.round(Number(region?.mediaSlot));
+        if (!Number.isFinite(mediaSlot) || mediaSlot < 1) return null;
+        const x = clampSilverAiRegionValue(region?.x, 0, 1000);
+        const y = clampSilverAiRegionValue(region?.y, 0, 1000);
+        const maxWidth = Math.max(1, 1000 - x);
+        const maxHeight = Math.max(1, 1000 - y);
+        const width = clampSilverAiRegionValue(region?.width, 40, maxWidth);
+        const height = clampSilverAiRegionValue(region?.height, 40, maxHeight);
+        return { mediaSlot, x, y, width, height };
+      }
+      function getSilverAiMediaBySlot(slot) {
+        return silverAiLastMediaPayloads.find((item) => Number(item.slot) === Number(slot)) || null;
+      }
+      function buildSilverAiFocusMarkup(item, index) {
+        const region = normalizeSilverAiFocusRegion(item?.focusRegion);
+        const media = region ? getSilverAiMediaBySlot(region.mediaSlot) : null;
+        if (!region || !media?.dataUrl) return '';
+        const cropWidthPct = (1000 / region.width) * 100;
+        const cropHeightPct = (1000 / region.height) * 100;
+        const cropLeftPct = (region.x / region.width) * 100;
+        const cropTopPct = (region.y / region.height) * 100;
+        const boxLeftPct = region.x / 10;
+        const boxTopPct = region.y / 10;
+        const boxWidthPct = region.width / 10;
+        const boxHeightPct = region.height / 10;
+        const focusTarget = String(item?.focusTarget || 'detected pattern');
+        const sourceLabel = media.sourceKind === 'video_frame'
+          ? `Frame ${region.mediaSlot}`
+          : `Image ${region.mediaSlot}`;
+        return `
+          <div class="silver-ai-result-media">
+            <div class="silver-ai-focus-crop-wrap">
+              <div class="silver-ai-focus-caption">#${index + 1} PATTERN_RECOGNIZED</div>
+              <div class="silver-ai-focus-crop">
+                <img
+                  src="${escapeHtml(media.dataUrl)}"
+                  alt="${escapeHtml(`Crop showing ${focusTarget}`)}"
+                  style="width:${cropWidthPct}%;height:${cropHeightPct}%;left:-${cropLeftPct}%;top:-${cropTopPct}%;"
+                >
+              </div>
+              <div class="silver-ai-focus-target">${escapeHtml(focusTarget)}</div>
+            </div>
+            <div class="silver-ai-focus-source">
+              <img src="${escapeHtml(media.dataUrl)}" alt="${escapeHtml(`Source view for ${focusTarget}`)}">
+              <div
+                class="silver-ai-focus-box"
+                style="left:${boxLeftPct}%;top:${boxTopPct}%;width:${boxWidthPct}%;height:${boxHeightPct}%;"
+              ></div>
+              <div class="silver-ai-focus-source-tag">${escapeHtml(sourceLabel)}</div>
+            </div>
+          </div>
+        `;
       }
       function renderSilverAiModelResults(result, { retrievalGroups = [], tokenCount = 0, fileCount = 0 } = {}) {
         if (!silverAiResultsEl) return;
@@ -6369,11 +6444,14 @@
         const visualCues = Array.isArray(result?.visualCues) ? result.visualCues.filter(Boolean).slice(0, 6) : [];
         silverAiResultsEl.innerHTML = `
           ${result?.overallSummary ? `<div class="silver-ai-result-card"><div class="silver-ai-result-title">AI Read</div><div class="silver-ai-result-copy">${escapeHtml(result.overallSummary)}</div>${visualCues.length ? `<div class="silver-ai-result-badges">${visualCues.map((cue) => `<span class="silver-ai-badge">${escapeHtml(cue)}</span>`).join('')}</div>` : ''}</div>` : ''}
+          <div class="silver-ai-results-heading">Detected Search Patterns</div>
           ${suggestions.map((item, index) => {
             const confidence = String(item?.confidence || 'medium').toUpperCase();
             const badges = [item?.matchedPattern, confidence].filter(Boolean);
             return `
               <div class="silver-ai-result-card">
+                <div class="silver-ai-result-scan-tag">SCANNED</div>
+                ${buildSilverAiFocusMarkup(item, index)}
                 <div class="silver-ai-result-head">
                   <div class="silver-ai-result-title">${index + 1}. ${escapeHtml(item?.title || 'Suggested search spot')}</div>
                   <div class="silver-ai-result-score">${escapeHtml(confidence)}</div>

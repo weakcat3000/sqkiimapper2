@@ -4170,6 +4170,354 @@
       }
     }
 
+    /* Final Silver AI overrides to keep the tactical Stitch layout consistent on top of legacy blocks */
+    #silver-ai-modal .silver-ai-card {
+      width: min(92vw, 388px);
+      max-width: 388px;
+      max-height: min(82vh, 736px);
+      border-radius: 0;
+      border: 1px solid rgba(0, 255, 255, 0.14);
+      background: #0c0e12;
+      box-shadow:
+        0 18px 42px rgba(0, 0, 0, 0.62),
+        inset 0 0 18px rgba(0, 255, 255, 0.03);
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 0;
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    #silver-ai-modal .silver-ai-header {
+      padding: 18px 16px 12px;
+    }
+
+    #silver-ai-modal .silver-ai-kicker {
+      font-size: 9px;
+      letter-spacing: 0.22em;
+      margin-bottom: 8px;
+    }
+
+    #silver-ai-modal .silver-ai-title {
+      font-size: 16px;
+      letter-spacing: 0.09em;
+      line-height: 1.15;
+    }
+
+    #silver-ai-modal .silver-ai-subtitle {
+      margin-top: 7px;
+      font-size: 10px;
+      line-height: 1.5;
+      max-width: none;
+    }
+
+    #silver-ai-modal .silver-ai-location {
+      margin: 0 16px 14px;
+      padding: 10px 12px;
+      gap: 10px;
+      min-height: 48px;
+    }
+
+    #silver-ai-modal .silver-ai-location-text {
+      font-size: 9px;
+      line-height: 1.35;
+      letter-spacing: 0.12em;
+    }
+
+    #silver-ai-modal .silver-ai-upload-section,
+    #silver-ai-modal .silver-ai-note-wrap,
+    #silver-ai-modal .silver-ai-results {
+      padding-left: 16px;
+      padding-right: 16px;
+    }
+
+    #silver-ai-modal .silver-ai-upload-section,
+    #silver-ai-modal .silver-ai-note-wrap {
+      margin-bottom: 16px;
+    }
+
+    #silver-ai-modal .silver-ai-upload-grid {
+      gap: 1px;
+    }
+
+    #silver-ai-modal .silver-ai-cta-btn {
+      height: 72px;
+      gap: 8px;
+    }
+
+    #silver-ai-modal .silver-ai-cta-btn span {
+      font-size: 8px;
+      letter-spacing: 0.14em;
+    }
+
+    #silver-ai-modal .silver-ai-upload-footer {
+      margin-top: 10px;
+      gap: 10px;
+    }
+
+    #silver-ai-modal .silver-ai-files,
+    #silver-ai-modal .silver-ai-upload-hint,
+    #silver-ai-modal .silver-ai-status {
+      font-size: 9px;
+      line-height: 1.45;
+    }
+
+    #silver-ai-modal .silver-ai-clear-btn {
+      font-size: 8px;
+      letter-spacing: 0.16em;
+    }
+
+    #silver-ai-modal .silver-ai-label-row {
+      margin-bottom: 8px;
+    }
+
+    #silver-ai-modal .silver-ai-label-row label,
+    #silver-ai-modal .silver-ai-label-hint {
+      font-size: 9px;
+      letter-spacing: 0.14em;
+    }
+
+    #silver-ai-modal .silver-ai-note-wrap textarea {
+      min-height: 78px;
+      padding: 11px 12px;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    #silver-ai-modal .silver-ai-preview {
+      margin: 0 16px 14px;
+      max-height: 140px;
+    }
+
+    #silver-ai-modal .silver-ai-preview img,
+    #silver-ai-modal .silver-ai-preview video {
+      max-height: 140px;
+    }
+
+    #silver-ai-modal .silver-ai-actions-wrap {
+      padding: 12px 16px 14px;
+    }
+
+    #silver-ai-modal .silver-ai-primary-btn {
+      height: 44px;
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      gap: 10px;
+    }
+
+    #silver-ai-modal .silver-ai-status {
+      margin: 0 16px 10px;
+    }
+
+    #silver-ai-modal .silver-ai-results {
+      padding-bottom: 18px;
+      gap: 12px;
+    }
+
+    #silver-ai-modal .silver-ai-results-heading {
+      margin-top: 2px;
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: 0.18em;
+      color: rgba(148, 163, 184, 0.82);
+      text-transform: uppercase;
+    }
+
+    #silver-ai-modal .silver-ai-result-card {
+      position: relative;
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    #silver-ai-modal .silver-ai-result-scan-tag {
+      position: absolute;
+      top: 0;
+      right: 0;
+      padding: 3px 6px;
+      font-size: 8px;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      color: #0c0e12;
+      background: rgba(193, 255, 254, 0.92);
+      text-transform: uppercase;
+    }
+
+    #silver-ai-modal .silver-ai-result-media {
+      display: grid;
+      grid-template-columns: 88px 88px;
+      gap: 8px;
+      align-items: start;
+    }
+
+    #silver-ai-modal .silver-ai-focus-crop-wrap,
+    #silver-ai-modal .silver-ai-focus-source {
+      display: grid;
+      gap: 6px;
+    }
+
+    #silver-ai-modal .silver-ai-focus-caption,
+    #silver-ai-modal .silver-ai-focus-source-tag,
+    #silver-ai-modal .silver-ai-focus-target {
+      font-size: 8px;
+      font-weight: 900;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #86f7f7;
+    }
+
+    #silver-ai-modal .silver-ai-focus-crop,
+    #silver-ai-modal .silver-ai-focus-source {
+      position: relative;
+      width: 88px;
+      height: 88px;
+      overflow: hidden;
+      border: 1px solid rgba(0, 255, 255, 0.18);
+      background: rgba(12, 18, 29, 0.9);
+    }
+
+    #silver-ai-modal .silver-ai-focus-crop img {
+      position: absolute;
+      max-width: none;
+      max-height: none;
+      object-fit: initial;
+    }
+
+    #silver-ai-modal .silver-ai-focus-source img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.76;
+      filter: grayscale(0.18);
+    }
+
+    #silver-ai-modal .silver-ai-focus-box {
+      position: absolute;
+      border: 1px solid #00ffff;
+      box-shadow:
+        0 0 0 1px rgba(0, 255, 255, 0.18) inset,
+        0 0 12px rgba(0, 255, 255, 0.24);
+      background: rgba(0, 255, 255, 0.06);
+    }
+
+    #silver-ai-modal .silver-ai-focus-source-tag {
+      position: absolute;
+      left: 6px;
+      bottom: 6px;
+      padding: 2px 4px;
+      background: rgba(12, 18, 29, 0.82);
+      color: #dffefe;
+    }
+
+    #silver-ai-modal .silver-ai-result-head {
+      margin-bottom: 0;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    #silver-ai-modal .silver-ai-result-title {
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    #silver-ai-modal .silver-ai-result-score,
+    #silver-ai-modal .silver-ai-badge {
+      font-size: 8px;
+    }
+
+    #silver-ai-modal .silver-ai-result-copy {
+      font-size: 10px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 430px) {
+      #silver-ai-modal .silver-ai-card {
+        width: min(92vw, 372px);
+        max-width: 372px;
+        max-height: min(80vh, 700px);
+      }
+
+      #silver-ai-modal .silver-ai-result-media {
+        grid-template-columns: 78px 78px;
+      }
+
+      #silver-ai-modal .silver-ai-focus-crop,
+      #silver-ai-modal .silver-ai-focus-source {
+        width: 78px;
+        height: 78px;
+      }
+    }
+
+    html.ios-device #silver-ai-modal .silver-ai-card {
+      width: min(92vw, 372px);
+      max-width: 372px;
+      max-height: min(78dvh, 688px);
+      border-radius: 0;
+      padding: 0;
+      margin-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    }
+
+    html.ios-device #silver-ai-modal .silver-ai-header {
+      padding: max(15px, env(safe-area-inset-top, 0px) + 2px) 14px 10px;
+    }
+
+    html.ios-device #silver-ai-modal .silver-ai-title {
+      font-size: 15px;
+    }
+
+    html.ios-device #silver-ai-modal .silver-ai-subtitle,
+    html.ios-device #silver-ai-modal .silver-ai-location-text,
+    html.ios-device #silver-ai-modal .silver-ai-files,
+    html.ios-device #silver-ai-modal .silver-ai-upload-hint,
+    html.ios-device #silver-ai-modal .silver-ai-status,
+    html.ios-device #silver-ai-modal .silver-ai-result-copy {
+      font-size: 9px;
+    }
+
+    html.ios-device #silver-ai-modal .silver-ai-location,
+    html.ios-device #silver-ai-modal .silver-ai-upload-section,
+    html.ios-device #silver-ai-modal .silver-ai-note-wrap,
+    html.ios-device #silver-ai-modal .silver-ai-results,
+    html.ios-device #silver-ai-modal .silver-ai-status,
+    html.ios-device #silver-ai-modal .silver-ai-preview,
+    html.ios-device #silver-ai-modal .silver-ai-actions-wrap {
+      margin-left: 14px;
+      margin-right: 14px;
+      padding-left: 0;
+      padding-right: 0;
+    }
+
+    html.ios-device #silver-ai-modal .silver-ai-cta-btn {
+      height: 66px;
+    }
+
+    html.ios-device #silver-ai-modal .silver-ai-note-wrap textarea {
+      min-height: 68px;
+      font-size: 16px;
+    }
+
+    html.ios-device #silver-ai-modal .silver-ai-preview,
+    html.ios-device #silver-ai-modal .silver-ai-preview img,
+    html.ios-device #silver-ai-modal .silver-ai-preview video {
+      max-height: 124px;
+    }
+
+    html.ios-device #silver-ai-modal .silver-ai-actions-wrap {
+      padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    }
+
+    html.ios-device #silver-ai-modal .silver-ai-result-media {
+      grid-template-columns: 74px 74px;
+    }
+
+    html.ios-device #silver-ai-modal .silver-ai-focus-crop,
+    html.ios-device #silver-ai-modal .silver-ai-focus-source {
+      width: 74px;
+      height: 74px;
+    }
+
     .maplibregl-ctrl-bottom-right {
       display: none !important;
     }
