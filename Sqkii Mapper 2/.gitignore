@@ -1,5 +1,6 @@
 # Secrets
 .env
+.dev.vars
 
 # Python
 __pycache__/

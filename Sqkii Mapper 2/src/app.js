@@ -5770,8 +5770,22 @@
       const audioBtn = document.getElementById('audio-toggle');
       const powerSaveBtn = document.getElementById('power-saving-toggle');
       const htmIconsBtn = document.getElementById('htm-icons-toggle');
+      const silverAiOpenBtn = document.getElementById('silver-ai-open');
       const silverFlagsQuickBtn = document.getElementById('silver-flags-toggle');
       const sqkiiVoucherQuickBtn = document.getElementById('sqkii-voucher-toggle');
+      const silverAiModalEl = document.getElementById('silver-ai-modal');
+      const silverAiCloseTopBtn = document.getElementById('silver-ai-close-top');
+      const silverAiInput = document.getElementById('silver-ai-input');
+      const silverAiTakePhotoBtn = document.getElementById('silver-ai-take-photo');
+      const silverAiTakeVideoBtn = document.getElementById('silver-ai-take-video');
+      const silverAiPickBtn = document.getElementById('silver-ai-pick');
+      const silverAiClearBtn = document.getElementById('silver-ai-clear');
+      const silverAiAnalyzeBtn = document.getElementById('silver-ai-analyze');
+      const silverAiNotes = document.getElementById('silver-ai-notes');
+      const silverAiFilesEl = document.getElementById('silver-ai-files');
+      const silverAiPreviewEl = document.getElementById('silver-ai-preview');
+      const silverAiStatusEl = document.getElementById('silver-ai-status');
+      const silverAiResultsEl = document.getElementById('silver-ai-results');
       const htmIconsModal = document.getElementById('htm-icons-modal');
       const htmIconsCloseBtn = document.getElementById('htm-icons-close');
       const htmIconsMasterBtn = document.getElementById('htm-icons-master-toggle');
@@ -5780,10 +5794,16 @@
       const htmIconsAllOffBtn = document.getElementById('htm-icons-all-off');
       const htmIconsStatusEl = document.getElementById('htm-icons-status');
       const htmIconsListEl = document.getElementById('htm-icons-list');
+      const SILVER_AI_DATASET_URL = '/silver-ai-dataset.json';
+      const SILVER_AI_ANALYZE_URL = 'https://sqkiimapper.wk-yeow-2024.workers.dev/api/silver-ai/analyze';
       const SILVER_HTM_LAYER_IDS = ['htm-icons-silver'];
       const SQKII_VOUCHER_LAYER_IDS = HTM_ICONS_LAYER_DEFS
         .filter((layer) => layer.markerKind === 'sv-ticket')
         .map((layer) => layer.id);
+      const silverAiModal = silverAiModalEl ? ModalManager.create('silver-ai-modal') : null;
+      let silverAiDatasetPromise = null;
+      let silverAiSelectedFiles = [];
+      let silverAiPreviewUrl = null;
       function setAudioIcon(on) {
         audioBtn.innerHTML = on
           ? `<svg viewBox="0 0 24 24" fill="none" stroke="#e5e7eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>`
@@ -5901,6 +5921,515 @@
           'Hide Sqkii voucher icons',
           'Show Sqkii voucher icons'
         );
+      }
+      function humanizeSilverAiToken(value) {
+        return String(value || '')
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, (match) => match.toUpperCase())
+          .trim();
+      }
+      function titleCaseSilverAiPhrase(value) {
+        const normalized = String(value || '').trim();
+        if (!normalized) return '';
+        return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+      }
+      function tokenizeSilverAiText(value) {
+        return Array.from(new Set(String(value || '')
+          .toLowerCase()
+          .match(/[a-z0-9]+/g) || []))
+          .filter((token) => token.length >= 2);
+      }
+      function openSilverAiPicker({ accept = 'image/*,video/*', capture = '', multiple = true } = {}) {
+        if (!silverAiInput) return;
+        silverAiInput.accept = accept;
+        silverAiInput.multiple = !!multiple;
+        if (capture) silverAiInput.setAttribute('capture', capture);
+        else silverAiInput.removeAttribute('capture');
+        silverAiInput.click();
+      }
+      function setSilverAiStatus(message, tone = 'info') {
+        if (!silverAiStatusEl) return;
+        silverAiStatusEl.textContent = message || '';
+        silverAiStatusEl.style.color = tone === 'error'
+          ? '#fca5a5'
+          : tone === 'success'
+            ? '#86efac'
+            : '#dbeafe';
+      }
+      function getSilverAiLocationContext() {
+        if (!Array.isArray(lastUserPos) || lastUserPos.length < 2) return null;
+        const lng = Number(lastUserPos[0]);
+        const lat = Number(lastUserPos[1]);
+        if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+        return { lat, lng };
+      }
+      function clearSilverAiPreview() {
+        if (silverAiPreviewUrl) {
+          URL.revokeObjectURL(silverAiPreviewUrl);
+          silverAiPreviewUrl = null;
+        }
+        if (silverAiPreviewEl) {
+          silverAiPreviewEl.hidden = true;
+          silverAiPreviewEl.innerHTML = '';
+        }
+      }
+      function renderSilverAiPreview() {
+        if (!silverAiPreviewEl) return;
+        clearSilverAiPreview();
+        const file = silverAiSelectedFiles[0];
+        if (!file) return;
+        silverAiPreviewUrl = URL.createObjectURL(file);
+        if (file.type?.startsWith('image/')) {
+          silverAiPreviewEl.innerHTML = `<img src="${escapeHtml(silverAiPreviewUrl)}" alt="Selected upload preview">`;
+          silverAiPreviewEl.hidden = false;
+          return;
+        }
+        if (file.type?.startsWith('video/')) {
+          silverAiPreviewEl.innerHTML = `<video src="${escapeHtml(silverAiPreviewUrl)}" controls muted playsinline preload="metadata"></video>`;
+          silverAiPreviewEl.hidden = false;
+        }
+      }
+      function renderSilverAiFiles() {
+        if (!silverAiFilesEl) return;
+        if (!silverAiSelectedFiles.length) {
+          silverAiFilesEl.textContent = 'No files selected yet.';
+          return;
+        }
+        silverAiFilesEl.innerHTML = silverAiSelectedFiles
+          .map((file) => {
+            const sizeMb = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+            const kind = file.type?.startsWith('video/') ? 'Video' : 'Image';
+            return `${escapeHtml(kind)}: ${escapeHtml(file.name)} (${escapeHtml(sizeMb)})`;
+          })
+          .join('<br>');
+      }
+      function resetSilverAiState({ keepNotes = false } = {}) {
+        silverAiSelectedFiles = [];
+        if (silverAiInput) silverAiInput.value = '';
+        if (!keepNotes && silverAiNotes) silverAiNotes.value = '';
+        if (silverAiResultsEl) silverAiResultsEl.innerHTML = '';
+        renderSilverAiFiles();
+        clearSilverAiPreview();
+        setSilverAiStatus('Ready to rank likely silver hiding spots from the reviewed archive.');
+      }
+      function setSilverAiFiles(fileList) {
+        const nextFiles = Array.from(fileList || []).filter(Boolean).slice(0, 3);
+        const videoCount = nextFiles.filter((file) => file.type?.startsWith('video/')).length;
+        silverAiSelectedFiles = nextFiles;
+        renderSilverAiFiles();
+        renderSilverAiPreview();
+        if (Array.from(fileList || []).length > 3) {
+          setSilverAiStatus('Using the first 3 files so the scout stays fast.', 'info');
+        } else if (videoCount > 1) {
+          setSilverAiStatus('Multiple videos selected. The scout will use the first video and ignore the rest.', 'info');
+        } else if (nextFiles.length) {
+          setSilverAiStatus(getSilverAiLocationContext()
+            ? 'Files loaded. GPS is available, so the scout can use your live location too.'
+            : 'Files loaded. Add scene notes for stronger matches, then run the scout.', 'info');
+        } else {
+          setSilverAiStatus('Ready to rank likely silver hiding spots from the reviewed archive.');
+        }
+      }
+      async function loadSilverAiDataset() {
+        if (!silverAiDatasetPromise) {
+          silverAiDatasetPromise = fetch(SILVER_AI_DATASET_URL, { cache: 'no-cache' })
+            .then((response) => {
+              if (!response.ok) throw new Error(`HTTP ${response.status}`);
+              return response.json();
+            })
+            .then((payload) => Array.isArray(payload?.rows) ? payload.rows : [])
+            .catch((error) => {
+              silverAiDatasetPromise = null;
+              throw error;
+            });
+        }
+        return silverAiDatasetPromise;
+      }
+      function scoreSilverAiRow(row, tokens) {
+        const textFields = [
+          row.spot_type,
+          row.spot_description,
+          row.primary_position,
+          row.secondary_position,
+          row.primary_object,
+          row.secondary_object,
+          row.tertiary_object,
+          row.environment_type,
+          row.surface_type,
+          row.concealment_type,
+          row.search_instruction,
+          row.search_text
+        ].filter(Boolean).join(' ').toLowerCase();
+        let score = (Number(row.search_priority) || 0) * 5 + (Number(row.confidence_score) || 0) * 8;
+        const matchedTokens = [];
+        tokens.forEach((token) => {
+          if (!token || !textFields.includes(token)) return;
+          matchedTokens.push(token);
+          if ([row.primary_object, row.secondary_object, row.tertiary_object].includes(token)) score += 18;
+          else if ([row.primary_position, row.secondary_position].includes(token)) score += 14;
+          else if ([row.concealment_type, row.environment_type, row.surface_type].includes(token)) score += 10;
+          else if ((row.spot_type || '').includes(token)) score += 8;
+          else score += 4;
+        });
+        return { score, matchedTokens };
+      }
+      function buildSilverAiRetrievalGroups(rows, tokens) {
+        const scoredRows = rows
+          .map((row) => {
+            const scored = scoreSilverAiRow(row, tokens);
+            return { ...row, __score: scored.score, __matchedTokens: scored.matchedTokens };
+          })
+          .sort((a, b) => b.__score - a.__score);
+        const grouped = new Map();
+        scoredRows.slice(0, 40).forEach((row) => {
+          const key = [row.primary_position, row.primary_object, row.concealment_type].join('|');
+          const existing = grouped.get(key) || {
+            key,
+            score: row.__score,
+            primaryPosition: row.primary_position,
+            primaryObject: row.primary_object,
+            concealmentType: row.concealment_type,
+            environmentType: row.environment_type,
+            surfaceType: row.surface_type,
+            searchInstruction: row.search_instruction,
+            matchedTokens: [],
+            examples: []
+          };
+          existing.score = Math.max(existing.score, row.__score);
+          existing.matchedTokens = Array.from(new Set([...existing.matchedTokens, ...row.__matchedTokens])).slice(0, 8);
+          if (existing.examples.length < 3) existing.examples.push(row);
+          grouped.set(key, existing);
+        });
+        return Array.from(grouped.values())
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 5);
+      }
+      function serializeSilverAiRetrievalContext(groups) {
+        return (groups || []).map((group) => ({
+          title: describeSilverAiSuggestion(group),
+          searchInstruction: group.searchInstruction || '',
+          environmentType: group.environmentType || '',
+          surfaceType: group.surfaceType || '',
+          concealmentType: group.concealmentType || '',
+          matchedCues: group.matchedTokens || [],
+          examples: (group.examples || []).slice(0, 3).map((row) => ({
+            campaign: row.campaign,
+            coinNumber: row.coin_number,
+            description: row.spot_description,
+          })),
+        }));
+      }
+      function describeSilverAiSuggestion(group) {
+        const position = humanizeSilverAiToken(group.primaryPosition || 'edge');
+        const object = humanizeSilverAiToken(group.primaryObject || 'spot');
+        if (group.concealmentType === 'seam_gap') return `${titleCaseSilverAiPhrase(position)} ${object} gaps`;
+        if (group.concealmentType === 'underside') return `${titleCaseSilverAiPhrase(position)} ${object} undersides`;
+        if (group.concealmentType === 'inside_object') return `${titleCaseSilverAiPhrase(position)} ${object} openings`;
+        if (group.concealmentType === 'behind_object') return `${titleCaseSilverAiPhrase(position)} ${object} edges`;
+        return `${titleCaseSilverAiPhrase(position)} ${object} spots`;
+      }
+      function renderSilverAiResults(groups, tokenCount, fileCount) {
+        if (!silverAiResultsEl) return;
+        if (!groups.length) {
+          silverAiResultsEl.innerHTML = '';
+          setSilverAiStatus('No close pattern match yet. Add clearer scene notes like bench, pipe, planter, leaves, kerb, wall, tiles, or pillar.', 'error');
+          return;
+        }
+        silverAiResultsEl.innerHTML = groups.map((group, index) => {
+          const badges = [
+            group.environmentType ? humanizeSilverAiToken(group.environmentType) : '',
+            group.surfaceType ? humanizeSilverAiToken(group.surfaceType) : '',
+            group.concealmentType ? humanizeSilverAiToken(group.concealmentType) : '',
+            group.primaryObject ? humanizeSilverAiToken(group.primaryObject) : ''
+          ].filter(Boolean);
+          const examples = group.examples
+            .slice(0, 2)
+            .map((row) => `${escapeHtml(row.campaign)} #${escapeHtml(String(row.coin_number))}: ${escapeHtml(row.spot_description)}`)
+            .join('<br>');
+          const matchedCue = group.matchedTokens.length
+            ? `Matched cues: ${escapeHtml(group.matchedTokens.slice(0, 6).join(', '))}.`
+            : 'Strong baseline match from the reviewed silver archive.';
+          return `
+            <div class="silver-ai-result-card">
+              <div class="silver-ai-result-head">
+                <div class="silver-ai-result-title">${index + 1}. ${escapeHtml(describeSilverAiSuggestion(group))}</div>
+                <div class="silver-ai-result-score">Rank ${index + 1}</div>
+              </div>
+              <div class="silver-ai-result-badges">
+                ${badges.map((badge) => `<span class="silver-ai-badge">${escapeHtml(badge)}</span>`).join('')}
+              </div>
+              <div class="silver-ai-result-copy">${escapeHtml(group.searchInstruction)}</div>
+              <div class="silver-ai-result-copy">${matchedCue}</div>
+              <div class="silver-ai-result-examples"><strong>Reviewed examples</strong><br>${examples}</div>
+            </div>
+          `;
+        }).join('');
+        const cueSummary = tokenCount
+          ? `Matched ${tokenCount} cue${tokenCount === 1 ? '' : 's'}`
+          : 'Used archive priors';
+        const fileSummary = fileCount
+          ? ` across ${fileCount} upload${fileCount === 1 ? '' : 's'}`
+          : '';
+        setSilverAiStatus(`${cueSummary}${fileSummary}. Suggestions are ranked from the reviewed Singapore and SG60 silver archive.`, 'success');
+      }
+      async function readFileAsDataUrl(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ''));
+          reader.onerror = () => reject(reader.error || new Error('Failed to read file.'));
+          reader.readAsDataURL(file);
+        });
+      }
+      async function loadImageElementFromFile(file) {
+        const objectUrl = URL.createObjectURL(file);
+        try {
+          return await new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve({ img, objectUrl });
+            img.onerror = () => reject(new Error('Could not decode selected image.'));
+            img.src = objectUrl;
+          });
+        } catch (error) {
+          URL.revokeObjectURL(objectUrl);
+          throw error;
+        }
+      }
+      function fitSilverAiDimensions(width, height, maxDimension = 1400) {
+        if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+          return { width: maxDimension, height: maxDimension };
+        }
+        if (Math.max(width, height) <= maxDimension) {
+          return { width: Math.round(width), height: Math.round(height) };
+        }
+        const scale = maxDimension / Math.max(width, height);
+        return {
+          width: Math.max(1, Math.round(width * scale)),
+          height: Math.max(1, Math.round(height * scale)),
+        };
+      }
+      async function buildSilverAiImagePayload(file) {
+        try {
+          const { img, objectUrl } = await loadImageElementFromFile(file);
+          try {
+            const dims = fitSilverAiDimensions(img.naturalWidth || img.width, img.naturalHeight || img.height, 1400);
+            const canvas = document.createElement('canvas');
+            canvas.width = dims.width;
+            canvas.height = dims.height;
+            const ctx = canvas.getContext('2d', { alpha: false });
+            ctx?.drawImage(img, 0, 0, dims.width, dims.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.84);
+            return {
+              mimeType: 'image/jpeg',
+              dataBase64: dataUrl.split(',')[1],
+              label: file.name || 'photo.jpg',
+              sourceKind: 'image',
+            };
+          } finally {
+            URL.revokeObjectURL(objectUrl);
+          }
+        } catch (error) {
+          const dataUrl = await readFileAsDataUrl(file);
+          return {
+            mimeType: file.type || 'image/jpeg',
+            dataBase64: String(dataUrl).split(',')[1] || '',
+            label: file.name || 'photo',
+            sourceKind: 'image',
+          };
+        }
+      }
+      async function loadVideoElementFromFile(file) {
+        const objectUrl = URL.createObjectURL(file);
+        try {
+          const video = await new Promise((resolve, reject) => {
+            const el = document.createElement('video');
+            el.preload = 'auto';
+            el.muted = true;
+            el.playsInline = true;
+            const cleanup = () => {
+              el.onloadedmetadata = null;
+              el.onloadeddata = null;
+              el.onerror = null;
+            };
+            const resolveReady = () => {
+              cleanup();
+              resolve(el);
+            };
+            el.onloadedmetadata = resolveReady;
+            el.onloadeddata = resolveReady;
+            el.onerror = () => {
+              cleanup();
+              reject(new Error('Could not decode selected video.'));
+            };
+            el.src = objectUrl;
+            el.load();
+          });
+          return { video, objectUrl };
+        } catch (error) {
+          URL.revokeObjectURL(objectUrl);
+          throw error;
+        }
+      }
+      async function seekSilverAiVideo(video, timeSec) {
+        return new Promise((resolve, reject) => {
+          const onSeeked = () => {
+            cleanup();
+            resolve();
+          };
+          const onError = () => {
+            cleanup();
+            reject(new Error('Could not sample a frame from the selected video.'));
+          };
+          const cleanup = () => {
+            video.removeEventListener('seeked', onSeeked);
+            video.removeEventListener('error', onError);
+          };
+          video.addEventListener('seeked', onSeeked, { once: true });
+          video.addEventListener('error', onError, { once: true });
+          video.currentTime = Math.max(0, Math.min(timeSec, Math.max(0, (video.duration || 0) - 0.05)));
+        });
+      }
+      async function extractSilverAiVideoFrames(file) {
+        const { video, objectUrl } = await loadVideoElementFromFile(file);
+        try {
+          const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+          const fractions = duration > 3 ? [0.12, 0.34, 0.58, 0.82] : [0.25, 0.68];
+          const uniqueTimes = Array.from(new Set(fractions.map((fraction) => Number((duration * fraction).toFixed(2)))));
+          const dims = fitSilverAiDimensions(video.videoWidth || 1280, video.videoHeight || 720, 1280);
+          const canvas = document.createElement('canvas');
+          canvas.width = dims.width;
+          canvas.height = dims.height;
+          const ctx = canvas.getContext('2d', { alpha: false });
+          const frames = [];
+          for (let index = 0; index < uniqueTimes.length; index += 1) {
+            const timeSec = uniqueTimes[index];
+            await seekSilverAiVideo(video, timeSec);
+            ctx?.drawImage(video, 0, 0, dims.width, dims.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            frames.push({
+              mimeType: 'image/jpeg',
+              dataBase64: dataUrl.split(',')[1],
+              label: `${file.name || 'video'} frame ${index + 1}`,
+              sourceKind: 'video_frame',
+              frameTimeSec: timeSec,
+            });
+          }
+          return frames;
+        } finally {
+          URL.revokeObjectURL(objectUrl);
+        }
+      }
+      async function buildSilverAiMediaPayloads() {
+        const payloads = [];
+        let seenVideo = false;
+        for (const file of silverAiSelectedFiles) {
+          if (file.type?.startsWith('image/')) {
+            payloads.push(await buildSilverAiImagePayload(file));
+            continue;
+          }
+          if (file.type?.startsWith('video/')) {
+            if (seenVideo) continue;
+            seenVideo = true;
+            const frames = await extractSilverAiVideoFrames(file);
+            payloads.push(...frames);
+          }
+        }
+        return payloads.slice(0, 8);
+      }
+      function renderSilverAiModelResults(result, { retrievalGroups = [], tokenCount = 0, fileCount = 0 } = {}) {
+        if (!silverAiResultsEl) return;
+        const suggestions = Array.isArray(result?.suggestions) ? result.suggestions.slice(0, 5) : [];
+        if (!suggestions.length) {
+          renderSilverAiResults(retrievalGroups, tokenCount, fileCount);
+          return;
+        }
+        const visualCues = Array.isArray(result?.visualCues) ? result.visualCues.filter(Boolean).slice(0, 6) : [];
+        silverAiResultsEl.innerHTML = `
+          ${result?.overallSummary ? `<div class="silver-ai-result-card"><div class="silver-ai-result-title">AI Read</div><div class="silver-ai-result-copy">${escapeHtml(result.overallSummary)}</div>${visualCues.length ? `<div class="silver-ai-result-badges">${visualCues.map((cue) => `<span class="silver-ai-badge">${escapeHtml(cue)}</span>`).join('')}</div>` : ''}</div>` : ''}
+          ${suggestions.map((item, index) => {
+            const confidence = String(item?.confidence || 'medium').toUpperCase();
+            const badges = [item?.matchedPattern, confidence].filter(Boolean);
+            return `
+              <div class="silver-ai-result-card">
+                <div class="silver-ai-result-head">
+                  <div class="silver-ai-result-title">${index + 1}. ${escapeHtml(item?.title || 'Suggested search spot')}</div>
+                  <div class="silver-ai-result-score">${escapeHtml(confidence)}</div>
+                </div>
+                <div class="silver-ai-result-badges">
+                  ${badges.map((badge) => `<span class="silver-ai-badge">${escapeHtml(String(badge))}</span>`).join('')}
+                </div>
+                <div class="silver-ai-result-copy">${escapeHtml(item?.searchInstruction || '')}</div>
+                ${item?.reasoning ? `<div class="silver-ai-result-copy">${escapeHtml(item.reasoning)}</div>` : ''}
+                ${item?.caution ? `<div class="silver-ai-result-copy">${escapeHtml(item.caution)}</div>` : ''}
+              </div>
+            `;
+          }).join('')}
+        `;
+        const summaryText = result?.overallSummary
+          ? `AI checked the uploaded media and ranked ${suggestions.length} likely silver hiding spots.`
+          : `AI returned ${suggestions.length} likely silver hiding spots.`;
+        setSilverAiStatus(summaryText, 'success');
+      }
+      async function analyzeSilverAiUploads() {
+        if (!silverAiAnalyzeBtn) return;
+        const notes = silverAiNotes?.value || '';
+        const locationContext = getSilverAiLocationContext();
+        const fileText = silverAiSelectedFiles.map((file) => `${file.name} ${file.type}`).join(' ');
+        const locationText = locationContext ? `${locationContext.lat} ${locationContext.lng}` : '';
+        const tokens = tokenizeSilverAiText(`${notes} ${fileText} ${locationText}`);
+        if (!tokens.length && !silverAiSelectedFiles.length) {
+          setSilverAiStatus('Add a short note or upload at least one image or video before running the scout.', 'error');
+          silverAiNotes?.focus();
+          return;
+        }
+        silverAiAnalyzeBtn.disabled = true;
+        let topGroups = [];
+        try {
+          const rows = await loadSilverAiDataset();
+          topGroups = buildSilverAiRetrievalGroups(rows, tokens);
+          if (!silverAiSelectedFiles.length) {
+            renderSilverAiResults(topGroups, tokens.length, 0);
+            return;
+          }
+
+          setSilverAiStatus('Preparing photos and video frames for vision analysis...');
+          const media = await buildSilverAiMediaPayloads();
+          if (!media.length) {
+            renderSilverAiResults(topGroups, tokens.length, silverAiSelectedFiles.length);
+            setSilverAiStatus('No usable image or video frames were extracted, so the scout fell back to archive matching.', 'error');
+            return;
+          }
+
+          setSilverAiStatus('Analyzing the uploaded media with Silver AI Scout...');
+          const response = await fetch(SILVER_AI_ANALYZE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              notes,
+              media,
+              locationContext,
+              retrievalContext: serializeSilverAiRetrievalContext(topGroups),
+            }),
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(payload?.detail || payload?.error || `HTTP ${response.status}`);
+          }
+          renderSilverAiModelResults(payload?.result, {
+            retrievalGroups: topGroups,
+            tokenCount: tokens.length,
+            fileCount: silverAiSelectedFiles.length,
+          });
+        } catch (error) {
+          console.error('[Silver AI] Failed to analyze uploads:', error);
+          if (topGroups.length) {
+            renderSilverAiResults(topGroups, tokens.length, silverAiSelectedFiles.length);
+            setSilverAiStatus(`AI vision is unavailable right now, so the scout fell back to reviewed-archive matches. ${error?.message || ''}`.trim(), 'error');
+          } else {
+            setSilverAiStatus('Silver AI Scout could not analyze the uploaded media just now.', 'error');
+          }
+        } finally {
+          silverAiAnalyzeBtn.disabled = false;
+        }
       }
       function setHtmIconsGroupEnabled(layerIds, active) {
         if (!Array.isArray(layerIds) || !layerIds.length) return;
@@ -6038,6 +6567,21 @@
         syncHtmIconsSettingsUi();
         if (htmIconsEnabled) ensureHtmIconsOverlay();
       });
+      silverAiOpenBtn?.addEventListener('click', () => {
+        if (!silverAiStatusEl?.textContent) {
+          setSilverAiStatus('Ready to rank likely silver hiding spots from the reviewed archive.');
+        }
+        silverAiModal?.open();
+      });
+      silverAiCloseTopBtn?.addEventListener('click', () => silverAiModal?.close());
+      silverAiTakePhotoBtn?.addEventListener('click', () => openSilverAiPicker({ accept: 'image/*', capture: 'environment', multiple: false }));
+      silverAiTakeVideoBtn?.addEventListener('click', () => openSilverAiPicker({ accept: 'video/*', capture: 'environment', multiple: false }));
+      silverAiPickBtn?.addEventListener('click', () => openSilverAiPicker({ accept: 'image/*,video/*', capture: '', multiple: true }));
+      silverAiClearBtn?.addEventListener('click', () => resetSilverAiState());
+      silverAiInput?.addEventListener('change', (event) => {
+        setSilverAiFiles(event.target?.files || []);
+      });
+      silverAiAnalyzeBtn?.addEventListener('click', analyzeSilverAiUploads);
       silverFlagsQuickBtn?.addEventListener('click', () => toggleHtmIconsGroup(SILVER_HTM_LAYER_IDS));
       sqkiiVoucherQuickBtn?.addEventListener('click', () => toggleHtmIconsGroup(SQKII_VOUCHER_LAYER_IDS));
       htmIconsListEl?.addEventListener('change', (e) => {
@@ -6046,6 +6590,7 @@
         setHtmIconsLayerVisibility(input.dataset.htmLayerId, input.checked);
       });
       if (htmIconsEnabled) setTimeout(() => scheduleHtmIconsOverlayRestore(), 0);
+      resetSilverAiState({ keepNotes: true });
       document.addEventListener('click', (ev) => { if (ev.target.closest('button')) playClick(); }, { capture: true });
 
       const sonarSfx = new Audio(SCANNING_SOUND_URL);
