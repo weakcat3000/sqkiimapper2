@@ -341,36 +341,58 @@
     <div id="silver-ai-modal" class="modal">
       <div class="modal-card silver-ai-card">
         <button id="silver-ai-close-top" class="style-editor-x lamp-search-close-top" aria-label="Close Silver AI Scout">×</button>
-        <div class="silver-ai-kicker">Silver AI Scout</div>
-        <h3>Suggest Where To Search</h3>
-        <div class="silver-ai-subtitle">
-          Upload images or a short video from the silver circle. Silver AI will only use GPS when your live location is already on. Otherwise it will analyze just your media and notes.
+        
+        <div class="silver-ai-header">
+          <div class="silver-ai-kicker">SILVER AI SCOUT</div>
+          <h3 class="silver-ai-title">SUGGEST SEARCH SPOTS</h3>
+          <div class="silver-ai-subtitle">
+            UPLOAD IMAGES OR A SHORT VIDEO FROM THE SILVER CIRCLE. OUR AI ANALYZES HABITAT PATTERNS TO PREDICT THE MOST LIKELY HIDING SPOTS.
+          </div>
         </div>
-        <div id="silver-ai-location" class="silver-ai-location">Live GPS is off, so Silver AI will use only your uploaded media and notes.</div>
 
-        <div class="silver-ai-upload">
+        <div id="silver-ai-location" class="silver-ai-location">
+          <div class="silver-ai-location-icon"></div>
+          <span class="silver-ai-location-text">LOCATION STATUS: SEARCHING FOR GPS SIGNAL...</span>
+        </div>
+
+        <div class="silver-ai-upload-section">
           <input id="silver-ai-input" type="file" accept="image/*,video/*" multiple hidden />
           <div class="silver-ai-upload-grid">
-            <button id="silver-ai-take-photo" class="btn silver-ai-cta-btn" type="button">Take Photo</button>
-            <button id="silver-ai-take-video" class="btn silver-ai-cta-btn" type="button">Take Video</button>
-            <button id="silver-ai-pick" class="btn silver-ai-cta-btn" type="button">Upload Media</button>
+            <button id="silver-ai-take-photo" class="btn silver-ai-cta-btn" type="button">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ai-icon"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+              <span>TAKE PHOTO</span>
+            </button>
+            <button id="silver-ai-take-video" class="btn silver-ai-cta-btn" type="button">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ai-icon"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
+              <span>TAKE VIDEO</span>
+            </button>
+            <button id="silver-ai-pick" class="btn silver-ai-cta-btn" type="button">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ai-icon"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+              <span>GALLERY</span>
+            </button>
           </div>
-          <div class="silver-ai-upload-row silver-ai-upload-row-clear">
-            <button id="silver-ai-clear" class="btn small" type="button">Clear</button>
+          <div class="silver-ai-upload-footer">
+            <div id="silver-ai-files" class="silver-ai-files">NO FILES SELECTED</div>
+            <button id="silver-ai-clear" class="silver-ai-clear-btn" type="button">CLEAR</button>
           </div>
-          <div class="silver-ai-upload-hint">Best for 1-3 images or one video around 10 seconds.</div>
-          <div id="silver-ai-files" class="silver-ai-files">No files selected yet.</div>
+          <div class="silver-ai-upload-hint">Best for 1-3 images or a ~10s video.</div>
         </div>
 
         <div class="silver-ai-note-wrap">
-          <label for="silver-ai-notes">Scene notes</label>
-          <textarea id="silver-ai-notes" placeholder="Example: blue bench, dry leaves underneath, beside concrete wall, sheltered walkway"></textarea>
+          <div class="silver-ai-label-row">
+            <label for="silver-ai-notes">Scene Context</label>
+            <span class="silver-ai-label-hint">Optional</span>
+          </div>
+          <textarea id="silver-ai-notes" placeholder="Describe unique features (e.g. blue bench, dry leaves, concrete wall)"></textarea>
         </div>
 
         <div id="silver-ai-preview" class="silver-ai-preview" hidden></div>
 
-        <div class="silver-ai-actions silver-ai-actions-sticky">
-          <button id="silver-ai-analyze" class="btn" type="button">Suggest Search Spots</button>
+        <div class="silver-ai-actions-wrap silver-ai-actions-sticky">
+          <button id="silver-ai-analyze" class="btn silver-ai-primary-btn" type="button">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ai-pulse-icon"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4h8Z"/></svg>
+            Suggest Search Spots
+          </button>
         </div>
 
         <div id="silver-ai-status" class="silver-ai-status" aria-live="polite"></div>
@@ -378,6 +400,7 @@
       </div>
     </div>
 
+    <!-- Gold Tools Rail -->
     <div id="tool-rail" class="tool-rail" aria-label="Quick tools">
       <button
         id="tool-rail-toggle"
@@ -417,7 +440,6 @@
         </button>
       </div>
     </div>
-
 
     <!-- Sheets View -->
     <div id="sheets-view" class="sheets-view">
