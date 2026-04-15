@@ -1439,6 +1439,7 @@
     .coin-db-footer-btns {
       display: flex;
       gap: 8px;
+      flex-wrap: wrap;
     }
 
     .coin-db-footer-btns .danger {
@@ -1517,11 +1518,25 @@
       gap: 8px;
     }
 
+    .coin-db-note-form input,
+    .coin-db-note-form textarea {
+      min-width: 0;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .coin-db-note-form input {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: var(--panel);
+      color: var(--text);
+      font: inherit;
+    }
+
     .coin-db-note-form textarea {
       grid-column: 1 / -1;
-      width: 100%;
       min-height: 80px;
-      box-sizing: border-box;
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 8px 10px;
@@ -1529,6 +1544,7 @@
       color: var(--text);
       resize: vertical;
       font: inherit;
+      contain: layout paint;
     }
 
     .coin-db-note-footer {

@@ -8895,6 +8895,7 @@
       const coinDbStatus = byId('coin-db-status');
       const coinDbList = byId('coin-db-list');
       let coinDbEntriesCache = [];
+      const coinDbInputDrafts = new Map();
 
       function coinDbSetStatus(message, isError = false) {
         if (!coinDbStatus) return;
@@ -9220,7 +9221,40 @@
         return coinDbEntriesCache.find((item) => String(item?.id) === String(entryId)) || null;
       }
 
+      function coinDbGetDraft(entryId) {
+        return coinDbInputDrafts.get(String(entryId)) || null;
+      }
+
+      function coinDbUpdateDraft(entryId, nextDraft = {}) {
+        const key = String(entryId);
+        const current = coinDbInputDrafts.get(key) || {};
+        const merged = { ...current, ...nextDraft };
+        coinDbInputDrafts.set(key, merged);
+        return merged;
+      }
+
+      function coinDbClearDraft(entryId) {
+        coinDbInputDrafts.delete(String(entryId));
+      }
+
+      function coinDbCaptureOpenEntryIds() {
+        return new Set(
+          Array.from(coinDbList?.querySelectorAll('.coin-db-dropdown[open][data-entry-id]') || [])
+            .map((el) => String(el.dataset.entryId || ''))
+            .filter(Boolean)
+        );
+      }
+
+      function coinDbRestoreOpenEntryIds(openEntryIds) {
+        if (!coinDbList || !(openEntryIds instanceof Set) || !openEntryIds.size) return;
+        for (const entryId of openEntryIds) {
+          const details = coinDbList.querySelector(`.coin-db-dropdown[data-entry-id="${entryId}"]`);
+          if (details) details.open = true;
+        }
+      }
+
       function renderCoinDbEntries(entries) {
+        const openEntryIds = coinDbCaptureOpenEntryIds();
         coinDbEntriesCache = Array.isArray(entries) ? entries : [];
 
         if (!coinDbList) return;
@@ -9238,6 +9272,10 @@
           const exactSpot = exactCoords
             ? `${coinDbFormatCoord(exactCoords.lat)}, ${coinDbFormatCoord(exactCoords.lng)}`
             : '';
+          const draft = coinDbGetDraft(entry.id);
+          const draftLat = draft?.exactLat ?? (entry.exact_lat ?? '');
+          const draftLng = draft?.exactLng ?? (entry.exact_lng ?? '');
+          const draftNote = draft?.exactNote ?? (entry.exact_note || '');
 
           const statusBadge = entry.status === 'active'
             ? '<span class="coin-db-badge active">● LIVE</span>'
@@ -9267,13 +9305,14 @@
                 </div>
 
                 <div class="coin-db-note-form">
-                  <input type="number" step="any" class="coin-db-exact-lat" data-entry-id="${escapeHtml(entry.id)}" placeholder="Exact latitude" value="${entry.exact_lat ?? ''}">
-                  <input type="number" step="any" class="coin-db-exact-lng" data-entry-id="${escapeHtml(entry.id)}" placeholder="Exact longitude" value="${entry.exact_lng ?? ''}">
-                  <textarea class="coin-db-exact-note" data-entry-id="${escapeHtml(entry.id)}" placeholder="Notes about the revealed exact spot">${escapeHtml(entry.exact_note || '')}</textarea>
+                  <input type="number" step="any" class="coin-db-exact-lat" data-entry-id="${escapeHtml(entry.id)}" placeholder="Exact latitude" value="${escapeHtml(String(draftLat))}">
+                  <input type="number" step="any" class="coin-db-exact-lng" data-entry-id="${escapeHtml(entry.id)}" placeholder="Exact longitude" value="${escapeHtml(String(draftLng))}">
+                  <textarea class="coin-db-exact-note" data-entry-id="${escapeHtml(entry.id)}" placeholder="Notes about the revealed exact spot">${escapeHtml(String(draftNote))}</textarea>
                   <div class="coin-db-note-footer">
                     <div class="coin-db-inline-status" id="coin-db-inline-status-${escapeHtml(entry.id)}"></div>
                     <div class="coin-db-footer-btns">
                       <button class="btn small coin-db-delete-entry danger" data-entry-id="${escapeHtml(entry.id)}" title="Delete this archived coin">Delete</button>
+                      <button class="btn small coin-db-load-steps" data-entry-id="${escapeHtml(entry.id)}">${stepsLoaded ? 'Reload Steps' : 'Load Steps'}</button>
                       <button class="btn small coin-db-preview-entry" data-entry-id="${escapeHtml(entry.id)}">Preview</button>
                       <button class="btn small coin-db-load-snapshot" data-entry-id="${escapeHtml(entry.id)}">Load Snapshot</button>
                       <button class="btn small coin-db-save-note" data-entry-id="${escapeHtml(entry.id)}">Save Exact Spot</button>
@@ -9309,6 +9348,7 @@
             </details>
           `;
         }).join('');
+        coinDbRestoreOpenEntryIds(openEntryIds);
       }
 
       function coinDbInlineStatus(entryId, message, isError = false) {
@@ -9366,6 +9406,22 @@
         if (error) throw error;
         if (!data) return null;
         return coinDbMergeEntryIntoCache(data);
+      }
+
+      async function loadCoinDbSteps(entryId) {
+        try {
+          coinDbSetStatus('Loading shrink steps...');
+          const entry = await fetchCoinDbEntryDetails(entryId, { includeSnapshot: false });
+          if (!entry) {
+            coinDbSetStatus('Could not find that archived coin.', true);
+            return;
+          }
+          renderCoinDbEntries(coinDbEntriesCache);
+          const stepCount = Array.isArray(entry.lifecycle) ? entry.lifecycle.length : 0;
+          coinDbSetStatus(`Loaded ${stepCount} shrink step${stepCount === 1 ? '' : 's'} for "${coinDbCanonicalLabel(entry.coin_label)}".`);
+        } catch (error) {
+          coinDbSetStatus(`Failed to load steps: ${coinDbFriendlyError(error)}`, true);
+        }
       }
 
       async function refreshCoinDatabase() {
@@ -9523,8 +9579,16 @@
 
           if (error) throw error;
 
+          coinDbMergeEntryIntoCache({
+            id: entryId,
+            exact_lat: exactLat,
+            exact_lng: exactLng,
+            exact_note: String(noteInput.value || '').trim() || null,
+            updated_by: clientId,
+            updated_at: new Date().toISOString()
+          });
+          coinDbClearDraft(entryId);
           coinDbInlineStatus(entryId, 'Saved.');
-          await refreshCoinDatabase();
         } catch (error) {
           coinDbInlineStatus(entryId, coinDbFriendlyError(error), true);
         }
@@ -10150,6 +10214,7 @@
         try {
           const { error } = await supabase.from(COIN_DB_TABLE).delete().eq('id', entryId);
           if (error) throw error;
+          coinDbClearDraft(entryId);
           coinDbSetStatus(`Deleted "${label}".`);
           await refreshCoinDatabase();
         } catch (error) {
@@ -10182,6 +10247,23 @@
       coinDbNameInput?.addEventListener('input', () => {
         coinDbSaveDraftLabel(coinDbNameInput.value);
       });
+      coinDbList?.addEventListener('input', (e) => {
+        const target = e.target;
+        if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
+        const entryId = String(target.dataset.entryId || '');
+        if (!entryId) return;
+        if (target.classList.contains('coin-db-exact-lat')) {
+          coinDbUpdateDraft(entryId, { exactLat: target.value });
+          return;
+        }
+        if (target.classList.contains('coin-db-exact-lng')) {
+          coinDbUpdateDraft(entryId, { exactLng: target.value });
+          return;
+        }
+        if (target.classList.contains('coin-db-exact-note')) {
+          coinDbUpdateDraft(entryId, { exactNote: target.value });
+        }
+      });
       coinDbModal?.addEventListener('click', (e) => {
         if (e.target === coinDbModal) closeCoinDbModal();
       });
@@ -10195,6 +10277,12 @@
         const previewBtn = e.target.closest('.coin-db-preview-entry');
         if (previewBtn) {
           openCoinDbPreview(previewBtn.dataset.entryId);
+          return;
+        }
+
+        const loadStepsBtn = e.target.closest('.coin-db-load-steps');
+        if (loadStepsBtn) {
+          await loadCoinDbSteps(loadStepsBtn.dataset.entryId);
           return;
         }
 
