@@ -8884,6 +8884,7 @@
       /* ================= Coin Database ================= */
       const COIN_DB_TABLE = 'coin_history_archive';
       const COIN_DB_ACTIVE_LABEL_PREFIX = 'sqkii-active-coin-label:';
+      const COIN_DB_LIST_LIMIT = 200;
       const coinDbModal = byId('coin-db-modal');
       const coinDbOpenBtn = byId('coin-db-open');
       const coinDbCloseBtn = byId('coin-db-close');
@@ -8903,6 +8904,9 @@
 
       function coinDbFriendlyError(error) {
         const message = String(error?.message || error || 'Unknown error');
+        if (/statement timeout|canceling statement due to statement timeout/i.test(message)) {
+          return 'The coin archive query timed out. The mapper now loads recent records first, then fetches heavy snapshots only when needed.';
+        }
         if (/relation .*coin_history_archive.*does not exist/i.test(message)) {
           return 'Supabase archive table is missing. Run supabase/coin_history_archive.sql first.';
         }
@@ -9200,6 +9204,22 @@
         coinDbNameInput.value = coinDbGetActiveLabel();
       }
 
+      function coinDbMergeEntryIntoCache(nextEntry) {
+        if (!nextEntry?.id) return null;
+        const entryId = String(nextEntry.id);
+        const index = coinDbEntriesCache.findIndex((item) => String(item?.id) === entryId);
+        if (index >= 0) {
+          coinDbEntriesCache[index] = { ...coinDbEntriesCache[index], ...nextEntry };
+          return coinDbEntriesCache[index];
+        }
+        coinDbEntriesCache.push(nextEntry);
+        return nextEntry;
+      }
+
+      function coinDbFindEntry(entryId) {
+        return coinDbEntriesCache.find((item) => String(item?.id) === String(entryId)) || null;
+      }
+
       function renderCoinDbEntries(entries) {
         coinDbEntriesCache = Array.isArray(entries) ? entries : [];
 
@@ -9210,7 +9230,9 @@
         }
 
         coinDbList.innerHTML = coinDbEntriesCache.map((entry) => {
-          const steps = Array.isArray(entry.lifecycle) ? entry.lifecycle : [];
+          const stepsLoaded = Array.isArray(entry.lifecycle);
+          const steps = stepsLoaded ? entry.lifecycle : [];
+          const shrinkCount = Number.isFinite(Number(entry?.shrink_count)) ? Number(entry.shrink_count) : steps.length;
           const displayLabel = coinDbCanonicalLabel(entry.coin_label || 'Unnamed coin') || 'Unnamed coin';
           const exactCoords = coinDbGetExactCoords(entry);
           const exactSpot = exactCoords
@@ -9232,7 +9254,7 @@
                   <span class="coin-db-dropdown-date">${escapeHtml(coinDbFormatDate(entry.created_at))}</span>
                 </div>
                 <div class="coin-db-dropdown-right">
-                  <span class="coin-db-chip">${steps.length} shrink${steps.length !== 1 ? 's' : ''}</span>
+                  <span class="coin-db-chip">${shrinkCount} shrink${shrinkCount !== 1 ? 's' : ''}</span>
                   <span class="coin-db-dropdown-arrow">▸</span>
                 </div>
               </summary>
@@ -9240,7 +9262,7 @@
               <div class="coin-db-dropdown-body">
                 <div class="coin-db-meta">
                   <span class="coin-db-chip">Room: ${escapeHtml(entry.room_code || '')}</span>
-                  <span class="coin-db-chip">Shrinks: ${steps.length}</span>
+                  <span class="coin-db-chip">Shrinks: ${shrinkCount}</span>
                   ${exactSpot ? `<span class="coin-db-chip">Exact: ${escapeHtml(exactSpot)}</span>` : ''}
                 </div>
 
@@ -9260,8 +9282,9 @@
                 </div>
 
                 <div class="coin-db-steps">
-                  ${steps.length === 0 ? '<div class="coin-db-empty" style="padding:10px">No shrink steps recorded yet.</div>' : ''}
-                  ${steps.map((step) => `
+                  ${!stepsLoaded ? '<div class="coin-db-empty" style="padding:10px">Preview or load this coin to fetch its saved shrink steps.</div>' : ''}
+                  ${stepsLoaded && steps.length === 0 ? '<div class="coin-db-empty" style="padding:10px">No shrink steps recorded yet.</div>' : ''}
+                  ${stepsLoaded ? steps.map((step) => `
                     <div class="coin-db-step">
                       <div>
                         <strong>Step</strong>
@@ -9280,7 +9303,7 @@
                         <span>${escapeHtml(coinDbFormatRadius(step.radiusMeters))}</span>
                       </div>
                     </div>
-                  `).join('')}
+                  `).join('') : ''}
                 </div>
               </div>
             </details>
@@ -9299,12 +9322,29 @@
         if (!currentRoomCode) return [];
         const { data, error } = await supabase
           .from(COIN_DB_TABLE)
-          .select('*')
+          .select('id, room_code, coin_label, status, shrink_count, exact_lat, exact_lng, exact_note, archived_by, updated_by, first_shrink_at, last_shrink_at, created_at, updated_at')
           .eq('room_code', currentRoomCode)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .limit(COIN_DB_LIST_LIMIT);
 
         if (error) throw error;
         return data || [];
+      }
+
+      async function fetchCoinDbEntryDetails(entryId, { includeSnapshot = false } = {}) {
+        if (!entryId) return null;
+        const columns = includeSnapshot
+          ? 'id, coin_label, lifecycle, snapshot_state'
+          : 'id, coin_label, lifecycle';
+        const { data, error } = await supabase
+          .from(COIN_DB_TABLE)
+          .select(columns)
+          .eq('id', entryId)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!data) return null;
+        return coinDbMergeEntryIntoCache(data);
       }
 
       async function refreshCoinDatabase() {
@@ -9333,7 +9373,11 @@
           });
           renderCoinDbEntries(entries);
           coinDbSyncNameInput();
-          coinDbSetStatus(entries.length ? `Loaded ${entries.length} archived coin record(s).` : 'No archived coins yet for this room.');
+          coinDbSetStatus(
+            entries.length
+              ? `Loaded ${entries.length} archived coin record(s)${entries.length >= COIN_DB_LIST_LIMIT ? ' (recent records only).' : '.'}`
+              : 'No archived coins yet for this room.'
+          );
         } catch (error) {
           renderCoinDbEntries([]);
           coinDbSetStatus(coinDbFriendlyError(error), true);
@@ -9466,8 +9510,21 @@
       }
 
       async function loadCoinDbSnapshot(entryId) {
-        const entry = coinDbEntriesCache.find((item) => String(item.id) === String(entryId));
-        if (!entry?.snapshot_state) return;
+        let entry = coinDbFindEntry(entryId);
+        try {
+          coinDbSetStatus('Loading saved snapshot...');
+          if (!Array.isArray(entry?.snapshot_state)) {
+            entry = await fetchCoinDbEntryDetails(entryId, { includeSnapshot: true });
+          }
+        } catch (error) {
+          coinDbSetStatus(`Failed to load snapshot: ${coinDbFriendlyError(error)}`, true);
+          return;
+        }
+
+        if (!Array.isArray(entry?.snapshot_state) || !entry.snapshot_state.length) {
+          coinDbSetStatus('This archived coin does not have a saved snapshot yet.', true);
+          return;
+        }
 
         try {
           await applyStateArray(entry.snapshot_state);
@@ -10033,23 +10090,34 @@
       }
 
       function openCoinDbPreview(entryId) {
-        const entry = coinDbEntriesCache.find((item) => String(item.id) === String(entryId));
-        const payload = buildCoinDbPreviewPayload(entry);
-        if (!payload) {
-          coinDbSetStatus('No valid shrink steps available to preview for this coin.', true);
-          return;
-        }
+        (async () => {
+          let entry = coinDbFindEntry(entryId);
+          try {
+            coinDbSetStatus('Loading shrink preview...');
+            if (!Array.isArray(entry?.lifecycle)) {
+              entry = await fetchCoinDbEntryDetails(entryId, { includeSnapshot: false });
+            }
+            const payload = buildCoinDbPreviewPayload(entry);
+            if (!payload) {
+              coinDbSetStatus('No valid shrink steps available to preview for this coin.', true);
+              return;
+            }
 
-        const previewWindow = window.open('', `coin-db-preview-${entryId}`, 'popup=yes,width=1320,height=860,resizable=yes,scrollbars=yes');
-        if (!previewWindow) {
-          coinDbSetStatus('Preview popup was blocked. Allow popups for this site and try again.', true);
-          return;
-        }
+            const previewWindow = window.open('', `coin-db-preview-${entryId}`, 'popup=yes,width=1320,height=860,resizable=yes,scrollbars=yes');
+            if (!previewWindow) {
+              coinDbSetStatus('Preview popup was blocked. Allow popups for this site and try again.', true);
+              return;
+            }
 
-        previewWindow.document.open();
-        previewWindow.document.write(buildCoinDbPreviewDocument(payload));
-        previewWindow.document.close();
-        previewWindow.focus();
+            previewWindow.document.open();
+            previewWindow.document.write(buildCoinDbPreviewDocument(payload));
+            previewWindow.document.close();
+            previewWindow.focus();
+            coinDbSetStatus(`Loaded preview for "${coinDbCanonicalLabel(entry?.coin_label)}".`);
+          } catch (error) {
+            coinDbSetStatus(`Failed to load preview: ${coinDbFriendlyError(error)}`, true);
+          }
+        })();
       }
 
       async function deleteCoinDbEntry(entryId) {
