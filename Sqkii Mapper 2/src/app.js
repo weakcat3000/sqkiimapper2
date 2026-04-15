@@ -9320,15 +9320,36 @@
 
       async function fetchCoinDbEntries() {
         if (!currentRoomCode) return [];
-        const { data, error } = await supabase
-          .from(COIN_DB_TABLE)
-          .select('id, room_code, coin_label, status, shrink_count, exact_lat, exact_lng, exact_note, archived_by, updated_by, first_shrink_at, last_shrink_at, created_at, updated_at')
-          .eq('room_code', currentRoomCode)
-          .order('created_at', { ascending: false })
-          .limit(COIN_DB_LIST_LIMIT);
+        const baseColumns = 'id, room_code, coin_label, status, shrink_count, exact_lat, exact_lng, exact_note, archived_by, updated_by, first_shrink_at, last_shrink_at, created_at, updated_at';
+        const runPrimaryQuery = async () => {
+          const { data, error } = await supabase
+            .from(COIN_DB_TABLE)
+            .select(baseColumns)
+            .eq('room_code', currentRoomCode)
+            .order('created_at', { ascending: false })
+            .limit(COIN_DB_LIST_LIMIT);
+          if (error) throw error;
+          return data || [];
+        };
+        const runFallbackQuery = async () => {
+          const { data, error } = await supabase
+            .from(COIN_DB_TABLE)
+            .select(baseColumns)
+            .eq('room_code', currentRoomCode)
+            .limit(50);
+          if (error) throw error;
+          return data || [];
+        };
 
-        if (error) throw error;
-        return data || [];
+        try {
+          return await runPrimaryQuery();
+        } catch (error) {
+          if (!/statement timeout|canceling statement due to statement timeout/i.test(String(error?.message || error || ''))) {
+            throw error;
+          }
+          coinDbSetStatus('Archive query timed out. Retrying with a smaller lightweight query...');
+          return await runFallbackQuery();
+        }
       }
 
       async function fetchCoinDbEntryDetails(entryId, { includeSnapshot = false } = {}) {
