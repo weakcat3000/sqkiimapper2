@@ -2843,21 +2843,21 @@
 
     .silver-ai-subtitle {
       color: rgba(226, 232, 240, 0.8);
-      font-size: 13px;
-      line-height: 1.55;
-      margin-bottom: 12px;
+      font-size: 12px;
+      line-height: 1.5;
+      margin-bottom: 10px;
       max-width: 50ch;
     }
 
     .silver-ai-location {
-      margin-bottom: 14px;
-      padding: 11px 13px;
-      border-radius: 14px;
+      margin-bottom: 12px;
+      padding: 9px 11px;
+      border-radius: 12px;
       border: 1px solid rgba(125, 211, 252, 0.16);
       background: linear-gradient(180deg, rgba(8, 19, 32, 0.92), rgba(12, 22, 36, 0.84));
       color: #dbeafe;
-      font-size: 12px;
-      line-height: 1.5;
+      font-size: 11px;
+      line-height: 1.45;
     }
 
     .silver-ai-location[data-state="live"] {
@@ -2876,7 +2876,7 @@
     .silver-ai-upload-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
+      gap: 8px;
     }
 
     .silver-ai-upload-row,
@@ -2891,9 +2891,10 @@
     }
 
     .silver-ai-cta-btn {
-      min-height: 46px;
-      border-radius: 14px;
+      min-height: 42px;
+      border-radius: 12px;
       font-weight: 800;
+      font-size: 13px;
       letter-spacing: 0.01em;
       background: linear-gradient(180deg, rgba(37, 99, 235, 0.24), rgba(14, 165, 233, 0.18));
       border-color: rgba(125, 211, 252, 0.22);
@@ -2902,7 +2903,7 @@
     .silver-ai-actions-sticky {
       position: sticky;
       bottom: 0;
-      padding-top: 10px;
+      padding-top: 8px;
       padding-bottom: max(2px, env(safe-area-inset-bottom, 0px));
       background: linear-gradient(180deg, rgba(11, 16, 24, 0), rgba(11, 16, 24, 0.92) 34%, rgba(11, 16, 24, 0.98));
       z-index: 1;
@@ -2910,42 +2911,45 @@
 
     .silver-ai-actions-sticky .btn {
       width: 100%;
-      min-height: 50px;
-      border-radius: 16px;
+      min-height: 44px;
+      border-radius: 14px;
       font-weight: 800;
+      font-size: 13px;
       letter-spacing: 0.01em;
     }
 
     .silver-ai-upload-hint {
       color: rgba(148, 163, 184, 0.86);
-      font-size: 12px;
+      font-size: 11px;
     }
 
     .silver-ai-files,
     .silver-ai-status {
       min-height: 18px;
       color: #dbeafe;
-      font-size: 12px;
-      line-height: 1.5;
+      font-size: 11px;
+      line-height: 1.45;
     }
 
     .silver-ai-note-wrap label {
       color: #e2e8f0;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
       letter-spacing: 0.04em;
       text-transform: uppercase;
     }
 
     .silver-ai-note-wrap textarea {
-      min-height: 92px;
+      min-height: 80px;
       resize: vertical;
-      padding: 12px 13px;
-      border-radius: 14px;
+      padding: 11px 12px;
+      border-radius: 12px;
       border: 1px solid rgba(148, 163, 184, 0.24);
       background: rgba(15, 23, 34, 0.92);
       color: #e5e7eb;
       font: inherit;
+      font-size: 14px;
+      line-height: 1.45;
     }
 
     .silver-ai-note-wrap textarea:focus {
@@ -2957,9 +2961,9 @@
     .silver-ai-preview {
       display: grid;
       place-items: center;
-      min-height: 120px;
-      margin-bottom: 14px;
-      border-radius: 18px;
+      min-height: 100px;
+      margin-bottom: 12px;
+      border-radius: 16px;
       border: 1px dashed rgba(148, 163, 184, 0.24);
       background: rgba(8, 13, 20, 0.62);
       overflow: hidden;
@@ -2969,21 +2973,21 @@
     .silver-ai-preview video {
       display: block;
       width: 100%;
-      max-height: 240px;
+      max-height: 220px;
       object-fit: cover;
     }
 
     .silver-ai-results {
       display: grid;
       gap: 12px;
-      margin-top: 14px;
+      margin-top: 12px;
     }
 
     .silver-ai-result-card {
       display: grid;
       gap: 8px;
-      padding: 14px;
-      border-radius: 16px;
+      padding: 12px;
+      border-radius: 14px;
       border: 1px solid rgba(148, 163, 184, 0.2);
       background:
         radial-gradient(circle at top right, rgba(125, 211, 252, 0.08), transparent 34%),
@@ -2999,7 +3003,7 @@
 
     .silver-ai-result-title {
       color: #f8fafc;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 800;
       line-height: 1.35;
     }
@@ -3010,7 +3014,7 @@
       border-radius: 999px;
       background: rgba(56, 189, 248, 0.14);
       color: #bae6fd;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 800;
       letter-spacing: 0.05em;
       text-transform: uppercase;
@@ -3027,15 +3031,15 @@
       border-radius: 999px;
       background: rgba(148, 163, 184, 0.14);
       color: #cbd5e1;
-      font-size: 11px;
+      font-size: 10px;
       line-height: 1;
     }
 
     .silver-ai-result-copy,
     .silver-ai-result-examples {
       color: rgba(226, 232, 240, 0.88);
-      font-size: 12px;
-      line-height: 1.55;
+      font-size: 11px;
+      line-height: 1.5;
     }
 
     .silver-ai-result-examples strong {
@@ -3576,9 +3580,9 @@
       }
 
       .silver-ai-card {
-        width: min(96vw, 560px);
-        max-height: min(92vh, 860px);
-        padding: 20px 16px 16px;
+        width: min(95vw, 540px);
+        max-height: min(88vh, 820px);
+        padding: 16px 14px 14px;
       }
 
       .silver-ai-upload-grid,
@@ -3591,6 +3595,21 @@
 
       .silver-ai-upload-grid {
         grid-template-columns: 1fr;
+      }
+
+      .silver-ai-cta-btn,
+      .silver-ai-actions-sticky .btn {
+        min-height: 40px;
+        font-size: 12px;
+      }
+
+      .silver-ai-note-wrap textarea {
+        min-height: 76px;
+      }
+
+      .silver-ai-preview img,
+      .silver-ai-preview video {
+        max-height: 180px;
       }
 
       .tool-rail-toggle-arrow {
@@ -3708,23 +3727,53 @@
       }
 
       html.ios-device .silver-ai-card {
-        width: 100vw;
+        width: min(100vw, 540px);
         max-width: none;
-        max-height: 100dvh;
-        min-height: 100dvh;
-        border-radius: 24px 24px 0 0;
-        padding: max(18px, env(safe-area-inset-top, 0px) + 8px) 16px calc(16px + env(safe-area-inset-bottom, 0px));
+        max-height: calc(100dvh - 84px);
+        min-height: 0;
+        border-radius: 20px 20px 0 0;
+        padding: max(14px, env(safe-area-inset-top, 0px) + 4px) 14px calc(10px + env(safe-area-inset-bottom, 0px));
+      }
+
+      html.ios-device .silver-ai-kicker {
+        font-size: 10px;
+      }
+
+      html.ios-device .silver-ai-card h3 {
+        font-size: 19px;
+        margin-bottom: 8px;
+      }
+
+      html.ios-device .silver-ai-subtitle,
+      html.ios-device .silver-ai-location,
+      html.ios-device .silver-ai-files,
+      html.ios-device .silver-ai-status,
+      html.ios-device .silver-ai-result-copy,
+      html.ios-device .silver-ai-result-examples {
+        font-size: 11px;
+      }
+
+      html.ios-device .silver-ai-note-wrap textarea {
+        font-size: 16px;
+        min-height: 72px;
       }
 
       html.ios-device .silver-ai-cta-btn,
-      html.ios-device .silver-ai-actions-sticky .btn,
-      html.ios-device .silver-ai-note-wrap textarea {
-        font-size: 16px;
+      html.ios-device .silver-ai-actions-sticky .btn {
+        min-height: 38px;
+        font-size: 12px;
+      }
+
+      html.ios-device .silver-ai-actions-sticky {
+        position: static;
+        padding-top: 4px;
+        padding-bottom: 0;
+        background: transparent;
       }
 
       html.ios-device .silver-ai-preview img,
       html.ios-device .silver-ai-preview video {
-        max-height: 34vh;
+        max-height: 26vh;
       }
     }
 

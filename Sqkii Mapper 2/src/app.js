@@ -5805,7 +5805,6 @@
       let silverAiDatasetPromise = null;
       let silverAiSelectedFiles = [];
       let silverAiPreviewUrl = null;
-      let silverAiLocationPromise = null;
       let lastUserPos = null; // [lng, lat]
       let lastUserAccuracyMeters = null;
       function setAudioIcon(on) {
@@ -5961,7 +5960,7 @@
             : '#dbeafe';
       }
       function describeSilverAiLocationContext(locationContext = getSilverAiLocationContext()) {
-        if (!locationContext) return 'Live GPS is not available yet. Open location on iPhone for more exact suggestions.';
+        if (!locationContext) return 'Live GPS is off, so Silver AI will use only your uploaded media and notes.';
         const lat = Number(locationContext.lat).toFixed(5);
         const lng = Number(locationContext.lng).toFixed(5);
         const accuracy = Number.isFinite(Number(locationContext.accuracyMeters))
@@ -5985,46 +5984,6 @@
           lng,
           accuracyMeters: Number.isFinite(lastUserAccuracyMeters) ? lastUserAccuracyMeters : null,
         };
-      }
-      async function requestSilverAiLocation({ quiet = false } = {}) {
-        const existing = getSilverAiLocationContext();
-        if (existing) {
-          updateSilverAiLocationUi();
-          return existing;
-        }
-        if (silverAiLocationPromise) return silverAiLocationPromise;
-        updateSilverAiLocationUi();
-        if (!quiet) setSilverAiStatus('Checking live GPS so the scout can anchor suggestions to your current position...');
-        silverAiLocationPromise = new Promise((resolve) => {
-          const finish = (value) => {
-            updateSilverAiLocationUi();
-            silverAiLocationPromise = null;
-            resolve(value);
-          };
-          try {
-            if (typeof navigator !== 'undefined' && navigator.geolocation?.getCurrentPosition) {
-              navigator.geolocation.getCurrentPosition(
-                (position) => {
-                  onFix(position);
-                  finish(getSilverAiLocationContext());
-                },
-                () => {
-                  try { nudgeGpsTracking(); } catch {}
-                  finish(getSilverAiLocationContext());
-                },
-                {
-                  enableHighAccuracy: true,
-                  maximumAge: 15000,
-                  timeout: 9000,
-                },
-              );
-              return;
-            }
-          } catch {}
-          try { nudgeGpsTracking(); } catch {}
-          finish(getSilverAiLocationContext());
-        });
-        return silverAiLocationPromise;
       }
       function clearSilverAiPreview() {
         if (silverAiPreviewUrl) {
@@ -6089,8 +6048,8 @@
           setSilverAiStatus('Multiple videos selected. The scout will use the first video and ignore the rest.', 'info');
         } else if (nextFiles.length) {
           setSilverAiStatus(getSilverAiLocationContext()
-            ? 'Files loaded. GPS is available, so the scout can use your live location too.'
-            : 'Files loaded. Add scene notes for stronger matches, then run the scout.', 'info');
+            ? 'Files loaded. Live GPS is already on, so Silver AI can use your real location too.'
+            : 'Files loaded. GPS is off, so Silver AI will use only your media and notes.', 'info');
         } else {
           setSilverAiStatus('Ready to rank likely silver hiding spots from the reviewed archive.');
         }
@@ -6446,8 +6405,7 @@
         silverAiAnalyzeBtn.disabled = true;
         let topGroups = [];
         try {
-          let locationContext = getSilverAiLocationContext();
-          if (!locationContext) locationContext = await requestSilverAiLocation({ quiet: true });
+          const locationContext = getSilverAiLocationContext();
           const locationText = locationContext ? `${locationContext.lat} ${locationContext.lng}` : '';
           const tokens = tokenizeSilverAiText(`${notes} ${fileText} ${locationText}`);
           const rows = await loadSilverAiDataset();
@@ -6639,7 +6597,6 @@
           setSilverAiStatus('Ready to rank likely silver hiding spots from the reviewed archive.');
         }
         updateSilverAiLocationUi();
-        requestSilverAiLocation({ quiet: true }).catch(() => {});
         loadSilverAiDataset().catch((error) => {
           console.warn('[Silver AI] Dataset preload failed:', error);
         });
