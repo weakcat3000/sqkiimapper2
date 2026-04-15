@@ -2845,8 +2845,25 @@
       color: rgba(226, 232, 240, 0.8);
       font-size: 13px;
       line-height: 1.55;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
       max-width: 50ch;
+    }
+
+    .silver-ai-location {
+      margin-bottom: 14px;
+      padding: 11px 13px;
+      border-radius: 14px;
+      border: 1px solid rgba(125, 211, 252, 0.16);
+      background: linear-gradient(180deg, rgba(8, 19, 32, 0.92), rgba(12, 22, 36, 0.84));
+      color: #dbeafe;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .silver-ai-location[data-state="live"] {
+      border-color: rgba(74, 222, 128, 0.24);
+      background: linear-gradient(180deg, rgba(9, 28, 22, 0.92), rgba(10, 24, 21, 0.86));
+      color: #dcfce7;
     }
 
     .silver-ai-upload,
@@ -2856,11 +2873,47 @@
       margin-bottom: 14px;
     }
 
+    .silver-ai-upload-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
     .silver-ai-upload-row,
     .silver-ai-actions {
       display: flex;
       gap: 10px;
       align-items: center;
+    }
+
+    .silver-ai-upload-row-clear {
+      justify-content: flex-end;
+    }
+
+    .silver-ai-cta-btn {
+      min-height: 46px;
+      border-radius: 14px;
+      font-weight: 800;
+      letter-spacing: 0.01em;
+      background: linear-gradient(180deg, rgba(37, 99, 235, 0.24), rgba(14, 165, 233, 0.18));
+      border-color: rgba(125, 211, 252, 0.22);
+    }
+
+    .silver-ai-actions-sticky {
+      position: sticky;
+      bottom: 0;
+      padding-top: 10px;
+      padding-bottom: max(2px, env(safe-area-inset-bottom, 0px));
+      background: linear-gradient(180deg, rgba(11, 16, 24, 0), rgba(11, 16, 24, 0.92) 34%, rgba(11, 16, 24, 0.98));
+      z-index: 1;
+    }
+
+    .silver-ai-actions-sticky .btn {
+      width: 100%;
+      min-height: 50px;
+      border-radius: 16px;
+      font-weight: 800;
+      letter-spacing: 0.01em;
     }
 
     .silver-ai-upload-hint {
@@ -3528,11 +3581,16 @@
         padding: 20px 16px 16px;
       }
 
+      .silver-ai-upload-grid,
       .silver-ai-upload-row,
       .silver-ai-actions,
       .silver-ai-result-head {
         flex-direction: column;
         align-items: stretch;
+      }
+
+      .silver-ai-upload-grid {
+        grid-template-columns: 1fr;
       }
 
       .tool-rail-toggle-arrow {
@@ -3647,6 +3705,26 @@
       html.ios-device .darkveil-canvas {
         opacity: .24;
         filter: none;
+      }
+
+      html.ios-device .silver-ai-card {
+        width: 100vw;
+        max-width: none;
+        max-height: 100dvh;
+        min-height: 100dvh;
+        border-radius: 24px 24px 0 0;
+        padding: max(18px, env(safe-area-inset-top, 0px) + 8px) 16px calc(16px + env(safe-area-inset-bottom, 0px));
+      }
+
+      html.ios-device .silver-ai-cta-btn,
+      html.ios-device .silver-ai-actions-sticky .btn,
+      html.ios-device .silver-ai-note-wrap textarea {
+        font-size: 16px;
+      }
+
+      html.ios-device .silver-ai-preview img,
+      html.ios-device .silver-ai-preview video {
+        max-height: 34vh;
       }
     }
 
