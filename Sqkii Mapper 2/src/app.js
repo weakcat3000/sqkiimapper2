@@ -5807,6 +5807,7 @@
       let silverAiSelectedFiles = [];
       let silverAiPreviewUrl = null;
       let silverAiLastMediaPayloads = [];
+      let silverAiLastMediaIssues = [];
       let lastUserPos = null; // [lng, lat]
       let lastUserAccuracyMeters = null;
       function setAudioIcon(on) {
@@ -6031,6 +6032,7 @@
       function resetSilverAiState({ keepNotes = false } = {}) {
         silverAiSelectedFiles = [];
         silverAiLastMediaPayloads = [];
+        silverAiLastMediaIssues = [];
         if (silverAiInput) silverAiInput.value = '';
         if (!keepNotes && silverAiNotes) silverAiNotes.value = '';
         if (silverAiResultsEl) silverAiResultsEl.innerHTML = '';
@@ -6235,38 +6237,74 @@
           height: Math.max(1, Math.round(height * scale)),
         };
       }
+      function buildSilverAiJpegPayloadFromDrawable(drawable, width, height, label, sourceKind) {
+        const dims = fitSilverAiDimensions(width, height, 1400);
+        const canvas = document.createElement('canvas');
+        canvas.width = dims.width;
+        canvas.height = dims.height;
+        const ctx = canvas.getContext('2d', { alpha: false });
+        ctx?.drawImage(drawable, 0, 0, dims.width, dims.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.84);
+        return {
+          mimeType: 'image/jpeg',
+          dataBase64: dataUrl.split(',')[1],
+          label,
+          sourceKind,
+          width: dims.width,
+          height: dims.height,
+        };
+      }
+      function buildSilverAiUnsupportedImageError(file) {
+        const mime = String(file?.type || '').toLowerCase();
+        const ext = String(file?.name || '').split('.').pop()?.toLowerCase() || '';
+        const isHeic = mime.includes('heic') || mime.includes('heif') || ext === 'heic' || ext === 'heif';
+        const error = new Error(
+          isHeic
+            ? 'This HEIC photo could not be prepared for AI vision. Try Take Photo or convert it to JPG first.'
+            : 'This photo could not be prepared for AI vision. Try Take Photo or use a JPG, PNG, or short video.'
+        );
+        error.code = 'unsupported_image_format';
+        return error;
+      }
+      function isSilverAiImageProcessingError(message) {
+        const text = String(message || '').toLowerCase();
+        return text.includes('unable to process input image')
+          || text.includes('unsupported_image_format')
+          || text.includes('could not be prepared for ai vision')
+          || text.includes('invalid_argument');
+      }
       async function buildSilverAiImagePayload(file) {
         try {
           const { img, objectUrl } = await loadImageElementFromFile(file);
           try {
-            const dims = fitSilverAiDimensions(img.naturalWidth || img.width, img.naturalHeight || img.height, 1400);
-            const canvas = document.createElement('canvas');
-            canvas.width = dims.width;
-            canvas.height = dims.height;
-            const ctx = canvas.getContext('2d', { alpha: false });
-            ctx?.drawImage(img, 0, 0, dims.width, dims.height);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.84);
-            return {
-              mimeType: 'image/jpeg',
-              dataBase64: dataUrl.split(',')[1],
-              label: file.name || 'photo.jpg',
-              sourceKind: 'image',
-              width: dims.width,
-              height: dims.height,
-            };
+            return buildSilverAiJpegPayloadFromDrawable(
+              img,
+              img.naturalWidth || img.width,
+              img.naturalHeight || img.height,
+              file.name || 'photo.jpg',
+              'image',
+            );
           } finally {
             URL.revokeObjectURL(objectUrl);
           }
         } catch (error) {
-          const dataUrl = await readFileAsDataUrl(file);
-          return {
-            mimeType: file.type || 'image/jpeg',
-            dataBase64: String(dataUrl).split(',')[1] || '',
-            label: file.name || 'photo',
-            sourceKind: 'image',
-            width: null,
-            height: null,
-          };
+          if (typeof createImageBitmap === 'function') {
+            try {
+              const bitmap = await createImageBitmap(file);
+              try {
+                return buildSilverAiJpegPayloadFromDrawable(
+                  bitmap,
+                  bitmap.width,
+                  bitmap.height,
+                  file.name || 'photo.jpg',
+                  'image',
+                );
+              } finally {
+                bitmap.close?.();
+              }
+            } catch { }
+          }
+          throw buildSilverAiUnsupportedImageError(file);
         }
       }
       async function loadVideoElementFromFile(file) {
@@ -6353,18 +6391,27 @@
         }
       }
       async function buildSilverAiMediaPayloads() {
+        silverAiLastMediaIssues = [];
         const payloads = [];
         let seenVideo = false;
         for (const file of silverAiSelectedFiles) {
           if (file.type?.startsWith('image/')) {
-            payloads.push(await buildSilverAiImagePayload(file));
+            try {
+              payloads.push(await buildSilverAiImagePayload(file));
+            } catch (error) {
+              silverAiLastMediaIssues.push(error?.message || `Could not prepare ${file.name || 'image'} for AI vision.`);
+            }
             continue;
           }
           if (file.type?.startsWith('video/')) {
             if (seenVideo) continue;
             seenVideo = true;
-            const frames = await extractSilverAiVideoFrames(file);
-            payloads.push(...frames);
+            try {
+              const frames = await extractSilverAiVideoFrames(file);
+              payloads.push(...frames);
+            } catch (error) {
+              silverAiLastMediaIssues.push(error?.message || `Could not prepare ${file.name || 'video'} for AI vision.`);
+            }
           }
         }
         const trimmed = payloads.slice(0, 8);
@@ -6526,7 +6573,8 @@
           const media = await buildSilverAiMediaPayloads();
           if (!media.length) {
             renderSilverAiResults(topGroups, tokens.length, silverAiSelectedFiles.length);
-            setSilverAiStatus('No usable image or video frames were extracted, so the scout fell back to archive matching.', 'error');
+            const mediaIssue = silverAiLastMediaIssues[0] || 'No usable image or video frames were extracted, so the scout fell back to archive matching.';
+            setSilverAiStatus(mediaIssue, 'error');
             return;
           }
 
@@ -6553,11 +6601,21 @@
         } catch (error) {
           console.error('[Silver AI] Failed to analyze uploads:', error);
           const fallbackTokens = tokenizeSilverAiText(`${notes} ${fileText}`);
+          const errorMessage = String(error?.message || '').trim();
+          const mediaIssue = isSilverAiImageProcessingError(errorMessage)
+            ? 'One of the uploaded photos could not be read by AI vision. Try Take Photo, use JPG or PNG, or upload a short video instead.'
+            : '';
           if (topGroups.length) {
             renderSilverAiResults(topGroups, fallbackTokens.length, silverAiSelectedFiles.length);
-            setSilverAiStatus(`AI vision is unavailable right now, so the scout fell back to reviewed-archive matches. ${error?.message || ''}`.trim(), 'error');
+            setSilverAiStatus(
+              (mediaIssue || `AI vision is unavailable right now, so the scout fell back to reviewed-archive matches. ${errorMessage}`.trim()),
+              'error'
+            );
           } else {
-            setSilverAiStatus(`Silver AI Scout could not analyze the uploaded media just now. ${error?.message || ''}`.trim(), 'error');
+            setSilverAiStatus(
+              (mediaIssue || `Silver AI Scout could not analyze the uploaded media just now. ${errorMessage}`.trim()),
+              'error'
+            );
           }
         } finally {
           silverAiAnalyzeBtn.disabled = false;

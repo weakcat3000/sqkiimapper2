@@ -4325,7 +4325,7 @@
 
     #silver-ai-modal .silver-ai-result-card {
       position: relative;
-      padding: 12px;
+      padding: 14px 12px 12px;
       display: grid;
       gap: 10px;
     }
@@ -4334,8 +4334,8 @@
       position: absolute;
       top: 0;
       right: 0;
-      padding: 3px 6px;
-      font-size: 8px;
+      padding: 3px 7px;
+      font-size: 7px;
       font-weight: 900;
       letter-spacing: 0.12em;
       color: #0c0e12;
@@ -4345,9 +4345,10 @@
 
     #silver-ai-modal .silver-ai-result-media {
       display: grid;
-      grid-template-columns: 88px 88px;
+      grid-template-columns: repeat(2, minmax(0, 84px));
       gap: 8px;
       align-items: start;
+      justify-content: start;
     }
 
     #silver-ai-modal .silver-ai-focus-crop-wrap,
@@ -4356,21 +4357,20 @@
       gap: 6px;
     }
 
-    #silver-ai-modal .silver-ai-focus-caption,
-    #silver-ai-modal .silver-ai-focus-source-tag,
     #silver-ai-modal .silver-ai-focus-target {
       font-size: 8px;
       font-weight: 900;
       letter-spacing: 0.14em;
       text-transform: uppercase;
       color: #86f7f7;
+      line-height: 1.25;
     }
 
     #silver-ai-modal .silver-ai-focus-crop,
     #silver-ai-modal .silver-ai-focus-source {
       position: relative;
-      width: 88px;
-      height: 88px;
+      width: 84px;
+      height: 84px;
       overflow: hidden;
       border: 1px solid rgba(0, 255, 255, 0.18);
       background: rgba(12, 18, 29, 0.9);
@@ -4402,16 +4402,10 @@
       background: rgba(0, 255, 255, 0.06);
     }
 
-    #silver-ai-modal .silver-ai-focus-source-tag {
-      position: absolute;
-      left: 6px;
-      bottom: 6px;
-      padding: 2px 4px;
-      background: rgba(12, 18, 29, 0.82);
-      color: #dffefe;
-    }
-
     #silver-ai-modal .silver-ai-result-head {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
       margin-bottom: 0;
       gap: 10px;
       align-items: flex-start;
@@ -4420,6 +4414,8 @@
     #silver-ai-modal .silver-ai-result-title {
       font-size: 11px;
       line-height: 1.35;
+      flex: 1 1 180px;
+      min-width: 0;
     }
 
     #silver-ai-modal .silver-ai-result-score,
@@ -4440,13 +4436,13 @@
       }
 
       #silver-ai-modal .silver-ai-result-media {
-        grid-template-columns: 78px 78px;
+        grid-template-columns: repeat(2, minmax(0, 76px));
       }
 
       #silver-ai-modal .silver-ai-focus-crop,
       #silver-ai-modal .silver-ai-focus-source {
-        width: 78px;
-        height: 78px;
+        width: 76px;
+        height: 76px;
       }
     }
 
@@ -4509,13 +4505,13 @@
     }
 
     html.ios-device #silver-ai-modal .silver-ai-result-media {
-      grid-template-columns: 74px 74px;
+      grid-template-columns: repeat(2, minmax(0, 72px));
     }
 
     html.ios-device #silver-ai-modal .silver-ai-focus-crop,
     html.ios-device #silver-ai-modal .silver-ai-focus-source {
-      width: 74px;
-      height: 74px;
+      width: 72px;
+      height: 72px;
     }
 
     .maplibregl-ctrl-bottom-right {
