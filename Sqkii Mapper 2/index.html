@@ -344,17 +344,18 @@
         <div class="silver-ai-kicker">Silver AI Scout</div>
         <h3>Suggest Where To Search</h3>
         <div class="silver-ai-subtitle">
-          Upload images or a short video from the silver circle. Add a few clues you notice, and the mapper will rank likely hiding-spot patterns from the reviewed Singapore and SG60 silver archive.
+          Upload images or a short video from the silver circle. The scout will use your live location when available, then rank likely hiding-spot patterns from the reviewed Singapore and SG60 silver archive.
         </div>
+        <div id="silver-ai-location" class="silver-ai-location">Checking whether live GPS is available for this hunt.</div>
 
         <div class="silver-ai-upload">
           <input id="silver-ai-input" type="file" accept="image/*,video/*" multiple hidden />
-          <div class="silver-ai-upload-row">
-            <button id="silver-ai-take-photo" class="btn" type="button">Take Photo</button>
-            <button id="silver-ai-take-video" class="btn" type="button">Take Video</button>
+          <div class="silver-ai-upload-grid">
+            <button id="silver-ai-take-photo" class="btn silver-ai-cta-btn" type="button">Take Photo</button>
+            <button id="silver-ai-take-video" class="btn silver-ai-cta-btn" type="button">Take Video</button>
+            <button id="silver-ai-pick" class="btn silver-ai-cta-btn" type="button">Upload Media</button>
           </div>
-          <div class="silver-ai-upload-row">
-            <button id="silver-ai-pick" class="btn" type="button">Upload Media</button>
+          <div class="silver-ai-upload-row silver-ai-upload-row-clear">
             <button id="silver-ai-clear" class="btn small" type="button">Clear</button>
           </div>
           <div class="silver-ai-upload-hint">Best for 1-3 images or one video around 10 seconds.</div>
@@ -368,7 +369,7 @@
 
         <div id="silver-ai-preview" class="silver-ai-preview" hidden></div>
 
-        <div class="silver-ai-actions">
+        <div class="silver-ai-actions silver-ai-actions-sticky">
           <button id="silver-ai-analyze" class="btn" type="button">Suggest Search Spots</button>
         </div>
 

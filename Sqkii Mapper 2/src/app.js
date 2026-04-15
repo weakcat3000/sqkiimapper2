@@ -5783,6 +5783,7 @@
       const silverAiAnalyzeBtn = document.getElementById('silver-ai-analyze');
       const silverAiNotes = document.getElementById('silver-ai-notes');
       const silverAiFilesEl = document.getElementById('silver-ai-files');
+      const silverAiLocationEl = document.getElementById('silver-ai-location');
       const silverAiPreviewEl = document.getElementById('silver-ai-preview');
       const silverAiStatusEl = document.getElementById('silver-ai-status');
       const silverAiResultsEl = document.getElementById('silver-ai-results');
@@ -5794,7 +5795,7 @@
       const htmIconsAllOffBtn = document.getElementById('htm-icons-all-off');
       const htmIconsStatusEl = document.getElementById('htm-icons-status');
       const htmIconsListEl = document.getElementById('htm-icons-list');
-      const SILVER_AI_DATASET_URL = '/silver-ai-dataset.json';
+      const SILVER_AI_DATASET_URL = new URL('silver-ai-dataset.json', document.baseURI || window.location.href).toString();
       const SILVER_AI_ANALYZE_URL = 'https://sqkiimapper.wk-yeow-2024.workers.dev/api/silver-ai/analyze';
       const SILVER_HTM_LAYER_IDS = ['htm-icons-silver'];
       const SQKII_VOUCHER_LAYER_IDS = HTM_ICONS_LAYER_DEFS
@@ -5804,6 +5805,7 @@
       let silverAiDatasetPromise = null;
       let silverAiSelectedFiles = [];
       let silverAiPreviewUrl = null;
+      let silverAiLocationPromise = null;
       function setAudioIcon(on) {
         audioBtn.innerHTML = on
           ? `<svg viewBox="0 0 24 24" fill="none" stroke="#e5e7eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>`
@@ -5956,12 +5958,71 @@
             ? '#86efac'
             : '#dbeafe';
       }
+      function describeSilverAiLocationContext(locationContext = getSilverAiLocationContext()) {
+        if (!locationContext) return 'Live GPS is not available yet. Open location on iPhone for more exact suggestions.';
+        const lat = Number(locationContext.lat).toFixed(5);
+        const lng = Number(locationContext.lng).toFixed(5);
+        const accuracy = Number.isFinite(Number(locationContext.accuracyMeters))
+          ? ` Accuracy about ${Math.round(Number(locationContext.accuracyMeters))} m.`
+          : '';
+        return `Using live GPS near ${lat}, ${lng}.${accuracy}`;
+      }
+      function updateSilverAiLocationUi() {
+        if (!silverAiLocationEl) return;
+        const hasLocation = !!getSilverAiLocationContext();
+        silverAiLocationEl.textContent = describeSilverAiLocationContext();
+        silverAiLocationEl.dataset.state = hasLocation ? 'live' : 'pending';
+      }
       function getSilverAiLocationContext() {
         if (!Array.isArray(lastUserPos) || lastUserPos.length < 2) return null;
         const lng = Number(lastUserPos[0]);
         const lat = Number(lastUserPos[1]);
         if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
-        return { lat, lng };
+        return {
+          lat,
+          lng,
+          accuracyMeters: Number.isFinite(lastUserAccuracyMeters) ? lastUserAccuracyMeters : null,
+        };
+      }
+      async function requestSilverAiLocation({ quiet = false } = {}) {
+        const existing = getSilverAiLocationContext();
+        if (existing) {
+          updateSilverAiLocationUi();
+          return existing;
+        }
+        if (silverAiLocationPromise) return silverAiLocationPromise;
+        updateSilverAiLocationUi();
+        if (!quiet) setSilverAiStatus('Checking live GPS so the scout can anchor suggestions to your current position...');
+        silverAiLocationPromise = new Promise((resolve) => {
+          const finish = (value) => {
+            updateSilverAiLocationUi();
+            silverAiLocationPromise = null;
+            resolve(value);
+          };
+          try {
+            if (typeof navigator !== 'undefined' && navigator.geolocation?.getCurrentPosition) {
+              navigator.geolocation.getCurrentPosition(
+                (position) => {
+                  onFix(position);
+                  finish(getSilverAiLocationContext());
+                },
+                () => {
+                  try { nudgeGpsTracking(); } catch {}
+                  finish(getSilverAiLocationContext());
+                },
+                {
+                  enableHighAccuracy: true,
+                  maximumAge: 15000,
+                  timeout: 9000,
+                },
+              );
+              return;
+            }
+          } catch {}
+          try { nudgeGpsTracking(); } catch {}
+          finish(getSilverAiLocationContext());
+        });
+        return silverAiLocationPromise;
       }
       function clearSilverAiPreview() {
         if (silverAiPreviewUrl) {
@@ -6010,6 +6071,7 @@
         if (silverAiResultsEl) silverAiResultsEl.innerHTML = '';
         renderSilverAiFiles();
         clearSilverAiPreview();
+        updateSilverAiLocationUi();
         setSilverAiStatus('Ready to rank likely silver hiding spots from the reviewed archive.');
       }
       function setSilverAiFiles(fileList) {
@@ -6018,6 +6080,7 @@
         silverAiSelectedFiles = nextFiles;
         renderSilverAiFiles();
         renderSilverAiPreview();
+        updateSilverAiLocationUi();
         if (Array.from(fileList || []).length > 3) {
           setSilverAiStatus('Using the first 3 files so the scout stays fast.', 'info');
         } else if (videoCount > 1) {
@@ -6034,7 +6097,7 @@
         if (!silverAiDatasetPromise) {
           silverAiDatasetPromise = fetch(SILVER_AI_DATASET_URL, { cache: 'no-cache' })
             .then((response) => {
-              if (!response.ok) throw new Error(`HTTP ${response.status}`);
+              if (!response.ok) throw new Error(`Dataset fetch failed (${response.status})`);
               return response.json();
             })
             .then((payload) => Array.isArray(payload?.rows) ? payload.rows : [])
@@ -6372,11 +6435,8 @@
       async function analyzeSilverAiUploads() {
         if (!silverAiAnalyzeBtn) return;
         const notes = silverAiNotes?.value || '';
-        const locationContext = getSilverAiLocationContext();
         const fileText = silverAiSelectedFiles.map((file) => `${file.name} ${file.type}`).join(' ');
-        const locationText = locationContext ? `${locationContext.lat} ${locationContext.lng}` : '';
-        const tokens = tokenizeSilverAiText(`${notes} ${fileText} ${locationText}`);
-        if (!tokens.length && !silverAiSelectedFiles.length) {
+        if (!notes.trim() && !silverAiSelectedFiles.length) {
           setSilverAiStatus('Add a short note or upload at least one image or video before running the scout.', 'error');
           silverAiNotes?.focus();
           return;
@@ -6384,6 +6444,10 @@
         silverAiAnalyzeBtn.disabled = true;
         let topGroups = [];
         try {
+          let locationContext = getSilverAiLocationContext();
+          if (!locationContext) locationContext = await requestSilverAiLocation({ quiet: true });
+          const locationText = locationContext ? `${locationContext.lat} ${locationContext.lng}` : '';
+          const tokens = tokenizeSilverAiText(`${notes} ${fileText} ${locationText}`);
           const rows = await loadSilverAiDataset();
           topGroups = buildSilverAiRetrievalGroups(rows, tokens);
           if (!silverAiSelectedFiles.length) {
@@ -6421,11 +6485,12 @@
           });
         } catch (error) {
           console.error('[Silver AI] Failed to analyze uploads:', error);
+          const fallbackTokens = tokenizeSilverAiText(`${notes} ${fileText}`);
           if (topGroups.length) {
-            renderSilverAiResults(topGroups, tokens.length, silverAiSelectedFiles.length);
+            renderSilverAiResults(topGroups, fallbackTokens.length, silverAiSelectedFiles.length);
             setSilverAiStatus(`AI vision is unavailable right now, so the scout fell back to reviewed-archive matches. ${error?.message || ''}`.trim(), 'error');
           } else {
-            setSilverAiStatus('Silver AI Scout could not analyze the uploaded media just now.', 'error');
+            setSilverAiStatus(`Silver AI Scout could not analyze the uploaded media just now. ${error?.message || ''}`.trim(), 'error');
           }
         } finally {
           silverAiAnalyzeBtn.disabled = false;
@@ -6571,6 +6636,11 @@
         if (!silverAiStatusEl?.textContent) {
           setSilverAiStatus('Ready to rank likely silver hiding spots from the reviewed archive.');
         }
+        updateSilverAiLocationUi();
+        requestSilverAiLocation({ quiet: true }).catch(() => {});
+        loadSilverAiDataset().catch((error) => {
+          console.warn('[Silver AI] Dataset preload failed:', error);
+        });
         silverAiModal?.open();
       });
       silverAiCloseTopBtn?.addEventListener('click', () => silverAiModal?.close());
@@ -6591,6 +6661,7 @@
       });
       if (htmIconsEnabled) setTimeout(() => scheduleHtmIconsOverlayRestore(), 0);
       resetSilverAiState({ keepNotes: true });
+      updateSilverAiLocationUi();
       document.addEventListener('click', (ev) => { if (ev.target.closest('button')) playClick(); }, { capture: true });
 
       const sonarSfx = new Audio(SCANNING_SOUND_URL);
@@ -6647,6 +6718,7 @@
       }
 
       let lastUserPos = null; // [lng, lat]
+      let lastUserAccuracyMeters = null;
       const sonarBtn = byId('sonar-btn');
       const compassBtn = byId('compass-btn');
 
@@ -6967,9 +7039,12 @@
       function onFix(e) {
         const lng = e?.coords?.longitude ?? e?.lng ?? e?.lngLat?.lng;
         const lat = e?.coords?.latitude ?? e?.lat ?? e?.lngLat?.lat;
+        const accuracyMeters = Number(e?.coords?.accuracy);
         if (typeof lng === 'number' && typeof lat === 'number') {
           lastUserPos = [lng, lat];
+          lastUserAccuracyMeters = Number.isFinite(accuracyMeters) ? accuracyMeters : null;
           roomPresenceShareLocation = true;
+          updateSilverAiLocationUi();
           updateSonarEnabled();
           if (compassEnabled) scheduleCompassRender();
           if (currentRoomCode) {
