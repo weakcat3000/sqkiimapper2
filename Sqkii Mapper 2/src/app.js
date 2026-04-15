@@ -6150,11 +6150,11 @@
       function describeSilverAiSuggestion(group) {
         const position = humanizeSilverAiToken(group.primaryPosition || 'edge');
         const object = humanizeSilverAiToken(group.primaryObject || 'spot');
-        if (group.concealmentType === 'seam_gap') return `${titleCaseSilverAiPhrase(position)} ${object} gaps`;
-        if (group.concealmentType === 'underside') return `${titleCaseSilverAiPhrase(position)} ${object} undersides`;
-        if (group.concealmentType === 'inside_object') return `${titleCaseSilverAiPhrase(position)} ${object} openings`;
-        if (group.concealmentType === 'behind_object') return `${titleCaseSilverAiPhrase(position)} ${object} edges`;
-        return `${titleCaseSilverAiPhrase(position)} ${object} spots`;
+        if (group.concealmentType === 'inside_object') return `Inside ${titleCaseSilverAiPhrase(object)}`;
+        if (group.concealmentType === 'underside') return `Under ${titleCaseSilverAiPhrase(object)}`;
+        if (group.concealmentType === 'behind_object') return `Behind ${titleCaseSilverAiPhrase(object)}`;
+        if (group.concealmentType === 'seam_gap') return `${titleCaseSilverAiPhrase(position)} ${object} edge`;
+        return `${titleCaseSilverAiPhrase(position)} ${object}`;
       }
       function renderSilverAiResults(groups, tokenCount, fileCount) {
         if (!silverAiResultsEl) return;
@@ -6394,6 +6394,32 @@
       function getSilverAiMediaBySlot(slot) {
         return silverAiLastMediaPayloads.find((item) => Number(item.slot) === Number(slot)) || null;
       }
+      function simplifySilverAiPlainText(text, { title = false } = {}) {
+        const raw = String(text || '').trim();
+        if (!raw) return '';
+        let next = raw
+          .replace(/[_-]+/g, ' ')
+          .replace(/\bpattern recognition\b/gi, '')
+          .replace(/\bseams?\b/gi, 'edge')
+          .replace(/\bseam gaps?\b/gi, 'edge')
+          .replace(/\bcrevices?\b/gi, 'small gap')
+          .replace(/\blips?\b/gi, 'edge')
+          .replace(/\bfixture interface\b/gi, 'edge')
+          .replace(/\bmicro spots?\b/gi, 'spots')
+          .replace(/\bundersides?\b/gi, 'bottom side')
+          .replace(/\bopenings?\b/gi, 'opening')
+          .replace(/\bedges edges\b/gi, 'edge')
+          .replace(/\bspots spots\b/gi, 'spots')
+          .replace(/^[,.\s]+|[,.\s]+$/g, '')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
+        if (!next) return '';
+        if (!title) return next;
+        return next
+          .split(/\s+/)
+          .map((word) => word ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : '')
+          .join(' ');
+      }
       function buildSilverAiFocusMarkup(item, index) {
         const region = normalizeSilverAiFocusRegion(item?.focusRegion);
         const media = region ? getSilverAiMediaBySlot(region.mediaSlot) : null;
@@ -6406,14 +6432,10 @@
         const boxTopPct = region.y / 10;
         const boxWidthPct = region.width / 10;
         const boxHeightPct = region.height / 10;
-        const focusTarget = String(item?.focusTarget || 'detected pattern');
-        const sourceLabel = media.sourceKind === 'video_frame'
-          ? `Frame ${region.mediaSlot}`
-          : `Image ${region.mediaSlot}`;
+        const focusTarget = simplifySilverAiPlainText(item?.focusTarget || 'highlighted area', { title: true });
         return `
           <div class="silver-ai-result-media">
             <div class="silver-ai-focus-crop-wrap">
-              <div class="silver-ai-focus-caption">#${index + 1} PATTERN_RECOGNIZED</div>
               <div class="silver-ai-focus-crop">
                 <img
                   src="${escapeHtml(media.dataUrl)}"
@@ -6429,7 +6451,6 @@
                 class="silver-ai-focus-box"
                 style="left:${boxLeftPct}%;top:${boxTopPct}%;width:${boxWidthPct}%;height:${boxHeightPct}%;"
               ></div>
-              <div class="silver-ai-focus-source-tag">${escapeHtml(sourceLabel)}</div>
             </div>
           </div>
         `;
@@ -6441,26 +6462,35 @@
           renderSilverAiResults(retrievalGroups, tokenCount, fileCount);
           return;
         }
-        const visualCues = Array.isArray(result?.visualCues) ? result.visualCues.filter(Boolean).slice(0, 6) : [];
+        const visualCues = Array.isArray(result?.visualCues)
+          ? result.visualCues
+              .map((cue) => simplifySilverAiPlainText(cue, { title: true }))
+              .filter(Boolean)
+              .slice(0, 6)
+          : [];
+        const overallSummary = simplifySilverAiPlainText(result?.overallSummary || '');
         silverAiResultsEl.innerHTML = `
-          ${result?.overallSummary ? `<div class="silver-ai-result-card"><div class="silver-ai-result-title">AI Read</div><div class="silver-ai-result-copy">${escapeHtml(result.overallSummary)}</div>${visualCues.length ? `<div class="silver-ai-result-badges">${visualCues.map((cue) => `<span class="silver-ai-badge">${escapeHtml(cue)}</span>`).join('')}</div>` : ''}</div>` : ''}
-          <div class="silver-ai-results-heading">Detected Search Patterns</div>
+          ${overallSummary ? `<div class="silver-ai-result-card"><div class="silver-ai-result-title">What The AI Saw</div><div class="silver-ai-result-copy">${escapeHtml(overallSummary)}</div>${visualCues.length ? `<div class="silver-ai-result-badges">${visualCues.map((cue) => `<span class="silver-ai-badge">${escapeHtml(cue)}</span>`).join('')}</div>` : ''}</div>` : ''}
+          <div class="silver-ai-results-heading">Likely Search Spots</div>
           ${suggestions.map((item, index) => {
             const confidence = String(item?.confidence || 'medium').toUpperCase();
-            const badges = [item?.matchedPattern, confidence].filter(Boolean);
+            const badges = [simplifySilverAiPlainText(item?.matchedPattern, { title: true }), confidence].filter(Boolean);
+            const title = simplifySilverAiPlainText(item?.title || 'Suggested search spot', { title: true });
+            const searchInstruction = simplifySilverAiPlainText(item?.searchInstruction || '');
+            const reasoning = simplifySilverAiPlainText(item?.reasoning || '');
             return `
               <div class="silver-ai-result-card">
                 <div class="silver-ai-result-scan-tag">SCANNED</div>
                 ${buildSilverAiFocusMarkup(item, index)}
                 <div class="silver-ai-result-head">
-                  <div class="silver-ai-result-title">${index + 1}. ${escapeHtml(item?.title || 'Suggested search spot')}</div>
+                  <div class="silver-ai-result-title">${index + 1}. ${escapeHtml(title)}</div>
                   <div class="silver-ai-result-score">${escapeHtml(confidence)}</div>
                 </div>
                 <div class="silver-ai-result-badges">
                   ${badges.map((badge) => `<span class="silver-ai-badge">${escapeHtml(String(badge))}</span>`).join('')}
                 </div>
-                <div class="silver-ai-result-copy">${escapeHtml(item?.searchInstruction || '')}</div>
-                ${item?.reasoning ? `<div class="silver-ai-result-copy">${escapeHtml(item.reasoning)}</div>` : ''}
+                <div class="silver-ai-result-copy">${escapeHtml(searchInstruction)}</div>
+                ${reasoning ? `<div class="silver-ai-result-copy">${escapeHtml(reasoning)}</div>` : ''}
               </div>
             `;
           }).join('')}
