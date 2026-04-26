@@ -10,9 +10,10 @@ try {
 }
 
 const appVersion = gitSha ? `v${pkg.version}-${gitSha}` : `v${pkg.version}`;
+const basePath = process.env.VITE_BASE_PATH || '/sqkiimapper2/';
 
 export default defineConfig({
-  base: '/sqkiimapper2/',
+  base: basePath,
   publicDir: 'public',
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
