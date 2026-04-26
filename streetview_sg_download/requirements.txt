@@ -1,0 +1,6 @@
+duckdb>=1.2
+huggingface_hub>=0.30
+mapillary>=4.1
+pandas>=2.2
+pyarrow>=16.0
+requests>=2.32

@@ -1,0 +1,72 @@
+coin_number,short_id,spot_type,spot_description,confidence,review_basis
+1,oU5vGUmo_iU,utility_cover_edge,"In the crack beside a round concrete manhole or utility cover, beside grass.",high,end6 contact sheet
+2,QYwr0mSeQR0,pipe_gap,"Behind a large white pipe, in between the pipe and concrete slab or wall.",high,full1 plus end10 contact sheets
+3,ZuYCJtKepmg,rock_base,"Beside a small concrete or rock block, on top of soil and under grass cover.",medium,end6 contact sheet
+4,LidgzIgiquE,stair_railing_corner,"In between the stair edge and metal railing base, on the concrete landing.",high,end6 contact sheet
+5,b4JIem7lUn8,planter_leaf_litter,"Under leaves, beside concrete, at the edge of a planter bed.",medium,end6 contact sheet
+6,R90RupEizx8,column_base_gap,"Beside a brick pillar, at floor level, in the concrete gap at the base.",high,full05 plus end6 contact sheets
+7,K7x9hL4Xj74,hollow_fixture,"Inside a hollow white fixture or cap, below the rim.",high,full05 plus end6 contact sheets
+8,1CTFltr5Rds,pipe_base_edge,"Beside a grey pipe or utility base, on the pebble concrete floor, against the wall.",high,end6 contact sheet
+9,CPsya-A3quk,brick_border_gap,"In between red bricks, along the brick border beside the walkway.",high,end6 contact sheet
+10,Wsp6XLmR8Co,planter_corner_gap,"In the planter corner, between concrete edges, under leaves and beside groundcover.",high,end6 contact sheet
+11,2BV4KbtVa5Y,foliage_wall_base,"Under foliage, beside a low brick wall, on soil at the wall base.",medium,end6 contact sheet
+12,H3dOYRce8CE,ledge_shrub_edge,"Under a low concrete ledge, beside shrubs and leaves.",medium,full05 plus end6 contact sheets
+13,EeEDdDbaZCU,bench_underside,"Under a green bench, below the seat panel.",high,user correction plus end6 contact sheet
+14,GF40nA3H9Is,grass_block_edge,"Beside a narrow concrete block, below grass level, near a drain edge.",medium,end6 contact sheet
+15,--oON0QUFi0,underside_beam_gap,"Under a low concrete bench or beam, inside the underside gap.",medium,end6 contact sheet
+16,Ab7Grf8Ws1Q,planter_wall_seam,"In between the planter wall and wooden planks, inside the floor seam.",high,end6 contact sheet
+17,6SGVBTrmMik,pipe_post_base,"Beside a black pipe or post, at the base on concrete.",medium,end6 contact sheet
+18,Lk8MaFk1n5M,bench_leaf_litter,"Under and behind a bench, inside the fern bed, covered by leaves and plants.",high,full1 plus end10 plus end6 contact sheets
+19,-x_nds_9rrA,pipe_base_gap,"Beside or behind a black cylindrical post, at the base on the void-deck floor.",low,end6 contact sheet
+20,V9ekSc2FE08,drainpipe_elbow,"Behind and below a white drainpipe elbow, beside a pillar on concrete.",high,end6 contact sheet
+21,CbrQ15hE164,panel_support_corner,"In the corner beside a perforated metal panel support, between the support and concrete floor.",high,end6 contact sheet
+22,gBCcOZ5-zCM,brick_grass_seam,"Beside the brick wall edging, on the grass slope, in a soil patch.",medium,end6 contact sheet
+23,8PbCjYtw3Fw,signboard_base,"Beside the signboard base, on grass at the bottom edge.",high,end6 contact sheet
+24,gYp4-yeVS2w,bench_underside,"Under a blue bench, below the seat panel.",high,user correction plus end6 contact sheet
+25,OpU06YLA55A,drain_grass_edge,"Beside a drain grate, on soil at the grass edge, under small leaves.",high,end6 contact sheet
+26,ZwwcIszrb_8,bench_underside,"Under a black bench, below the seat panel, beside grass.",high,full1 plus end6 contact sheets
+27,STosuIpHXps,bench_support_gap,"Behind a metal bench support, in between the bench and wall, on concrete.",high,full1 plus end6 contact sheets
+28,sT7fDNfaIfI,planter_wall_opening,"Inside a narrow opening in a concrete planter wall, beside soil and plant leaves.",high,full1 plus end6 contact sheets
+29,HLXnWdx24eY,fence_curb_leaf_litter,"Under wet leaves, beside a green fence, on the curb edge.",high,end6 contact sheet
+30,LMYIbU57uwM,roots_curb_edge,"Under twigs and roots, beside a green fence, against the concrete curb.",high,end6 contact sheet
+31,8lhGsJdjrMQ,stair_edge_gap,In between the metal stair edge and concrete side wall.,high,end6 contact sheet
+32,Cxb1MvGZ12o,pipe_gap,"Behind a white drainpipe, in between the pipe and wall.",high,full1 plus end6 contact sheets
+33,li0nCJERVQw,lamp_post_base,"Beside a black lamp post base, in soil and leaves.",high,end6 contact sheet
+34,jT5t7cmFYUE,brick_concrete_corner,"In between brick and concrete, inside a corner crack beside the wall.",high,full1 plus end6 contact sheets
+35,DtxAM6fQ3jQ,concrete_block_crack,"In between concrete blocks, inside a narrow crack beside leaves.",high,end6 contact sheet
+36,jOxQTShB3uA,stone_planter_edge,"Under leaves, beside a white concrete or stone planter edge.",high,end6 contact sheet
+37,PVfwhe4dAkw,planter_soil,"Inside a white planter, on soil below a shrub.",high,end6 contact sheet
+38,TKX9s4gnbTw,brick_wall_gap,"In between red paving bricks and the wall, inside the corner gap.",high,end6 contact sheet
+39,ItYuVF1UP_I,slab_block_gap,"In between a loose concrete block and a long concrete slab, on grass.",high,full1 plus end6 contact sheets
+40,8tvZt5LCuAw,concrete_block_gap,"In between rough concrete blocks, beside a brick curb or ledge.",high,full1 plus end6 contact sheets
+41,SfK51g-6IWI,pipe_gap,"Behind a white drainpipe, beside a pillar, on the floor.",high,end6 contact sheet
+42,Q_vp5KtOenk,lamp_post_base_plants,"Under strap leaves, beside a lamp post base, above the concrete footing.",high,full1 plus end6 contact sheets
+43,S8kG06nVMUw,curb_drain_gap,"In between the concrete curb and metal drain cover, beside grass.",high,end6 contact sheet
+44,TFO3rh4-SNI,lamp_post_base,"Beside a lamp post base, on soil under leaves.",high,end6 contact sheet
+45,YKv5xKHNuGg,walkway_planter_crack,"In the crack beside a pebble-wash walkway, on soil at the planter edge.",high,end6 contact sheet
+46,_FhdF9idORc,hedge_drain_edge,"Beside a drain grate, under leaves, at the hedge border.",high,end6 contact sheet
+47,x6-S8zD7JjU,path_edge_corner,"In between the stone path edge and soil corner, beside grass.",high,full1 plus end10 plus end6 contact sheets
+48,_W9yNmf51MM,tree_root_gap,"In between tree roots and a stone border, under grass.",high,end6 contact sheet
+49,59yaFjAkenU,drain_cover_gap,"In between a square drain cover frame and a metal flap, on soil under small plants.",high,end6 contact sheet
+50,V4umLWrpR6o,pipe_corner_gap,"Behind a white drainpipe, in between the pipe and wall corner.",medium,full1 plus end6 contact sheets
+51,gHF4jr5evcg,roots_walkway_edge,"Under roots and vines, beside a blue pebble-wash walkway edge.",high,end6 contact sheet
+52,2EP8jD2OSpc,hedge_wall_edge,"Beside a hedge, on the concrete edge of a low planter wall.",medium,end6 contact sheet
+53,buM7VTC_dMc,drain_paving_seam,"In the seam beside a linear drain grate, between the concrete drain edge and paving slab.",high,end6 contact sheet
+54,_RQDqAikyLk,fence_base_plants,"Under strap leaves, beside a green fence or railing base, on pebble-wash concrete.",high,end6 contact sheet
+55,0oh8kasxHjU,brick_border_soil,"Under the red brick planter border, on soil below the edge.",high,end6 contact sheet
+56,nJ-iGtHKUAg,bench_side_gap,"Behind a green metal bench side panel, beside plants and stone paving.",high,full1 plus end6 contact sheets
+57,i0DNRLb7QQQ,tree_planter_crack,"In between the red brick planter wall and the tree base, inside the crack.",high,full1 plus end6 contact sheets
+58,70Svmr4Cl_o,hedge_planter_edge,"Beside the hedge, on top of the low concrete planter wall edge.",medium,full1 plus end6 contact sheets
+59,qsHZENDy3W4,planter_wall_opening,"Inside a rectangular opening in the top of the low concrete planter wall, under the hedge.",high,full1 plus end10 plus end6 contact sheets
+60,-uKx_Je2Y-k,utility_box_base,"Beside a yellow utility box base, in grass at the bottom corner.",high,full1 plus end6 contact sheets
+61,Ge9J0Hk_bw4,bench_underside,"Under a blue bench, below the seat panel.",high,end6 contact sheet
+63,Tz5SpqYf7tI,concrete_overhang_gap,"Under a rough concrete overhang, in between the slab and the ground.",high,end6 contact sheet
+64,hl_eLa3judA,pebble_planter_edge,"Beside a pebble-wash planter edge, under strap leaves.",high,end6 contact sheet
+66,JxRydjhEERY,bench_slat_gap,"In between the wooden bench slats and the concrete planter edge, beside grass.",high,full1 plus end6 contact sheets
+67,f4_hWZz9TWE,utility_cover_lip,"Under the lip of a yellow utility cover, beside grass.",high,end6 contact sheet
+68,AYohbCkHxJ4,brick_grass_edge,"Beside the red brick border, at the grass edge.",high,end6 contact sheet
+69,eIHs32K2SCA,bench_side_gap,"Behind a green metal bench side panel, beside plants and stone paving.",high,full1 plus end6 contact sheets
+70,vMJFTF2k-6I,wall_vine_crack,"Under small vines, beside a wall, inside a ledge crack.",high,end6 contact sheet
+71,qwt0EqdPwzs,brick_pebble_border,"In between the brick edging and pebble-wash walkway, beside grass.",medium,full1 plus end10 plus end6 contact sheets
+72,s8br74UBLOM,brick_border_soil,"Under the red brick wall edge, on soil beside grass.",high,end6 contact sheet
+74,nRO2JPJ7FZM,grass_path_edge,"In the grass, beside a pebble-wash path edge.",medium,end10 plus end6 contact sheets

@@ -1294,93 +1294,193 @@ function analysisShellHtml() {
   `;
 }
 
-function analysisResultHtml(result) {
-  const groups = result.candidate_groups || [];
-  const modelSummary = (result.model_votes || []).map((vote) => {
-    const status = vote.failed ? `failed: ${vote.error || 'unavailable'}` : `${vote.candidate_count || 0} candidate(s)`;
-    return `<span>${escapeHtml(vote.agent_name || 'AI agent')}: ${escapeHtml(status)}</span>`;
-  }).join('');
+function cleanResultText(text) {
+  return String(text || '')
+    .replace(/Result shown, but Supabase save needs server env:[\s\S]*?(?=\n[A-Z]|\n\d\.|$)/gi, '')
+    .replace(/Supabase env missing on server\.?/gi, '')
+    .replace(/Google Street View Static API failed\.?/gi, '')
+    .replace(/Street View verification unavailable\.?/gi, '')
+    .replace(/Manual verification required:\s*Google Street View Static API failed\.?/gi, '')
+    .replace(/qwen[^.\n]*failed[^.\n]*\.?/gi, '')
+    .replace(/nemotron[^.\n]*failed[^.\n]*\.?/gi, '')
+    .replace(/OpenRouter model unavailable[^.\n]*\.?/gi, '')
+    .replace(/Model malformed response[^.\n]*\.?/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function confidenceBadge(group, result) {
+  const label = String(result?.final_label || group?.label || '').toLowerCase();
+  const score = Number(result?.final_score || group?.weighted_score || 0);
+  const votes = group?.model_votes ? Object.keys(group.model_votes).length : 0;
+
+  if (/very high|highly accurate|high/.test(label) || votes >= 2 || score >= 70) {
+    return { text: 'HIGH', className: 'is-high' };
+  }
+
+  if (/medium|possible/.test(label) || score >= 45) {
+    return { text: 'MED', className: 'is-medium' };
+  }
+
+  return { text: 'LOW', className: 'is-low' };
+}
+
+function streetViewDisplay(group) {
+  const sv = group?.streetview || {};
+  const score = Number(sv.verification_score);
+
+  if (Number.isFinite(score) && score > 0) {
+    return {
+      label: `${Math.round(score)}% Match`,
+      detail: `Best heading: ${Number(sv.best_heading || 0)}°`,
+      className: score >= 70 ? 'is-high' : score >= 45 ? 'is-medium' : 'is-low'
+    };
+  }
+
+  return {
+    label: 'Needs Check',
+    detail: 'Street View comparison unavailable',
+    className: 'is-muted'
+  };
+}
+
+function extractVisualClues(group) {
+  const fromRepresentative = group?.representative?.visual_clues;
+  const fromGroup = group?.visual_clues;
+  const fromStreetView = group?.streetview?.matching_features;
+
+  const clues = [
+    ...(Array.isArray(fromRepresentative) ? fromRepresentative : []),
+    ...(Array.isArray(fromGroup) ? fromGroup : []),
+    ...(Array.isArray(fromStreetView) ? fromStreetView : [])
+  ]
+    .map((cue) => String(cue || '').trim())
+    .filter(Boolean);
+
+  return [...new Set(clues)].slice(0, 6);
+}
+
+function candidateReasoning(group, result) {
+  const possible = [
+    group?.representative?.reasoning,
+    group?.reasoning,
+    cleanResultText(result?.reasoning)
+  ]
+    .map((item) => cleanResultText(item))
+    .find(Boolean);
+
+  return possible || 'AI found this as the closest valid match inside the selected coin radius. Please compare the map and Street View manually before confirming.';
+}
+
+function modelVoteNames(group) {
+  const votes = group?.model_votes || {};
+  const names = Object.keys(votes)
+    .map((name) => name
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (m) => m.toUpperCase())
+      .replace('Qwen 2 5 Vl', 'Qwen')
+      .replace('Nemotron Nano 12b Vl', 'Nemotron')
+      .replace('Singapore Geolocation Analyst', 'Gemini')
+    )
+    .slice(0, 3);
+
+  return names.length ? names : ['AI'];
+}
+
+function technicalDebugHtml(result) {
+  const rejectedCount = result?.rejected_candidates?.length || 0;
+  const rawReason = String(result?.reasoning || '').trim();
+
+  if (!rejectedCount && !rawReason) return '';
+
   return `
-    <div class="jigsaw-result-summary">
-      <strong>${escapeHtml(result.final_label)}</strong>
-      <span>Score ${escapeHtml(String(result.final_score || 0))}</span>
-    </div>
-    <div class="jigsaw-result-copy">${escapeHtml(result.reasoning || '')}</div>
-    ${modelSummary ? `<div class="jigsaw-candidate-meta jigsaw-model-summary">${modelSummary}</div>` : ''}
-    ${result.persistence_warning ? `<div class="jigsaw-rejected-note">Result shown, but Supabase save needs server env: ${escapeHtml(result.persistence_warning)}</div>` : ''}
-    ${result.rejected_candidates?.length ? `<div class="jigsaw-rejected-note">Some AI guesses were rejected because they were outside the selected coin's search radius.</div>` : ''}
-    <div class="jigsaw-candidates">
-      ${groups.length ? groups.map((group, index) => `
-        <div class="jigsaw-candidate">
-          <div>
-            <strong>${index + 1}. ${escapeHtml(group.location_name)}</strong>
-            <span>${escapeHtml(formatCoord(group.lat))}, ${escapeHtml(formatCoord(group.lng))}</span>
-          </div>
-          <div class="jigsaw-candidate-meta">
-            <span>${escapeHtml(group.label)}</span>
-            <span>Weighted ${escapeHtml(String(group.weighted_score))}</span>
-            <span>Street View Visual Match: ${escapeHtml(formatStreetViewScore(group.streetview?.verification_score))}</span>
-            <span>Best heading: ${escapeHtml(formatHeading(group.streetview?.best_heading))}</span>
-          </div>
-          ${modelVotesForGroupHtml(group)}
-          ${streetViewDetailHtml(group.streetview)}
-          <button class="btn small jigsaw-select-candidate" data-index="${index}">Select Location</button>
-        </div>
-      `).join('') : '<div class="jigsaw-empty">No valid candidates inside selected coin radius.</div>'}
-    </div>
-    <details class="jigsaw-rejected-list" ${result.rejected_candidates?.length ? '' : 'hidden'}>
-      <summary>Rejected outside-radius guesses</summary>
-      ${(result.rejected_candidates || []).map((candidate) => `<div>${escapeHtml(candidate.location_name)} (${escapeHtml(String(candidate.distance_from_coin_center_m))} m)</div>`).join('')}
+    <details class="jigsaw-technical-details">
+      <summary>Technical details</summary>
+      ${rejectedCount ? `<p>${rejectedCount} outside-radius guess(es) were rejected before scoring.</p>` : ''}
+      ${rawReason ? `<pre>${escapeHtml(rawReason)}</pre>` : ''}
     </details>
   `;
 }
 
-function formatStreetViewScore(value) {
-  const n = Number(value);
-  return Number.isFinite(n) ? `${Math.round(n)}%` : 'unavailable';
-}
+function analysisResultHtml(result) {
+  const groups = result.candidate_groups || [];
 
-function formatHeading(value) {
-  const n = Number(value);
-  return Number.isFinite(n) ? `${Math.round(n)}°` : 'unavailable';
-}
-
-function compactListText(items = []) {
-  const clean = (Array.isArray(items) ? items : []).map((item) => String(item || '').trim()).filter(Boolean);
-  return clean.length ? clean.join(', ') : 'none reported';
-}
-
-function modelVotesForGroupHtml(group) {
-  const votes = Object.entries(group.model_votes || {});
-  if (!votes.length) return '';
-  return `
-    <div class="jigsaw-result-copy">
-      Model votes: ${votes.map(([agent, vote]) => {
-        const confidence = Number(vote?.confidence);
-        const suffix = Number.isFinite(confidence) ? ` (${Math.round(confidence * 100)}%)` : '';
-        return escapeHtml(`${agent}${suffix}`);
-      }).join(', ')}
-    </div>
-  `;
-}
-
-function streetViewDetailHtml(streetview) {
-  if (!streetview) {
-    return '<div class="jigsaw-result-copy">Street View verification unavailable. Manual verification required.</div>';
+  if (!groups.length) {
+    return `
+      <div class="jigsaw-quickfind-empty">
+        <div class="jigsaw-quickfind-kicker">Quick Find</div>
+        <h3>No valid candidate found</h3>
+        <p>No AI suggestions passed the selected coin radius check. Try adding more puzzle pieces or uploading a clearer full image.</p>
+        ${technicalDebugHtml(result)}
+      </div>
+    `;
   }
+
   return `
-    <div class="jigsaw-result-copy">
-      Matching: ${escapeHtml(compactListText(streetview.matching_features))}
-    </div>
-    <div class="jigsaw-result-copy">
-      Mismatch: ${escapeHtml(compactListText(streetview.mismatching_features))}
-    </div>
-    <div class="jigsaw-result-copy">
-      Manual verification required${streetview.pixel_similarity_notes ? `: ${escapeHtml(streetview.pixel_similarity_notes)}` : ''}
+    <div class="jigsaw-quickfind-stack">
+      ${groups.map((group, index) => {
+        const badge = confidenceBadge(group, result);
+        const street = streetViewDisplay(group);
+        const clues = extractVisualClues(group);
+        const votes = modelVoteNames(group);
+        const reasoning = candidateReasoning(group, result);
+
+        return `
+          <article class="jigsaw-quickfind-card">
+            <header class="jigsaw-quickfind-header">
+              <div>
+                <div class="jigsaw-quickfind-kicker">${index === 0 ? 'AI Location' : `Alternative ${index}`}</div>
+                <h3>${escapeHtml(group.location_name || 'Possible location')}</h3>
+                <div class="jigsaw-quickfind-coords">
+                  ${escapeHtml(formatCoord(group.lat))}, ${escapeHtml(formatCoord(group.lng))}
+                </div>
+              </div>
+
+              <span class="jigsaw-confidence-pill ${badge.className}">
+                ${escapeHtml(badge.text)}
+              </span>
+            </header>
+
+            <div class="jigsaw-quickfind-tabs">
+              <span class="jigsaw-mini-tab is-streetview">Street View</span>
+              ${votes.map((vote, voteIndex) => `
+                <span class="jigsaw-mini-tab">Alt ${voteIndex + 1}</span>
+              `).join('')}
+            </div>
+
+            <section class="jigsaw-quickfind-section">
+              <h4>Visual Clues</h4>
+              <div class="jigsaw-clue-list">
+                ${clues.length
+                  ? clues.map((cue) => `<span>${escapeHtml(cue)}</span>`).join('')
+                  : '<span>No specific clues reported</span>'}
+              </div>
+            </section>
+
+            <section class="jigsaw-quickfind-section">
+              <h4>Reasoning</h4>
+              <p>${escapeHtml(reasoning)}</p>
+            </section>
+
+            <section class="jigsaw-quickfind-section jigsaw-streetview-clean">
+              <h4>Street View</h4>
+              <div class="jigsaw-streetview-status ${street.className}">
+                <strong>${escapeHtml(street.label)}</strong>
+                <span>${escapeHtml(street.detail)}</span>
+              </div>
+            </section>
+
+            <button class="btn small jigsaw-select-candidate jigsaw-quickfind-select" data-index="${index}">
+              Select Location
+            </button>
+          </article>
+        `;
+      }).join('')}
+
+      ${technicalDebugHtml(result)}
     </div>
   `;
 }
-
 function bindAnalysisResultActions(result) {
   const root = byId('jigsaw-overlay-results');
   if (!root) return;

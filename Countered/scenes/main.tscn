@@ -1,0 +1,53 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/battle_board.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/shop_panel.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://scenes/hud.tscn" id="4"]
+[ext_resource type="PackedScene" path="res://scenes/bench.tscn" id="5"]
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="BattleBoard" parent="." instance=ExtResource("2")]
+position = Vector2(0, 0)
+
+[node name="UILayer" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="TopPanel" type="VBoxContainer" parent="UILayer"]
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 50.0
+grow_horizontal = 2
+
+[node name="HUD" parent="UILayer/TopPanel" instance=ExtResource("4")]
+
+[node name="BottomPanel" type="VBoxContainer" parent="UILayer"]
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -220.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="Shop" parent="UILayer/BottomPanel" instance=ExtResource("3")]
+
+[node name="Bench" parent="UILayer/BottomPanel" instance=ExtResource("5")]
