@@ -2573,7 +2573,7 @@
 #jigsaw-cinematic-singapore-wrap.jigsaw-cinematic-singapore-wrap {
   position: absolute !important;
   left: 50% !important;
-  top: 50% !important;
+  top: 54% !important;
   width: clamp(106px, 9.8vw, 163px) !important;
   aspect-ratio: 3 / 2 !important;
   transform: translate(-50%, -50%) !important;
