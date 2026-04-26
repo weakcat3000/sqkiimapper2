@@ -2503,6 +2503,7 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
+  transform: translate(-8%, 8%); /* Shift entire target visual bottom-left */
 }
 
 .jigsaw-cinematic-globe {
@@ -2617,9 +2618,13 @@
 
 #jigsaw-cinematic-singapore-wrap.jigsaw-cinematic-singapore-wrap {
   position: absolute !important;
-  left: 42% !important;
-  top: 59% !important;
+  left: 50% !important;
+  top: 50% !important;
   width: clamp(127px, 11.76vw, 196px) !important;
+  transform: translate(-50%, -50%) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   pointer-events: none !important;
   z-index: 80 !important;
   transition: opacity 0.45s ease, visibility 0.45s ease;
