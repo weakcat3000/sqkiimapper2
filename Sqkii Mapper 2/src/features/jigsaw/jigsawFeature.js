@@ -41,6 +41,7 @@ const state = {
 };
 
 const PUBLIC_BASE_URL = import.meta.env?.BASE_URL || '/';
+const DEFAULT_GOOGLE_MAPS_API_KEY = 'AIzaSyAgZehd9LWQS0qnmOLSj0affmL546rRY0M';
 
 function publicAssetUrl(path) {
   const base = PUBLIC_BASE_URL.endsWith('/') ? PUBLIC_BASE_URL : `${PUBLIC_BASE_URL}/`;
@@ -84,6 +85,7 @@ function googleMapsApiKey() {
     import.meta.env?.VITE_GOOGLE_MAPS_API_KEY
     || window.SQKII_GOOGLE_MAPS_API_KEY
     || localStorage.getItem('sqkii_google_maps_api_key')
+    || DEFAULT_GOOGLE_MAPS_API_KEY
     || ''
   ).trim();
 }
