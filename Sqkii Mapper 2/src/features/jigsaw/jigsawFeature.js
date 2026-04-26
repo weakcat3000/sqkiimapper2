@@ -1040,6 +1040,19 @@ function startAnalysisCinematic() {
   renderScanGlobe(true);
   setAnalysisCinematicPhase('globe');
 
+  // Play prediction sound (first 4s only)
+  try {
+    const sound = new Audio(publicAssetUrl('jigsaw-predict.mp3'));
+    sound.volume = 0.6;
+    sound.play().catch(err => console.warn('[Jigsaw] Audio play blocked:', err));
+    setTimeout(() => {
+      sound.pause();
+      sound.currentTime = 0;
+    }, 4000);
+  } catch (err) {
+    console.warn('[Jigsaw] Audio initialization failed:', err);
+  }
+
   clearTimeout(state.analysisRevealTimer);
 
   // Phase 1: slower globe scan before Singapore reveal.
