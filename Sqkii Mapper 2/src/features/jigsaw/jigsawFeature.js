@@ -1101,6 +1101,7 @@ function revealAnalysisResultWindow(result) {
   root.dataset.rendered = 'result';
   root.innerHTML = analysisShellHtml();
 
+  renderScanGlobe(true);
   renderOverlayMap();
   renderStreetViewPanel();
   // We don't call renderAnalysisResult here because it's already rendered in shell via state.latestResult
@@ -1182,6 +1183,7 @@ function analysisCinematicShellHtml() {
 
 function analysisShellHtml() {
   const resultHtml = state.latestResult ? analysisResultHtml(state.latestResult) : '';
+  const singaporeOutlineUrl = publicAssetUrl('assets/singapore-outline-transparent-white.png');
 
   return `
     <div class="jigsaw-analysis-layout jigsaw-analysis-polished jigsaw-analysis-compact">
@@ -1193,9 +1195,13 @@ function analysisShellHtml() {
 
           <div class="jigsaw-globegl-module" aria-hidden="true">
             <div id="jigsaw-globe-gl" class="jigsaw-globegl-stage"></div>
+            <div class="jigsaw-globegl-singapore-scan">
+              <img src="${escapeHtml(singaporeOutlineUrl)}" alt="" draggable="false" decoding="async" />
+              <span class="jigsaw-globegl-singapore-scanline"></span>
+            </div>
             <div class="jigsaw-globegl-hud">
               <span class="jigsaw-globegl-dot"></span>
-              <span>Zooming to Singapore</span>
+              <span>Scanning Singapore</span>
             </div>
           </div>
 
@@ -1441,6 +1447,7 @@ async function renderScanGlobe(isCinematic = false) {
 
   try {
     const Globe = await loadGlobeGlApi();
+    const isCompactResultGlobe = el.classList.contains('jigsaw-globegl-stage');
 
     el.innerHTML = '';
 
@@ -1532,7 +1539,7 @@ async function renderScanGlobe(isCinematic = false) {
       controls.enablePan = false;
       controls.enableRotate = true;
       controls.autoRotate = true;
-      controls.autoRotateSpeed = isCinematic ? 0.28 : 0.65;
+      controls.autoRotateSpeed = isCompactResultGlobe ? 0.42 : (isCinematic ? 0.28 : 0.65);
     }
 
     setTimeout(() => {
@@ -1553,7 +1560,7 @@ async function renderScanGlobe(isCinematic = false) {
 
       const controls = state.scanGlobe.controls?.();
       if (controls) {
-        controls.autoRotate = false;
+        controls.autoRotate = isCompactResultGlobe;
         controls.enableRotate = false;
       }
 
