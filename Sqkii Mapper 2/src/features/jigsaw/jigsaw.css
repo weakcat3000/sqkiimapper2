@@ -1,0 +1,2680 @@
+.jigsaw-modal.visible,
+.jigsaw-choice-modal.visible,
+.jigsaw-analysis-modal.visible {
+  display: grid;
+  place-items: center;
+}
+
+.jigsaw-workspace-card,
+.jigsaw-analysis-card {
+  width: min(1200px, calc(100vw - 20px));
+  max-height: min(780px, calc(100dvh - 20px));
+  overflow: hidden;
+  background-color: #111318;
+  background-image: 
+      linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+  border: 1px solid rgba(34, 211, 238, 0.34);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.58), inset 0 0 0 1px rgba(168, 85, 247, 0.12);
+  position: relative;
+  color: var(--text);
+  font-family: 'Space Grotesk', 'Inter', sans-serif;
+}
+
+.jigsaw-workspace-card {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+}
+
+.jigsaw-analysis-card {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.jigsaw-close {
+  z-index: 5;
+}
+
+/* --- TACTICAL DASHBOARD STYLES --- */
+
+/* Header */
+.jigsaw-tactical-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(34, 211, 238, 0.2);
+}
+
+.jigsaw-tactical-title h1 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: #dbfcff;
+  letter-spacing: 0.05em;
+  margin: 0;
+  text-transform: uppercase;
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+}
+
+.jigsaw-network-sync {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.jigsaw-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #00f0ff;
+  box-shadow: 0 0 5px #00f0ff;
+  animation: jigsawPulse 2s infinite;
+}
+
+@keyframes jigsawPulse {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.2); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.jigsaw-sync-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #b9cacb;
+}
+
+.jigsaw-tactical-status-area {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  background: rgba(26, 28, 32, 0.5);
+  border: 1px solid rgba(59, 73, 75, 0.3);
+  padding: 6px 10px;
+  border-radius: 4px;
+  backdrop-filter: blur(12px);
+}
+
+.jigsaw-status-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  color: #7df4ff;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.jigsaw-progress-track {
+  width: 120px;
+  height: 4px;
+  background-color: #333539;
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.jigsaw-progress-fill {
+  position: absolute;
+  top: 0; left: 0; height: 100%;
+  background-color: #00f0ff;
+  box-shadow: 0 0 8px #00f0ff;
+  transition: width 0.3s ease;
+}
+
+/* Bento Layout */
+.jigsaw-tactical-layout {
+  display: grid;
+  grid-template-columns: minmax(500px, 1.8fr) minmax(320px, 1fr);
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  padding-bottom: 8px;
+}
+
+@media (max-width: 1024px) {
+  .jigsaw-tactical-layout {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+}
+
+/* Bracket Panel */
+.jigsaw-bracket-panel {
+  position: relative;
+  background: rgba(30, 32, 36, 0.3);
+  border: 1px solid rgba(59, 73, 75, 0.4);
+  backdrop-filter: blur(16px);
+  padding: 12px;
+  box-shadow: inset 0 0 40px rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+}
+
+.jigsaw-bracket-panel::before,
+.jigsaw-bracket-panel::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+}
+
+.jigsaw-bracket-panel::before {
+  top: -1px; left: -1px;
+  border-top: 2px solid #00f0ff;
+  border-left: 2px solid #00f0ff;
+}
+
+.jigsaw-bracket-panel::after {
+  bottom: -1px; right: -1px;
+  border-bottom: 2px solid #00f0ff;
+  border-right: 2px solid #00f0ff;
+}
+
+.jigsaw-telemetry-label {
+  position: absolute;
+  top: 12px; right: 16px;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  color: #3b494b;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Grid Area */
+.jigsaw-grid-container {
+  flex: 1;
+  margin-top: 12px;
+  background-image: url('jigsaw-trial-base-bg.png');
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-color: #0c0e12;
+  position: relative;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.8);
+  aspect-ratio: 1 / 1;
+  max-height: 580px;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.jigsaw-scanline {
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 100%;
+  background: linear-gradient(to bottom, transparent 0%, rgba(0, 240, 255, 0.1) 50%, transparent 100%);
+  animation: jigsawScan 4s linear infinite;
+  pointer-events: none;
+  z-index: 10;
+}
+
+@keyframes jigsawScan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+.jigsaw-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  gap: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  position: relative;
+  z-index: 5;
+  border: none;
+}
+
+.jigsaw-grid-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: transparent;
+}
+
+.jigsaw-cut-svg {
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.8));
+}
+
+.jigsaw-sel-piece {
+  animation: jigsawSelectPulse 2s infinite;
+  filter: drop-shadow(0 0 12px rgba(0, 240, 255, 0.8));
+}
+
+@keyframes jigsawSelectPulse {
+  0% { stroke-opacity: 0.7; fill-opacity: 0.1; }
+  50% { stroke-opacity: 1; fill-opacity: 0.25; }
+  100% { stroke-opacity: 0.7; fill-opacity: 0.1; }
+}
+
+.jigsaw-sel-label {
+  position: absolute;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  background: #00f0ff;
+  color: #002022;
+  padding: 1px 4px;
+  pointer-events: none;
+  z-index: 20;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+}
+
+.jigsaw-cell {
+  position: relative;
+  min-width: 0; min-height: 0; padding: 0;
+  border: none;
+  background: transparent;
+  color: transparent;
+  display: block;
+  cursor: pointer;
+  z-index: 7;
+}
+
+.jigsaw-cell:hover {
+  background: rgba(0, 240, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(0, 240, 255, 0.2);
+}
+
+.jigsaw-cell span { opacity: 0; }
+.jigsaw-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Right Panel Elements */
+.jigsaw-tactical-right {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.jigsaw-action-panel {
+  background: rgba(26, 28, 32, 0.9);
+  border-color: rgba(0, 240, 255, 0.2);
+  transition: border-color 0.3s ease;
+  overflow: hidden;
+}
+
+.jigsaw-action-panel:hover {
+  border-color: rgba(0, 240, 255, 0.5);
+}
+
+.jigsaw-action-glow {
+  position: absolute;
+  right: -40px; top: -40px;
+  width: 128px; height: 128px;
+  background: rgba(0, 240, 255, 0.05);
+  border-radius: 50%;
+  filter: blur(24px);
+  transition: background 0.3s ease;
+}
+
+.jigsaw-action-panel:hover .jigsaw-action-glow {
+  background: rgba(0, 240, 255, 0.1);
+}
+
+.jigsaw-action-panel h4 {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: #e2e2e8;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-bottom: 1px solid rgba(59, 73, 75, 0.2);
+  padding-bottom: 6px;
+  margin: 0 0 10px;
+}
+
+.jigsaw-btn-tactical {
+  width: 100%;
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid #00f0ff;
+  color: #00f0ff;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  text-transform: uppercase;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.jigsaw-btn-tactical:hover {
+  background: rgba(0, 240, 255, 0.2);
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+}
+
+.jigsaw-btn-tactical::before {
+  content: ''; position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: linear-gradient(to right, transparent, rgba(0,240,255,0.1), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.5s ease;
+}
+
+.jigsaw-btn-tactical:hover::before {
+  animation: jigsawShimmer 1.5s infinite;
+}
+
+@keyframes jigsawShimmer {
+  100% { transform: translateX(100%); }
+}
+
+.jigsaw-manual-override {
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  color: #849495;
+  text-align: center;
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+
+.jigsaw-panel-header h3 {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: #dbfcff;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 12px;
+}
+
+.jigsaw-btn-outline {
+  width: 100%;
+  background: transparent;
+  border: 1px dashed rgba(59, 73, 75, 0.8);
+  color: #849495;
+  padding: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.jigsaw-btn-outline:hover {
+  border-color: rgba(0, 240, 255, 0.5);
+  color: #dbfcff;
+}
+
+.jigsaw-piece-preview,
+.jigsaw-status {
+  margin: 6px 0; min-height: 16px;
+  color: #849495; font-size: 11px; font-family: 'Inter', sans-serif;
+}
+.jigsaw-status.error { color: #ffb4ab; }
+
+.jigsaw-form-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 8px 0;
+}
+.jigsaw-form-grid label, .jigsaw-notes-label {
+  display: grid; gap: 4px; color: #b9cacb; font-size: 11px; font-family: 'Inter', sans-serif; text-transform: uppercase;
+}
+.jigsaw-tactical-input {
+  width: 100%; box-sizing: border-box;
+  background: rgba(30, 32, 36, 0.8);
+  border: 1px solid rgba(59, 73, 75, 0.5);
+  color: #00dbe9;
+  font-family: 'Space Grotesk', monospace;
+  padding: 6px; font-size: 13px;
+}
+.jigsaw-tactical-input:focus {
+  outline: none; border-color: #00f0ff; animation: jigsawFlicker 0.45s;
+}
+@keyframes jigsawFlicker {
+  0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; }
+}
+
+.jigsaw-notes-label textarea { min-height: 60px; resize: none; font-family: 'Inter', sans-serif; color: #e2e2e8; }
+.jigsaw-mt-2 { margin-top: 12px; }
+
+.jigsaw-map-panel-tactical h4 {
+  font-family: 'Inter', sans-serif; font-size: 12px; color: #e2e2e8;
+  text-transform: uppercase; margin: 0 0 12px;
+}
+.jigsaw-map { 
+  width: 100%; 
+  min-height: 160px; 
+  background: #0c0e12; 
+  border: 1px solid rgba(59, 73, 75, 0.5); 
+}
+
+.jigsaw-map-shell .jigsaw-map {
+  flex: 1;
+}
+
+
+.jigsaw-choice-card {
+  border: 1px solid rgba(34, 211, 238, 0.34);
+  background: rgba(2, 6, 23, 0.98);
+  color: var(--text);
+}
+
+.jigsaw-coin-picker-card {
+  width: min(620px, calc(100vw - 28px));
+}
+
+.jigsaw-coin-picker-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  max-height: min(560px, 70dvh);
+  overflow: auto;
+}
+
+.jigsaw-coin-option {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+  padding: 12px;
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  background: rgba(15, 23, 42, 0.84);
+  color: var(--text);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.jigsaw-coin-option:hover {
+  border-color: rgba(34, 211, 238, 0.78);
+  background: rgba(8, 47, 73, 0.62);
+}
+
+.jigsaw-coin-option span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.jigsaw-choice-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.jigsaw-analysis-layout {
+  display: grid;
+  grid-template-columns: minmax(380px, 0.9fr) minmax(460px, 1.1fr);
+  gap: 0;
+  height: clamp(500px, 85dvh, 740px);
+  min-height: 0;
+}
+
+.jigsaw-analysis-left,
+.jigsaw-analysis-right {
+  padding: 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.jigsaw-analysis-left {
+  border-right: 1px solid rgba(34, 211, 238, 0.18);
+  background:
+    linear-gradient(180deg, rgba(2, 6, 23, 0.4), rgba(17, 24, 39, 0.72));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.jigsaw-analysis-right {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.jigsaw-scan-container {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 12px 0;
+  perspective: 800px;
+}
+
+.jigsaw-3d-globe {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  transform-style: preserve-3d;
+}
+
+.jigsaw-globe-svg {
+  width: 100%;
+  height: 100%;
+  animation: jigsawGlobeRotate 12s linear infinite;
+}
+
+.jigsaw-globe-line {
+  vector-effect: non-scaling-stroke;
+}
+
+@keyframes jigsawGlobeRotate {
+  0% { transform: rotateY(0deg) rotateX(15deg); }
+  100% { transform: rotateY(360deg) rotateX(15deg); }
+}
+
+.jigsaw-scan-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 220px;
+  height: 220px;
+  margin: -110px 0 0 -110px;
+  border: 2px solid rgba(0, 240, 255, 0.6);
+  border-radius: 50%;
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.4), inset 0 0 15px rgba(0, 240, 255, 0.4);
+  animation: jigsawScanMove 3s ease-in-out infinite;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(0, 240, 255, 0.05) 0%, transparent 70%);
+}
+
+@keyframes jigsawScanMove {
+  0%, 100% { transform: translateY(-60px) rotateX(75deg) scale(0.8); opacity: 0; }
+  50% { transform: translateY(0px) rotateX(75deg) scale(1.1); opacity: 1; }
+}
+
+.jigsaw-singapore-outline {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100px;
+  height: 60px;
+  margin: -30px 0 0 -50px;
+  z-index: 10;
+  filter: drop-shadow(0 0 8px #00f0ff);
+}
+
+.jigsaw-sg-path {
+  stroke-dasharray: 400;
+  stroke-dashoffset: 400;
+  animation: jigsawSgDraw 4s ease-out infinite;
+}
+
+@keyframes jigsawSgDraw {
+  0% { stroke-dashoffset: 400; opacity: 0; }
+  20% { opacity: 1; }
+  50%, 100% { stroke-dashoffset: 0; opacity: 1; }
+}
+
+.jigsaw-progress {
+  padding: 10px;
+  border: 1px solid rgba(34, 211, 238, 0.24);
+  background: rgba(8, 47, 73, 0.38);
+  color: #cffafe;
+  font-family: 'Space Grotesk', monospace;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+.jigsaw-model-list {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.jigsaw-model-list div,
+.jigsaw-candidate,
+.jigsaw-result-summary {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.72);
+  padding: 10px;
+}
+
+.jigsaw-results-panel {
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  margin: 0 0 12px;
+  padding-right: 4px;
+}
+
+.jigsaw-map-shell,
+.jigsaw-streetview-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.jigsaw-map-title {
+  color: #dbeafe;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.jigsaw-streetview-panel {
+  flex: 1;
+  background: #07111d;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  overflow: hidden;
+  min-height: 160px;
+}
+
+.jigsaw-map-error {
+  height: 100%;
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  padding: 14px;
+  box-sizing: border-box;
+  color: #fca5a5;
+  text-align: center;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.jigsaw-result-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.jigsaw-candidates {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.jigsaw-candidate {
+  display: grid;
+  gap: 8px;
+}
+
+.jigsaw-candidate strong,
+.jigsaw-candidate span {
+  display: block;
+}
+
+.jigsaw-candidate-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.jigsaw-rejected-list {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.jigsaw-rail-btn {
+  color: #ecfeff;
+  font-weight: 950;
+  font-size: 20px;
+  border-color: rgba(34, 211, 238, 0.5);
+  background:
+    linear-gradient(180deg, rgba(8, 145, 178, 0.32), rgba(88, 28, 135, 0.26));
+}
+
+.jigsaw-rail-btn img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 8px 16px rgba(34, 211, 238, 0.24))
+    drop-shadow(0 0 10px rgba(216, 180, 254, 0.22));
+}
+
+.coin-db-jigsaw-entry {
+  border-color: rgba(34, 211, 238, 0.45) !important;
+  color: #cffafe !important;
+}
+
+@media (max-width: 980px) {
+  .jigsaw-header,
+  .jigsaw-layout,
+  .jigsaw-analysis-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .jigsaw-header-stats {
+    justify-content: flex-start;
+  }
+
+  .jigsaw-grid {
+    height: auto;
+  }
+
+  .jigsaw-analysis-left {
+    border-right: 0;
+    border-bottom: 1px solid rgba(34, 211, 238, 0.18);
+  }
+
+  .jigsaw-coin-option {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* Jigsaw UI Stability + Polish Patch                                         */
+/* -------------------------------------------------------------------------- */
+
+/* Selected cell rectangle should not fight the SVG jigsaw-shaped selector. */
+.jigsaw-cell.is-selected {
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.jigsaw-cell.is-selected::before,
+.jigsaw-cell.is-selected::after {
+  display: none !important;
+}
+
+.jigsaw-cell:hover {
+  background: rgba(0, 240, 255, 0.035);
+  box-shadow: inset 0 0 0 1px rgba(0, 240, 255, 0.16);
+}
+
+.jigsaw-cell.has-piece {
+  background: transparent;
+}
+
+/* Jigsaw-shaped SVG selector. */
+.jigsaw-selected-piece-layer {
+  pointer-events: none;
+}
+
+.jigsaw-selected-piece-glow {
+  fill: rgba(0, 240, 255, 0.08);
+  stroke: rgba(0, 240, 255, 0.28);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  filter: url(#jigsawSelectionGlow);
+}
+
+.jigsaw-selected-piece-shape {
+  fill: rgba(0, 240, 255, 0.105);
+  stroke: #28f4ff;
+  stroke-width: 0.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  animation: jigsawSelectedPiecePulse 1.8s ease-in-out infinite;
+}
+
+@keyframes jigsawSelectedPiecePulse {
+  0% {
+    fill-opacity: 0.08;
+    stroke-opacity: 0.72;
+  }
+  50% {
+    fill-opacity: 0.16;
+    stroke-opacity: 1;
+  }
+  100% {
+    fill-opacity: 0.08;
+    stroke-opacity: 0.72;
+  }
+}
+
+/* Keep legacy selected path harmless if older markup remains somewhere. */
+.jigsaw-sel-piece {
+  fill: rgba(0, 240, 255, 0.10);
+  stroke: #28f4ff;
+  stroke-width: 0.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 6px rgba(0, 240, 255, 0.45));
+}
+
+/* Upload controls */
+.jigsaw-upload-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.jigsaw-clear-btn {
+  min-width: 118px;
+  white-space: nowrap;
+}
+
+.jigsaw-clear-btn:disabled,
+.jigsaw-save-btn:disabled,
+.jigsaw-btn-tactical:disabled,
+.jigsaw-save-btn.is-disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.jigsaw-piece-preview {
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: rgba(2, 6, 23, 0.38);
+}
+
+.jigsaw-piece-preview.has-file {
+  border-color: rgba(34, 211, 238, 0.32);
+  color: #c8fbff;
+  background: rgba(8, 47, 73, 0.22);
+}
+
+/* Predict Location popout close button */
+.jigsaw-choice-card {
+  position: relative;
+  padding: 28px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top right, rgba(0, 240, 255, 0.08), transparent 34%),
+    rgba(4, 8, 18, 0.96);
+  border: 1px solid rgba(34, 211, 238, 0.38);
+  box-shadow: 0 22px 80px rgba(0, 0, 0, 0.55);
+}
+
+#jigsaw-predict-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(34, 211, 238, 0.45);
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.72);
+  color: #bffcff;
+  font-size: 20px;
+  cursor: pointer;
+  z-index: 10;
+}
+
+#jigsaw-predict-close:hover {
+  background: rgba(34, 211, 238, 0.16);
+  color: #ffffff;
+  box-shadow: 0 0 18px rgba(34, 211, 238, 0.3);
+}
+
+/* Analysis overlay: stable shell + top-left globe scan. */
+.jigsaw-analysis-polished {
+  grid-template-columns: minmax(420px, 0.88fr) minmax(520px, 1.12fr);
+}
+
+.jigsaw-analysis-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.jigsaw-analysis-hero h2 {
+  margin: 8px 0 0;
+  font-size: 28px;
+  color: #f2fbff;
+  letter-spacing: 0.02em;
+}
+
+.jigsaw-radius-pill {
+  padding: 7px 10px;
+  border: 1px solid rgba(34, 211, 238, 0.38);
+  border-radius: 999px;
+  background: rgba(34, 211, 238, 0.1);
+  color: #7df4ff;
+  font-weight: 900;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.jigsaw-globe-zoom-stage {
+  height: 240px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at center, rgba(34, 211, 238, 0.08), transparent 45%),
+    linear-gradient(180deg, rgba(2, 12, 22, 0.72), rgba(2, 6, 23, 0.2));
+}
+
+.jigsaw-orbit-shell {
+  position: relative;
+  width: 210px;
+  height: 210px;
+  animation: jigsawGlobeZoomToSingapore 4.2s ease-in-out infinite;
+  transform-style: preserve-3d;
+}
+
+.jigsaw-globe3d {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(34, 211, 238, 0.42);
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 32px rgba(34, 211, 238, 0.08),
+    0 0 34px rgba(34, 211, 238, 0.12);
+  transform-style: preserve-3d;
+  animation: jigsawGlobeRotate3d 8s linear infinite;
+}
+
+.jigsaw-globe3d span {
+  position: absolute;
+  inset: 12px;
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  border-radius: 50%;
+}
+
+.jigsaw-globe3d .lat-1 { transform: rotateX(65deg); }
+.jigsaw-globe3d .lat-2 { transform: rotateX(35deg); }
+.jigsaw-globe3d .lat-3 { transform: rotateX(-35deg); }
+
+.jigsaw-globe3d .lng-1 { transform: rotateY(35deg); }
+.jigsaw-globe3d .lng-2 { transform: rotateY(70deg); }
+.jigsaw-globe3d .lng-3 { transform: rotateY(110deg); }
+
+.jigsaw-equator {
+  inset: 50% 10px auto 10px !important;
+  height: 1px !important;
+  border: 0 !important;
+  border-top: 1px solid rgba(34, 211, 238, 0.28) !important;
+  border-radius: 0 !important;
+}
+
+.jigsaw-scan-beam {
+  inset: -10px !important;
+  border: 0 !important;
+  border-radius: 50%;
+  background:
+    conic-gradient(from 90deg, transparent 0deg, rgba(34, 211, 238, 0.18) 26deg, transparent 60deg);
+  animation: jigsawScanBeamSpin 1.5s linear infinite;
+}
+
+.jigsaw-singapore-target {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 118px;
+  height: 76px;
+  transform: translate(-50%, -50%) scale(0.58);
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  filter: drop-shadow(0 0 12px rgba(0, 240, 255, 0.7));
+  animation: jigsawSingaporeLock 4.2s ease-in-out infinite;
+}
+
+.jigsaw-singapore-target svg {
+  width: 118px;
+  height: 70px;
+}
+
+.jigsaw-singapore-path {
+  fill: rgba(34, 211, 238, 0.08);
+  stroke: #00f0ff;
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+  stroke-dasharray: 250;
+  stroke-dashoffset: 250;
+  animation: jigsawSingaporeDraw 4.2s ease-in-out infinite;
+}
+
+.jigsaw-singapore-target span {
+  position: absolute;
+  bottom: -8px;
+  color: #8ff7ff;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+
+@keyframes jigsawGlobeRotate3d {
+  from { transform: rotateY(0deg) rotateX(12deg); }
+  to { transform: rotateY(360deg) rotateX(12deg); }
+}
+
+@keyframes jigsawGlobeZoomToSingapore {
+  0% {
+    transform: scale(0.75) rotateX(0deg);
+    opacity: 0.75;
+  }
+  45% {
+    transform: scale(1) rotateX(0deg);
+    opacity: 1;
+  }
+  72% {
+    transform: scale(1.18) rotateX(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.75) rotateX(0deg);
+    opacity: 0.75;
+  }
+}
+
+@keyframes jigsawSingaporeLock {
+  0%, 32% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.42);
+  }
+  52%, 82% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.72);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.42);
+  }
+}
+
+@keyframes jigsawSingaporeDraw {
+  0%, 34% {
+    stroke-dashoffset: 250;
+  }
+  58%, 100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes jigsawScanBeamSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.jigsaw-progress.is-running::after {
+  content: '';
+  display: inline-block;
+  width: 1.2em;
+  text-align: left;
+  animation: jigsawLoadingDots 1.2s steps(4, end) infinite;
+}
+
+@keyframes jigsawLoadingDots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75%, 100% { content: '...'; }
+}
+
+@media (max-width: 980px) {
+  .jigsaw-analysis-polished {
+    grid-template-columns: 1fr;
+  }
+
+  .jigsaw-upload-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   FINAL JIGSAW UI POLISH OVERRIDES
+   These rules intentionally sit at the end of the file to override older
+   tactical prototype styles without touching the functional JS pipeline.
+---------------------------------------------------------------------------- */
+
+.jigsaw-workspace-card {
+  width: min(1420px, calc(100vw - 48px));
+  height: min(880px, calc(100dvh - 48px));
+  max-height: min(880px, calc(100dvh - 48px));
+  padding: 20px;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(0, 240, 255, 0.07), transparent 28%),
+    radial-gradient(circle at 100% 0%, rgba(124, 58, 237, 0.08), transparent 32%),
+    linear-gradient(180deg, rgba(8, 12, 20, 0.94), rgba(5, 8, 14, 0.96));
+  backdrop-filter: blur(18px);
+}
+
+#jigsaw-workspace-root {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.jigsaw-polished-header {
+  flex: 0 0 auto;
+  padding: 0 12px 14px;
+  margin-bottom: 14px;
+}
+
+.jigsaw-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.jigsaw-coin-chip,
+.jigsaw-boundary-chip,
+.jigsaw-radius-pill {
+  border: 1px solid rgba(34, 211, 238, 0.42);
+  border-radius: 999px;
+  background: rgba(34, 211, 238, 0.11);
+  color: #9ff8ff;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  box-shadow: inset 0 0 14px rgba(0, 240, 255, 0.05);
+}
+
+.jigsaw-sync-separator {
+  color: rgba(219, 252, 255, 0.32);
+  font-size: 10px;
+}
+
+.jigsaw-status-stack {
+  display: grid;
+  gap: 2px;
+  min-width: 190px;
+}
+
+.jigsaw-status-subline {
+  color: rgba(219, 252, 255, 0.52);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.jigsaw-workspace-layout-polished {
+  grid-template-columns: minmax(680px, 1.65fr) minmax(360px, 0.78fr);
+  gap: 16px;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
+}
+
+.jigsaw-tactical-left,
+.jigsaw-board-panel {
+  min-height: 0;
+  height: 100%;
+}
+
+.jigsaw-board-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 18px;
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(4, 10, 20, 0.74), rgba(4, 7, 12, 0.8)),
+    linear-gradient(rgba(0, 240, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.025) 1px, transparent 1px);
+  background-size: auto, 32px 32px, 32px 32px;
+}
+
+.jigsaw-board-topbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 2px 6px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.jigsaw-board-topbar h3 {
+  margin: 0;
+  color: #c9fbff;
+  font-size: 14px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.jigsaw-board-topbar p,
+.jigsaw-panel-header p,
+.jigsaw-boundary-heading p {
+  margin: 5px 0 0;
+  color: rgba(219, 252, 255, 0.48);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.jigsaw-board-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.jigsaw-board-meta span {
+  padding: 6px 10px;
+  border: 1px solid rgba(34, 211, 238, 0.14);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.58);
+  color: #8ff7ff;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.jigsaw-board-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px 10px;
+}
+
+.jigsaw-grid-container {
+  width: min(100%, 690px);
+  height: auto;
+  max-height: min(690px, calc(100dvh - 250px));
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  border-radius: 12px;
+  overflow: hidden;
+  background-image: url('/jigsaw-trial-base-bg.png');
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.08),
+    0 24px 70px rgba(0, 0, 0, 0.42),
+    inset 0 0 42px rgba(0, 0, 0, 0.72);
+}
+
+.jigsaw-grid {
+  grid-template-rows: repeat(var(--rows), minmax(0, 1fr));
+}
+
+.jigsaw-grid-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+
+.jigsaw-cell {
+  border: 1px solid rgba(148, 163, 184, 0.045);
+  background: transparent;
+}
+
+.jigsaw-cell:hover {
+  background: rgba(0, 240, 255, 0.035);
+  box-shadow: inset 0 0 0 1px rgba(0, 240, 255, 0.18);
+}
+
+.jigsaw-cell.is-selected {
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+.jigsaw-cell.has-piece {
+  background: rgba(0, 240, 255, 0.02);
+}
+
+.jigsaw-board-footer {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 6px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+  color: rgba(219, 252, 255, 0.58);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.jigsaw-control-console {
+  min-height: 0;
+  overflow-y: auto;
+  gap: 14px;
+  padding-right: 6px;
+  scrollbar-color: rgba(34, 211, 238, 0.58) rgba(2, 6, 23, 0.2);
+}
+
+.jigsaw-control-console .jigsaw-bracket-panel {
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.jigsaw-action-panel {
+  min-height: 146px;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.jigsaw-action-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid rgba(34, 211, 238, 0.14);
+  padding-bottom: 10px;
+}
+
+.jigsaw-action-header h4,
+.jigsaw-boundary-heading h4,
+.jigsaw-panel-header h3 {
+  margin: 0;
+  border: 0;
+  padding: 0;
+  color: #d8ffff;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.jigsaw-action-header p {
+  margin: 5px 0 0;
+  color: rgba(219, 252, 255, 0.52);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.jigsaw-predict-main {
+  min-height: 62px;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.jigsaw-btn-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid rgba(34, 211, 238, 0.56);
+  border-radius: 999px;
+  background: rgba(34, 211, 238, 0.12);
+  color: #00f0ff;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.jigsaw-btn-copy {
+  display: grid;
+  gap: 3px;
+  text-align: left;
+}
+
+.jigsaw-btn-copy strong {
+  color: #00f0ff;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.jigsaw-btn-copy small {
+  color: rgba(219, 252, 255, 0.62);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.jigsaw-upload-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.jigsaw-clear-btn {
+  min-width: 118px;
+  white-space: nowrap;
+}
+
+.jigsaw-piece-preview {
+  margin: 8px 0 14px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 10px;
+  padding: 10px 11px;
+  background: rgba(2, 6, 23, 0.42);
+  color: rgba(219, 252, 255, 0.6);
+}
+
+.jigsaw-piece-preview.has-file {
+  color: #bffcff;
+  border-color: rgba(34, 211, 238, 0.28);
+  background: rgba(34, 211, 238, 0.08);
+}
+
+.jigsaw-save-btn:disabled,
+.jigsaw-clear-btn:disabled,
+.jigsaw-btn-tactical:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.jigsaw-boundary-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.jigsaw-boundary-heading > span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(34, 211, 238, 0.1);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  color: #7df4ff;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.jigsaw-map-panel-tactical .jigsaw-map {
+  min-height: 185px;
+  height: 210px;
+  border-radius: 10px;
+  overflow: hidden;
+  filter: saturate(0.78) contrast(0.92) brightness(0.88);
+}
+
+.jigsaw-map-meta {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  color: rgba(219, 252, 255, 0.45);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+#jigsaw-predict-close,
+#jigsaw-analysis-close,
+#jigsaw-close,
+#jigsaw-coin-picker-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(34, 211, 238, 0.45);
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.72);
+  color: #bffcff;
+  font-size: 22px;
+  cursor: pointer;
+  z-index: 20;
+}
+
+.jigsaw-choice-card {
+  position: relative;
+  width: min(560px, calc(100vw - 32px));
+  padding: 28px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top right, rgba(0, 240, 255, 0.08), transparent 34%),
+    rgba(4, 8, 18, 0.96);
+  border: 1px solid rgba(34, 211, 238, 0.38);
+  color: #f4fbff;
+  box-shadow: 0 22px 80px rgba(0, 0, 0, 0.55);
+}
+
+.jigsaw-choice-actions .btn {
+  min-height: 66px;
+  border-radius: 12px;
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  background: rgba(15, 23, 42, 0.78);
+  color: #e8fbff;
+  font-weight: 900;
+}
+
+/* Polished analysis overlay */
+.jigsaw-analysis-card {
+  width: min(1420px, calc(100vw - 48px));
+  height: min(860px, calc(100dvh - 48px));
+  max-height: min(860px, calc(100dvh - 48px));
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+#jigsaw-analysis-root {
+  height: 100%;
+  min-height: 0;
+}
+
+.jigsaw-analysis-polished {
+  height: 100%;
+  grid-template-columns: minmax(430px, 0.78fr) minmax(580px, 1.22fr);
+}
+
+.jigsaw-analysis-left {
+  padding: 22px;
+  overflow: hidden;
+}
+
+.jigsaw-analysis-right {
+  padding: 22px;
+  display: grid;
+  grid-template-rows: minmax(230px, 0.44fr) minmax(260px, 0.56fr);
+  gap: 16px;
+  overflow: hidden;
+}
+
+.jigsaw-globe-zoom-stage {
+  height: 210px;
+  margin: 10px 0 16px;
+}
+
+.jigsaw-model-list.jigsaw-step-list {
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.jigsaw-step-list div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  border-radius: 10px;
+}
+
+.jigsaw-step-list strong {
+  color: #8ff7ff;
+  letter-spacing: 0.08em;
+}
+
+.jigsaw-step-list span {
+  color: rgba(244, 251, 255, 0.86);
+}
+
+.jigsaw-analysis-map-card {
+  min-height: 0;
+  padding: 0;
+  border: 1px solid rgba(34, 211, 238, 0.15);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(5, 10, 20, 0.88);
+}
+
+.jigsaw-analysis-map-card .jigsaw-map-title {
+  flex: 0 0 auto;
+  padding: 12px 14px 8px;
+}
+
+.jigsaw-analysis-map-card .jigsaw-map,
+.jigsaw-analysis-map-card .jigsaw-streetview-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  border: 0;
+  background: #08111d;
+}
+
+.jigsaw-streetview-panel .jigsaw-map-error,
+.jigsaw-analysis-map-card .jigsaw-map-error {
+  min-height: 100%;
+}
+
+.jigsaw-results-panel {
+  border-radius: 12px;
+}
+
+.jigsaw-result-summary,
+.jigsaw-candidate,
+.jigsaw-model-list div {
+  border-radius: 10px;
+  border-color: rgba(34, 211, 238, 0.12);
+  background: rgba(15, 23, 42, 0.52);
+}
+
+.jigsaw-selected-piece-shape {
+  fill: rgba(0, 240, 255, 0.11);
+  stroke: #28f4ff;
+  stroke-width: 0.95;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.7));
+}
+
+.jigsaw-selected-piece-glow {
+  fill: rgba(0, 240, 255, 0.07);
+  stroke: rgba(0, 240, 255, 0.32);
+  stroke-width: 2.1;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  filter: url(#jigsawSelectionGlow);
+}
+
+@media (max-width: 1100px) {
+  .jigsaw-workspace-card,
+  .jigsaw-analysis-card {
+    width: calc(100vw - 24px);
+    height: calc(100dvh - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+
+  .jigsaw-workspace-layout-polished,
+  .jigsaw-analysis-polished {
+    grid-template-columns: 1fr;
+    overflow: auto;
+  }
+
+  .jigsaw-control-console,
+  .jigsaw-analysis-right {
+    overflow: visible;
+  }
+
+  .jigsaw-board-footer {
+    flex-direction: column;
+    gap: 5px;
+  }
+}
+
+/* =========================================================
+   Compact analysis overlay patch
+   Makes the left-side scan section useful without wasting space.
+   ========================================================= */
+
+.jigsaw-analysis-compact {
+  grid-template-columns: minmax(380px, 0.62fr) minmax(640px, 1.38fr);
+}
+
+.jigsaw-analysis-compact .jigsaw-analysis-left {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.jigsaw-analysis-command-bar {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 118px;
+  padding: 14px;
+  border: 1px solid rgba(34, 211, 238, 0.14);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 80% 20%, rgba(34, 211, 238, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(6, 17, 31, 0.62), rgba(2, 6, 23, 0.34));
+}
+
+.jigsaw-analysis-copy {
+  min-width: 0;
+}
+
+.jigsaw-analysis-copy h2 {
+  margin: 6px 0 4px;
+  color: #e6fbff;
+  font-size: clamp(22px, 2.2vw, 32px);
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+}
+
+.jigsaw-analysis-copy p {
+  margin: 0;
+  max-width: 28ch;
+  color: rgba(219, 252, 255, 0.58);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.jigsaw-mini-globe-stage {
+  width: 112px;
+  height: 112px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.09), transparent 68%);
+}
+
+.jigsaw-orbit-shell--mini {
+  width: 92px;
+  height: 92px;
+  animation: jigsawGlobeZoomToSingapore 4.2s ease-in-out infinite;
+}
+
+.jigsaw-orbit-shell--mini .jigsaw-globe3d {
+  inset: 0;
+}
+
+.jigsaw-singapore-target--mini {
+  width: 74px;
+  height: 46px;
+}
+
+.jigsaw-singapore-target--mini svg {
+  width: 74px;
+  height: 46px;
+}
+
+.jigsaw-singapore-target--mini span {
+  display: none;
+}
+
+.jigsaw-analysis-command-bar .jigsaw-radius-pill {
+  align-self: start;
+  white-space: nowrap;
+}
+
+.jigsaw-progress-compact {
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  min-height: unset;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.jigsaw-step-track {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.jigsaw-step-pill {
+  min-width: 0;
+  padding: 8px 7px;
+  border: 1px solid rgba(34, 211, 238, 0.12);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.48);
+  display: grid;
+  gap: 2px;
+  align-content: center;
+}
+
+.jigsaw-step-pill strong {
+  color: #7df4ff;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.08em;
+}
+
+.jigsaw-step-pill span {
+  color: rgba(244, 251, 255, 0.76);
+  font-size: 10px;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.jigsaw-results-panel--priority {
+  flex: 1 1 auto;
+  min-height: 180px;
+  margin: 0;
+  overflow: auto;
+}
+
+.jigsaw-safety-note--compact {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.jigsaw-analysis-compact .jigsaw-analysis-right {
+  grid-template-rows: minmax(250px, 0.42fr) minmax(320px, 0.58fr);
+  gap: 14px;
+}
+
+.jigsaw-analysis-compact .jigsaw-map-title {
+  padding: 10px 12px 8px;
+  font-size: 12px;
+}
+
+@media (max-width: 1100px) {
+  .jigsaw-analysis-compact {
+    grid-template-columns: 1fr;
+  }
+
+  .jigsaw-analysis-command-bar {
+    grid-template-columns: minmax(0, 1fr) 96px;
+  }
+
+  .jigsaw-analysis-command-bar .jigsaw-radius-pill {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .jigsaw-step-track {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Make saved cells selectable and removable */
+.jigsaw-grid-overlay,
+.jigsaw-cut-svg,
+.jigsaw-cut-svg * {
+  pointer-events: none !important;
+}
+
+.jigsaw-cell {
+  position: relative;
+  pointer-events: auto;
+}
+
+.jigsaw-cell.has-piece {
+  cursor: pointer;
+}
+
+.jigsaw-cell.has-piece::after {
+  content: '';
+  position: absolute;
+  inset: 43%;
+  border-radius: 999px;
+  background: rgba(125, 244, 255, 0.24);
+  box-shadow: 0 0 10px rgba(125, 244, 255, 0.34);
+  pointer-events: none;
+}
+
+.jigsaw-cell.is-selected {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.jigsaw-clear-btn:not(:disabled) {
+  border-color: rgba(255, 171, 145, 0.48);
+  color: #ffccbc;
+}
+
+.jigsaw-clear-btn:not(:disabled):hover {
+  background: rgba(255, 112, 67, 0.12);
+  border-color: rgba(255, 171, 145, 0.78);
+  color: #fff2ed;
+}
+
+.jigsaw-clear-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.jigsaw-piece-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* =========================================================
+   Final compact Globe.gl analysis UI fix
+   Prevents globe/text overlap and stops the globe from feeling cropped.
+   ========================================================= */
+
+.jigsaw-analysis-command-bar {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-areas:
+    "copy radius"
+    "globe globe";
+  gap: 16px !important;
+  align-items: start;
+  padding: 22px !important;
+  min-height: unset !important;
+  overflow: hidden;
+}
+
+.jigsaw-analysis-copy {
+  grid-area: copy;
+  min-width: 0;
+}
+
+.jigsaw-analysis-copy .jigsaw-kicker {
+  margin: 0 0 10px;
+  color: rgba(219, 252, 255, 0.82);
+  font-size: 13px;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.jigsaw-analysis-copy h2 {
+  margin: 0 0 10px !important;
+  font-size: 20px !important;
+  line-height: 1.02 !important;
+  color: #dffaff;
+  letter-spacing: 0.01em;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.jigsaw-analysis-copy p {
+  margin: 0;
+  max-width: 42ch;
+  color: rgba(191, 252, 255, 0.72);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.jigsaw-analysis-command-bar .jigsaw-radius-pill {
+  grid-area: radius;
+  justify-self: end;
+  align-self: start;
+  position: relative;
+  z-index: 5;
+  white-space: nowrap;
+  padding: 9px 15px;
+  font-size: 12px;
+}
+
+/* Globe module becomes a clean scan viewport instead of an oversized image */
+.jigsaw-globegl-module {
+  grid-area: globe;
+  position: relative;
+  width: 100% !important;
+  height: 178px !important;
+  margin: 4px 0 0;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  background:
+    radial-gradient(circle at 50% 55%, rgba(0, 240, 255, 0.18), transparent 38%),
+    linear-gradient(180deg, rgba(2, 14, 26, 0.92), rgba(2, 6, 23, 0.68));
+  box-shadow:
+    inset 0 0 35px rgba(0, 240, 255, 0.07),
+    0 0 28px rgba(0, 0, 0, 0.2);
+}
+
+/* Slightly shrink the rendered globe visually so it sits inside the frame */
+.jigsaw-globegl-stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.jigsaw-globegl-stage canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  transform: scale(0.86);
+  transform-origin: center center;
+}
+
+/* Turn the floating “Zooming...” text into a proper HUD pill */
+.jigsaw-globegl-hud {
+  position: absolute !important;
+  left: 14px !important;
+  top: 14px !important;
+  bottom: auto !important;
+  z-index: 10;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 7px;
+  max-width: calc(100% - 28px);
+  padding: 7px 10px;
+  border: 1px solid rgba(34, 211, 238, 0.34);
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.78);
+  backdrop-filter: blur(10px);
+  color: #bffcff !important;
+  font-size: 10px !important;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 0 18px rgba(0, 240, 255, 0.12);
+}
+
+.jigsaw-globegl-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #00f0ff;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.9);
+  animation: jigsawPulse 1.4s ease-in-out infinite;
+}
+
+/* Make the progress bar feel less bulky */
+.jigsaw-progress-compact {
+  margin-top: 0 !important;
+  padding: 12px 16px !important;
+  border-radius: 15px !important;
+  font-size: 12px !important;
+  letter-spacing: 0.14em;
+  text-align: center !important;
+}
+
+/* Make the step cards smaller and cleaner */
+.jigsaw-step-track {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+.jigsaw-step-pill {
+  min-height: 54px !important;
+  padding: 9px 10px !important;
+  border-radius: 14px !important;
+  background: rgba(15, 23, 42, 0.52) !important;
+}
+
+.jigsaw-step-pill strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #7df4ff;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.jigsaw-step-pill span {
+  display: block;
+  color: rgba(219, 252, 255, 0.78);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Give actual results more room */
+.jigsaw-results-panel--priority {
+  flex: 1 1 auto !important;
+  min-height: 220px !important;
+}
+
+/* Responsive fallback */
+@media (max-width: 1180px) {
+  .jigsaw-analysis-command-bar {
+    grid-template-columns: 1fr !important;
+    grid-template-areas:
+      "radius"
+      "copy"
+      "globe";
+  }
+
+  .jigsaw-analysis-command-bar .jigsaw-radius-pill {
+    justify-self: start;
+  }
+
+  .jigsaw-globegl-module {
+    height: 170px !important;
+  }
+
+  .jigsaw-analysis-copy h2 {
+    font-size: 20px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .jigsaw-step-track {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+
+/* =========================================================
+   Full-screen cinematic analysis loader
+   ========================================================= */
+
+#jigsaw-analysis-overlay .style-editor-content,
+#jigsaw-analysis-overlay .style-editor-modal,
+#jigsaw-analysis-overlay .jigsaw-analysis-root {
+  width: min(1400px, 94vw);
+  max-width: 1400px;
+}
+
+.jigsaw-analysis-cinematic {
+  position: relative;
+  min-height: 78vh;
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  border-radius: 24px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(0, 240, 255, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(2, 10, 20, 0.96), rgba(1, 4, 14, 0.98));
+}
+
+.jigsaw-cinematic-bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 240, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(circle at center, black 58%, transparent 100%);
+  pointer-events: none;
+}
+
+.jigsaw-cinematic-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.jigsaw-cinematic-globe {
+  position: absolute;
+  inset: 0;
+}
+
+.jigsaw-cinematic-globe canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.jigsaw-cinematic-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at center, transparent 38%, rgba(0, 0, 0, 0.16) 60%, rgba(0, 0, 0, 0.58) 100%);
+  pointer-events: none;
+}
+
+.jigsaw-cinematic-copy {
+  position: absolute;
+  top: 28px !important;
+  left: 28px !important;
+  z-index: 14;
+  max-width: min(760px, 52vw);
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+.jigsaw-cinematic-kicker {
+  margin: 0 0 14px;
+  color: rgba(125, 244, 255, 0.9);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.jigsaw-cinematic-copy h2 {
+  margin: 0 0 16px !important;
+  color: #dffaff;
+  font-size: clamp(42px, 5.2vw, 86px) !important;
+  line-height: 0.94 !important;
+  letter-spacing: 0.005em;
+  white-space: nowrap !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  text-shadow:
+    0 0 24px rgba(0, 240, 255, 0.18),
+    0 8px 30px rgba(0, 0, 0, 0.45);
+}
+
+.jigsaw-cinematic-copy p {
+  margin: 0;
+  max-width: 40ch;
+  color: rgba(191, 252, 255, 0.82);
+  font-size: 18px;
+  line-height: 1.42;
+  text-shadow: 0 0 16px rgba(0, 0, 0, 0.65);
+}
+
+/* No central card. Singapore outline floats cinematically. */
+.jigsaw-cinematic-singapore-wrap {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 12;
+  transition: opacity 0.5s ease;
+}
+
+.jigsaw-analysis-cinematic.phase-singapore .jigsaw-cinematic-singapore-wrap,
+.jigsaw-analysis-cinematic.phase-target .jigsaw-cinematic-singapore-wrap {
+  opacity: 1;
+}
+
+.jigsaw-cinematic-singapore-png {
+  width: min(680px, 44vw);
+  height: auto;
+  display: block;
+  object-fit: contain;
+  opacity: 0.95;
+  filter:
+    drop-shadow(0 0 16px rgba(0, 240, 255, 0.85))
+    drop-shadow(0 0 44px rgba(0, 240, 255, 0.38));
+  animation: jigsawSingaporePngFloat 1.45s ease-in-out infinite alternate;
+}
+
+/* scanning line across PNG area */
+.jigsaw-cinematic-singapore-local-scanline {
+  position: absolute;
+  top: 31%;
+  bottom: 31%;
+  left: -10%;
+  width: 9%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 240, 255, 0.08) 18%,
+    rgba(0, 240, 255, 0.5) 52%,
+    rgba(125, 244, 255, 0.12) 76%,
+    transparent 100%
+  );
+  filter: blur(1px);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.jigsaw-analysis-cinematic.phase-singapore .jigsaw-cinematic-singapore-local-scanline {
+  opacity: 1;
+  animation: jigsawSingaporeLocalScan 1.25s linear infinite;
+}
+
+.jigsaw-analysis-cinematic.phase-target .jigsaw-cinematic-singapore-local-scanline {
+  opacity: 0;
+  animation: none;
+}
+
+.jigsaw-cinematic-globe {
+  position: absolute;
+  inset: 0;
+  opacity: 0.9;
+  transition: opacity 0.55s ease, filter 0.55s ease, transform 0.55s ease;
+  z-index: 8;
+}
+
+.jigsaw-analysis-cinematic.phase-singapore .jigsaw-cinematic-globe,
+.jigsaw-analysis-cinematic.phase-target .jigsaw-cinematic-globe {
+  opacity: 0.34;
+  filter: blur(1.2px) brightness(0.68) saturate(1.08);
+  transform: scale(1.04);
+}
+
+/* Full window vertical scan line */
+.jigsaw-cinematic-scanline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -10%;
+  width: 10%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 240, 255, 0.035) 20%,
+    rgba(0, 240, 255, 0.23) 48%,
+    rgba(125, 244, 255, 0.12) 60%,
+    rgba(0, 240, 255, 0.035) 80%,
+    transparent 100%
+  );
+  filter: blur(1.4px);
+  animation: jigsawCinematicScan 1.9s linear infinite;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Footer stays cinematic, no borders around whole page */
+.jigsaw-cinematic-footer {
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  bottom: 26px;
+  z-index: 18;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.jigsaw-cinematic-pill,
+.jigsaw-cinematic-radius {
+  border: 1px solid rgba(34, 211, 238, 0.36);
+  background: rgba(2, 6, 23, 0.68);
+  backdrop-filter: blur(10px);
+  color: #dffcff;
+  box-shadow: 0 0 22px rgba(0, 240, 255, 0.1);
+}
+
+/* Target located */
+.jigsaw-cinematic-target {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 22;
+  transform: translate(-50%, -50%) scale(0.92);
+  padding: 18px 30px;
+  border-radius: 18px;
+  border: 1px solid rgba(34, 211, 238, 0.44);
+  background:
+    radial-gradient(circle at top, rgba(0, 240, 255, 0.16), transparent 58%),
+    rgba(2, 6, 23, 0.86);
+  color: #ecfeff;
+  font-size: clamp(26px, 3.2vw, 46px);
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow:
+    0 0 44px rgba(0, 240, 255, 0.22),
+    inset 0 0 30px rgba(0, 240, 255, 0.08);
+}
+
+.jigsaw-cinematic-target.is-visible {
+  animation: jigsawTargetPop 0.8s ease forwards;
+}
+
+@keyframes jigsawCinematicScan {
+  0% { left: -12%; }
+  100% { left: 104%; }
+}
+
+@keyframes jigsawSingaporeLocalScan {
+  0% { left: 20%; }
+  100% { left: 72%; }
+}
+
+@keyframes jigsawSingaporePngFloat {
+  0% {
+    transform: scale(0.985);
+    opacity: 0.82;
+  }
+  100% {
+    transform: scale(1.018);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 980px) {
+  .jigsaw-cinematic-copy {
+    top: 22px !important;
+    left: 22px !important;
+    max-width: calc(100% - 44px);
+  }
+
+  .jigsaw-cinematic-copy h2 {
+    font-size: clamp(34px, 8vw, 58px) !important;
+  }
+
+  .jigsaw-cinematic-copy p {
+    font-size: 15px;
+  }
+
+  .jigsaw-cinematic-singapore-png {
+    width: min(720px, 72vw);
+  }
+
+  .jigsaw-cinematic-footer {
+    left: 22px;
+    right: 22px;
+    bottom: 22px;
+  }
+}
+
+/* =========================================================
+   Force Singapore PNG outline to show above cinematic globe
+   ========================================================= */
+
+.jigsaw-cinematic-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.jigsaw-cinematic-globe {
+  z-index: 1 !important;
+}
+
+.jigsaw-cinematic-scanline {
+  z-index: 8 !important;
+}
+
+.jigsaw-cinematic-vignette {
+  z-index: 9 !important;
+  pointer-events: none;
+}
+
+/* PNG outline layer */
+#jigsaw-cinematic-singapore-wrap,
+.jigsaw-cinematic-singapore-wrap {
+  position: absolute !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  z-index: 30 !important;
+  transition: opacity 0.45s ease, visibility 0.45s ease;
+}
+
+/* show only when Singapore phase starts */
+.jigsaw-analysis-cinematic.phase-singapore #jigsaw-cinematic-singapore-wrap,
+.jigsaw-analysis-cinematic.phase-target #jigsaw-cinematic-singapore-wrap,
+.jigsaw-analysis-cinematic.phase-singapore .jigsaw-cinematic-singapore-wrap,
+.jigsaw-analysis-cinematic.phase-target .jigsaw-cinematic-singapore-wrap {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.jigsaw-cinematic-singapore-png {
+  width: min(820px, 50vw) !important;
+  height: auto !important;
+  display: block !important;
+  object-fit: contain !important;
+  opacity: 1 !important;
+  z-index: 31 !important;
+  filter:
+    drop-shadow(0 0 10px rgba(0, 240, 255, 1))
+    drop-shadow(0 0 26px rgba(0, 240, 255, 0.75))
+    drop-shadow(0 0 60px rgba(0, 240, 255, 0.38)) !important;
+  animation: jigsawSingaporePngFloat 1.45s ease-in-out infinite alternate;
+}
+
+/* dim globe more when outline appears */
+.jigsaw-analysis-cinematic.phase-singapore .jigsaw-cinematic-globe,
+.jigsaw-analysis-cinematic.phase-target .jigsaw-cinematic-globe {
+  opacity: 0.24 !important;
+  filter: blur(1.3px) brightness(0.52) saturate(1.15) !important;
+}
+
+/* Singapore-specific scanline over the PNG */
+.jigsaw-cinematic-singapore-local-scanline {
+  position: absolute !important;
+  top: 30% !important;
+  bottom: 30% !important;
+  left: -12% !important;
+  width: 10% !important;
+  z-index: 32 !important;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 240, 255, 0.06) 18%,
+    rgba(0, 240, 255, 0.55) 50%,
+    rgba(125, 244, 255, 0.16) 76%,
+    transparent 100%
+  ) !important;
+  filter: blur(1px);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.jigsaw-analysis-cinematic.phase-singapore .jigsaw-cinematic-singapore-local-scanline {
+  opacity: 1 !important;
+  animation: jigsawSingaporeLocalScan 1.25s linear infinite;
+}
+
+.jigsaw-analysis-cinematic.phase-target .jigsaw-cinematic-singapore-local-scanline {
+  opacity: 0 !important;
+  animation: none;
+}
+
+@keyframes jigsawSingaporePngFloat {
+  0% {
+    transform: scale(0.985);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.018);
+    opacity: 1;
+  }
+}
+
+@keyframes jigsawSingaporeLocalScan {
+  0% {
+    left: 18%;
+  }
+  100% {
+    left: 74%;
+  }
+}
+
+/* =========================================================
+   FINAL FIX: Singapore PNG cinematic layer
+   Place PNG at: public/assets/singapore-outline-transparent-white.png
+   ========================================================= */
+
+#jigsaw-cinematic-singapore-wrap.jigsaw-cinematic-singapore-wrap {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: clamp(106px, 9.8vw, 163px) !important;
+  aspect-ratio: 3 / 2 !important;
+  transform: translate(-50%, -50%) !important;
+  display: grid !important;
+  place-items: center !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  z-index: 80 !important;
+  transition: opacity 0.45s ease, visibility 0.45s ease;
+}
+
+.jigsaw-analysis-cinematic.phase-singapore #jigsaw-cinematic-singapore-wrap,
+.jigsaw-analysis-cinematic.phase-target #jigsaw-cinematic-singapore-wrap {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+#jigsaw-cinematic-singapore-png.jigsaw-cinematic-singapore-png {
+  width: 100% !important;
+  height: auto !important;
+  display: block !important;
+  object-fit: contain !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 81 !important;
+  mix-blend-mode: screen;
+  filter:
+    drop-shadow(0 0 10px rgba(0, 240, 255, 1))
+    drop-shadow(0 0 30px rgba(0, 240, 255, 0.75))
+    drop-shadow(0 0 70px rgba(0, 240, 255, 0.42)) !important;
+  animation: jigsawSingaporePngFloat 1.45s ease-in-out infinite alternate;
+}
+
+.jigsaw-analysis-cinematic.phase-singapore .jigsaw-cinematic-globe {
+  opacity: 0.9 !important;
+  filter: none !important;
+  transform: scale(1.04);
+}
+
+.jigsaw-analysis-cinematic.phase-target .jigsaw-cinematic-globe {
+  opacity: 0.5 !important;
+  filter: blur(0.8px) brightness(0.72) saturate(1.08) !important;
+  transform: scale(1.04);
+}
+
+.jigsaw-cinematic-vignette {
+  z-index: 40 !important;
+  pointer-events: none !important;
+}
+
+.jigsaw-cinematic-scanline {
+  z-index: 70 !important;
+}
+
+.jigsaw-cinematic-singapore-local-scanline {
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: -24% !important;
+  width: 22% !important;
+  z-index: 82 !important;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 240, 255, 0.06) 18%,
+    rgba(0, 240, 255, 0.58) 50%,
+    rgba(125, 244, 255, 0.16) 76%,
+    transparent 100%
+  ) !important;
+  filter: blur(1px);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.jigsaw-analysis-cinematic.phase-singapore .jigsaw-cinematic-singapore-local-scanline {
+  opacity: 1 !important;
+  animation: jigsawSingaporeLocalScan 1.25s linear infinite;
+}
+
+.jigsaw-analysis-cinematic.phase-target .jigsaw-cinematic-singapore-local-scanline {
+  opacity: 0 !important;
+  animation: none !important;
+}
+
+@keyframes jigsawSingaporePngFloat {
+  0% {
+    transform: scale(0.985);
+    opacity: 0.88;
+  }
+  100% {
+    transform: scale(1.018);
+    opacity: 1;
+  }
+}
+
+@keyframes jigsawSingaporeLocalScan {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(560%);
+  }
+}

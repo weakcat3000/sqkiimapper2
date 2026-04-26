@@ -2836,7 +2836,7 @@
 
     .tool-rail-silver {
       bottom: calc(16px + var(--tool-rail-size) + var(--tool-rail-gap));
-      --tool-rail-actions-width: 260px;
+      --tool-rail-actions-width: 328px;
       z-index: 981;
     }
 
@@ -3070,6 +3070,10 @@
       transition-delay: .16s;
     }
 
+    .tool-rail.open .tool-rail-btn:nth-child(5) {
+      transition-delay: .2s;
+    }
+
     .tool-rail-btn.active {
       border-color: rgba(226, 232, 240, 0.46);
       box-shadow:
@@ -3188,10 +3192,21 @@
       background:
         radial-gradient(circle at 34% 24%, rgba(56, 189, 248, 0.2), transparent 42%),
         linear-gradient(180deg, rgba(10, 24, 36, 0.96), rgba(8, 13, 20, 0.98));
+    }
+
+    .tool-rail-btn-sonar.sonar-btn::before {
+      content: "";
+      width: 76%;
+      height: 76%;
+      display: block;
       background-image: url('./assets/metal-sonar.png');
-      background-size: 76% 76%;
+      background-size: contain;
       background-repeat: no-repeat;
       background-position: center;
+      filter:
+        drop-shadow(0 8px 16px rgba(56, 189, 248, 0.24))
+        drop-shadow(0 0 10px rgba(125, 211, 252, 0.22));
+      pointer-events: none;
     }
 
     .silver-ai-card {
@@ -3474,8 +3489,8 @@
     }
 
     .sonar-btn.disabled {
-      opacity: .5;
-      filter: grayscale(60%)
+      opacity: .86;
+      filter: none
     }
 
     .sonar-options {
@@ -3946,7 +3961,7 @@
       }
 
       .tool-rail-silver {
-        --tool-rail-actions-width: 220.4px;
+        --tool-rail-actions-width: 278px;
       }
 
       .map-edit-fab,

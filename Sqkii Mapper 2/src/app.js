@@ -1,3 +1,5 @@
+import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsawFeature.js';
+
       /* ===================== UTILITY FUNCTIONS MODULE ===================== */
       /**
        * Centralized utilities to eliminate code duplication and improve performance
@@ -3732,6 +3734,7 @@
       let seReconCoin = null;
       let seSearchLampPost = null;
       let sePredictExact = null;
+      let seJigsawAi = null;
 
 
       seDrag.addEventListener('click', () => {
@@ -3969,6 +3972,10 @@
             try { sePredictExact.remove(); } catch { }
             sePredictExact = null;
           }
+          if (seJigsawAi) {
+            try { seJigsawAi.remove(); } catch { }
+            seJigsawAi = null;
+          }
 
           // Create new Calculate Statistics button
           seCalcStats = document.createElement('button');
@@ -4113,6 +4120,39 @@
             openShrinkPredictorModal(fid, center, radius, f, p);
           };
 
+          seJigsawAi = document.createElement('button');
+          seJigsawAi.className = 'btn small';
+          seJigsawAi.style.cssText = 'width:100%;margin-top:4px;background:rgba(6,182,212,0.16);border-color:#22d3ee;color:#cffafe;';
+          seJigsawAi.textContent = 'Jigsaw AI';
+
+          seJigsawAi.onclick = () => {
+            let center = p._circleCenter;
+            let radius = p._circleRadius;
+
+            if (!center || !radius) {
+              try {
+                const centroid = turf.centroid(f);
+                center = centroid.geometry.coordinates;
+                const bbox = turf.bbox(f);
+                const dx = bbox[2] - bbox[0];
+                const dy = bbox[3] - bbox[1];
+                radius = Math.max(dx, dy) * 111320 / 2;
+              } catch {
+                alert('Could not determine circle parameters.');
+                return;
+              }
+            }
+
+            openJigsawWorkspace({
+              coin_id: p._coinId || p.coin_id || p.fid || fid,
+              coin_name: p._coinLabel || p.coin_label || p.name || 'Selected live coin',
+              center_lat: Number(center[1]),
+              center_lng: Number(center[0]),
+              radius_m: Number(radius),
+              status: 'live'
+            });
+          };
+
           // Insert all buttons before the actions row
           const actionsRow = editorEl.querySelector('.style-actions');
           if (actionsRow) {
@@ -4120,6 +4160,7 @@
             // Order: Calculate → Predict → Recon → Glimpse → Search → actions
             parent.insertBefore(seCalcStats, actionsRow);
             parent.insertBefore(sePredictExact, actionsRow);
+            parent.insertBefore(seJigsawAi, actionsRow);
             parent.insertBefore(seReconCoin, actionsRow);
             parent.insertBefore(seGlimpseSigns, actionsRow);
             parent.insertBefore(seSearchLampPost, actionsRow);
@@ -4174,6 +4215,10 @@
           if (sePredictExact) {
             try { sePredictExact.remove(); } catch { }
             sePredictExact = null;
+          }
+          if (seJigsawAi) {
+            try { seJigsawAi.remove(); } catch { }
+            seJigsawAi = null;
           }
 
 
@@ -4242,6 +4287,10 @@
         if (sePredictExact) {
           try { sePredictExact.remove(); } catch { }
           sePredictExact = null;
+        }
+        if (seJigsawAi) {
+          try { seJigsawAi.remove(); } catch { }
+          seJigsawAi = null;
         }
       }
 
@@ -9481,6 +9530,7 @@
                       <button class="btn small coin-db-load-steps" data-entry-id="${escapeHtml(entry.id)}">${stepsLoaded ? 'Reload Steps' : 'Load Steps'}</button>
                       <button class="btn small coin-db-preview-entry" data-entry-id="${escapeHtml(entry.id)}">Preview</button>
                       <button class="btn small coin-db-load-snapshot" data-entry-id="${escapeHtml(entry.id)}">Load Snapshot</button>
+                      ${entry.status === 'active' ? `<button class="btn small coin-db-jigsaw-entry" data-entry-id="${escapeHtml(entry.id)}">Jigsaw</button>` : ''}
                       <button class="btn small coin-db-save-note" data-entry-id="${escapeHtml(entry.id)}">Save Exact Spot</button>
                     </div>
                   </div>
@@ -9573,6 +9623,113 @@
         if (!data) return null;
         return coinDbMergeEntryIntoCache(data);
       }
+
+      function coinDbEntryToJigsawCoin(entry) {
+        const steps = Array.isArray(entry?.lifecycle) ? entry.lifecycle : [];
+        const latest = [...steps]
+          .filter((step) => Number.isFinite(Number(step?.lat)) && Number.isFinite(Number(step?.lng)) && Number.isFinite(Number(step?.radiusMeters)))
+          .sort((a, b) => coinDbStepTimestamp(b) - coinDbStepTimestamp(a))[0];
+        if (!latest) return null;
+        return {
+          coin_id: coinDbRootCoinId(latest.coinId || entry.id || latest.fid || ''),
+          coin_name: coinDbCanonicalLabel(entry.coin_label || latest.coinLabel || latest.featureName || 'Live silver coin'),
+          center_lat: Number(latest.lat),
+          center_lng: Number(latest.lng),
+          radius_m: Number(latest.radiusMeters),
+          status: String(entry.status || 'active')
+        };
+      }
+
+      async function openJigsawForCoinDbEntry(entryId) {
+        try {
+          coinDbSetStatus('Opening Jigsaw AI workspace...');
+          let entry = coinDbFindEntry(entryId);
+          if (!Array.isArray(entry?.lifecycle)) {
+            entry = await fetchCoinDbEntryDetails(entryId, { includeSnapshot: false });
+          }
+          const coin = coinDbEntryToJigsawCoin(entry);
+          if (!coin) {
+            coinDbSetStatus('Jigsaw needs at least one live shrink circle with a valid radius.', true);
+            return;
+          }
+          openJigsawWorkspace(coin);
+          coinDbSetStatus(`Opened Jigsaw AI for "${coin.coin_name}".`);
+        } catch (error) {
+          coinDbSetStatus(`Could not open Jigsaw AI: ${coinDbFriendlyError(error)}`, true);
+        }
+      }
+
+      function getActiveJigsawCoinFromCurrentState() {
+        return getLiveJigsawCoinsFromCurrentState()[0] || null;
+      }
+
+      function getLiveJigsawCoinsFromCurrentState() {
+        const stateArr = coinDbSerializeState();
+        const liveCoins = [];
+        const seen = new Set();
+
+        for (const layer of (stateArr || [])) {
+          const layerName = String(layer?.name || '').trim().toLowerCase();
+          if (layerName !== 'live sqkii circles') continue;
+
+          for (const feature of (layer?.data?.features || [])) {
+            const props = feature?.properties || {};
+            if (props._deleted) continue;
+
+            const radius = Number(props._circleRadius);
+            let lng = Number(props._circleLng);
+            let lat = Number(props._circleLat);
+            if ((!Number.isFinite(lng) || !Number.isFinite(lat)) && Array.isArray(props._circleCenter) && props._circleCenter.length >= 2) {
+              lng = Number(props._circleCenter[0]);
+              lat = Number(props._circleCenter[1]);
+            }
+            if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(radius) || radius <= 0) continue;
+
+            const coinId = coinDbRootCoinId(props._coinId || props.coin_id || props.fid || props._gid || `${lat.toFixed(6)},${lng.toFixed(6)},${radius.toFixed(1)}`);
+            const key = coinId || `${lat.toFixed(6)},${lng.toFixed(6)},${radius.toFixed(1)}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+
+            liveCoins.push({
+              coin_id: coinId || key,
+              coin_name: coinDbCanonicalLabel(props._coinLabel || props.coin_label || props.name || props.title || coinId || `Live coin ${liveCoins.length + 1}`),
+              center_lat: lat,
+              center_lng: lng,
+              radius_m: radius,
+              status: 'live'
+            });
+          }
+        }
+
+        if (liveCoins.length) {
+          return liveCoins.sort((a, b) => String(a.coin_name || '').localeCompare(String(b.coin_name || ''), undefined, { numeric: true }));
+        }
+
+        const groups = buildSilverCoinArchiveGroups(stateArr);
+        return groups
+          .filter((group) => group.isLive && group.steps.length)
+          .map((group) => {
+            const latest = [...group.steps].sort((a, b) => coinDbStepTimestamp(b) - coinDbStepTimestamp(a))[0];
+            if (!latest) return null;
+            return {
+              coin_id: coinDbRootCoinId(group.coinId || latest.coinId || latest.fid || ''),
+              coin_name: coinDbCanonicalLabel(group.coinLabel || latest.coinLabel || latest.featureName || 'Live silver coin'),
+              center_lat: Number(latest.lat),
+              center_lng: Number(latest.lng),
+              radius_m: Number(latest.radiusMeters),
+              status: 'live'
+            };
+          })
+          .filter(Boolean);
+      }
+
+      initJigsawFeature({
+        supabase,
+        mapleaf,
+        mapgl,
+        getActiveCoin: getActiveJigsawCoinFromCurrentState,
+        getLiveCoins: getLiveJigsawCoinsFromCurrentState
+      });
 
       async function loadCoinDbSteps(entryId) {
         try {
@@ -10455,6 +10612,12 @@
         const loadBtn = e.target.closest('.coin-db-load-snapshot');
         if (loadBtn) {
           await loadCoinDbSnapshot(loadBtn.dataset.entryId);
+          return;
+        }
+
+        const jigsawBtn = e.target.closest('.coin-db-jigsaw-entry');
+        if (jigsawBtn) {
+          await openJigsawForCoinDbEntry(jigsawBtn.dataset.entryId);
           return;
         }
 
