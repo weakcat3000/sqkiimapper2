@@ -2589,10 +2589,6 @@
   animation: jigsawSingaporeLocalScan 1.25s linear infinite;
 }
 
-.jigsaw-analysis-cinematic.phase-target .jigsaw-cinematic-singapore-local-scanline {
-  opacity: 0 !important;
-  animation: none;
-}
 
 @keyframes jigsawSingaporePngFloat {
   0% {
@@ -2621,15 +2617,9 @@
 
 #jigsaw-cinematic-singapore-wrap.jigsaw-cinematic-singapore-wrap {
   position: absolute !important;
-  left: 52% !important;
-  top: 49% !important;
+  left: 42% !important;
+  top: 59% !important;
   width: clamp(127px, 11.76vw, 196px) !important;
-  aspect-ratio: 3 / 2 !important;
-  transform: translate(-50%, -50%) !important;
-  display: grid !important;
-  place-items: center !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
   pointer-events: none !important;
   z-index: 80 !important;
   transition: opacity 0.45s ease, visibility 0.45s ease;

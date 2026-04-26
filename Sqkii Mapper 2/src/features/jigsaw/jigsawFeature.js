@@ -1663,7 +1663,7 @@ async function renderScanGlobe(isCinematic = false) {
       name: state.coin?.coin_name || 'Selected Coin Boundary',
       lat: coinLat,
       lng: coinLng,
-      size: 0.65,
+      size: 0.32,
       color: 'rgba(0, 240, 255, 0.95)'
     };
 
