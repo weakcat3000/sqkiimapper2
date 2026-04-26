@@ -29,7 +29,7 @@ const state = {
   globeGlPromise: null,
   analysisPhase: 'idle',
   analysisStartedAt: 0,
-  analysisMinSequenceMs: 4200,
+  analysisMinSequenceMs: 9200,
   analysisPendingResult: null,
   analysisRevealTimer: null,
   googleMapOverlays: {
@@ -925,7 +925,7 @@ async function runPredictionFromBoard() {
       notes
     });
   } catch (error) {
-    openAnalysisOverlay(friendlyError(error), true);
+    showAnalysisError(friendlyError(error));
   }
 }
 
@@ -942,7 +942,7 @@ async function runPredictionFromFullImage(file) {
       notes
     });
   } catch (error) {
-    openAnalysisOverlay(friendlyError(error), true);
+    showAnalysisError(friendlyError(error));
   }
 }
 
@@ -965,14 +965,52 @@ async function runAnalysis({ input_type, image_url, stitched_image_url, notes })
   renderWorkspace();
 }
 
-function openAnalysisOverlay() {
+function openAnalysisOverlay(message = '') {
   const root = byId('jigsaw-analysis-root');
 
   if (root?.dataset.rendered === 'cinematic' || root?.dataset.rendered === 'result') {
+    if (message) {
+      const status = byId('jigsaw-cinematic-status');
+      if (status) status.textContent = message;
+      setAnalysisProgress(message);
+    }
     return;
   }
 
   startAnalysisCinematic();
+  if (message) {
+    const status = byId('jigsaw-cinematic-status');
+    if (status) status.textContent = message;
+  }
+}
+
+function showAnalysisError(message) {
+  showModal('jigsaw-analysis-overlay');
+  clearTimeout(state.analysisRevealTimer);
+  state.analysisRevealTimer = null;
+  state.analysisPhase = 'idle';
+
+  const root = byId('jigsaw-analysis-root');
+  if (!root) return;
+  root.dataset.rendered = 'result';
+  root.innerHTML = `
+    <div class="jigsaw-analysis-layout jigsaw-analysis-polished jigsaw-analysis-compact">
+      <section class="jigsaw-analysis-left">
+        <div class="jigsaw-analysis-command-bar">
+          <div class="jigsaw-analysis-copy">
+            <h2>${escapeHtml(state.coin?.coin_name || 'Silver Coin')}</h2>
+          </div>
+          <span class="jigsaw-radius-pill">${escapeHtml(formatRadius(state.coin?.radius_m))}</span>
+        </div>
+        <div id="jigsaw-analysis-progress" class="jigsaw-progress jigsaw-progress-compact error">
+          ${escapeHtml(message || 'Jigsaw analysis failed.')}
+        </div>
+        <div class="jigsaw-results-panel">
+          <div class="jigsaw-empty">${escapeHtml(message || 'Jigsaw analysis failed.')}</div>
+        </div>
+      </section>
+    </div>
+  `;
 }
 
 
@@ -1004,11 +1042,11 @@ function startAnalysisCinematic() {
 
   clearTimeout(state.analysisRevealTimer);
 
-  // Phase 1: globe scan
+  // Phase 1: slower globe scan before Singapore reveal.
   state.analysisRevealTimer = setTimeout(() => {
     if (state.analysisPhase !== 'globe') return;
     setAnalysisCinematicPhase('singapore');
-  }, 4000);
+  }, 9000);
 }
 
 function setAnalysisCinematicPhase(phase) {
@@ -1030,7 +1068,7 @@ function setAnalysisCinematicPhase(phase) {
     const controls = state.scanGlobe?.controls?.();
     if (controls) {
       controls.autoRotate = true;
-      controls.autoRotateSpeed = 0.28;
+      controls.autoRotateSpeed = 0.196;
     }
   }
 
@@ -1076,12 +1114,10 @@ function finishAnalysisCinematic(result) {
   };
 
   if (state.analysisPhase === 'globe') {
-    // Move into Singapore phase first, then reveal
-    setAnalysisCinematicPhase('singapore');
-
     setTimeout(() => {
-      setTimeout(doReveal, remaining > 900 ? remaining - 900 : 0);
-    }, 900);
+      setAnalysisCinematicPhase('singapore');
+      setTimeout(doReveal, 900);
+    }, Math.max(0, 9000 - elapsed));
 
     return;
   }
@@ -1110,6 +1146,7 @@ function revealAnalysisResultWindow(result) {
   if (resultsPanel) {
     resultsPanel.innerHTML = analysisResultHtml(result);
   }
+  bindAnalysisResultActions(result);
 
   const layout = root.querySelector('.jigsaw-analysis-layout');
   if (layout) {
@@ -1215,15 +1252,15 @@ function analysisShellHtml() {
         <div class="jigsaw-step-track" aria-label="AI analysis steps">
           <div class="jigsaw-step-pill">
             <strong>01</strong>
-            <span>OpenAI</span>
-          </div>
-          <div class="jigsaw-step-pill">
-            <strong>02</strong>
             <span>Gemini</span>
           </div>
           <div class="jigsaw-step-pill">
+            <strong>02</strong>
+            <span>Qwen</span>
+          </div>
+          <div class="jigsaw-step-pill">
             <strong>03</strong>
-            <span>Reference</span>
+            <span>Nemotron</span>
           </div>
           <div class="jigsaw-step-pill">
             <strong>04</strong>
@@ -1231,7 +1268,7 @@ function analysisShellHtml() {
           </div>
           <div class="jigsaw-step-pill">
             <strong>05</strong>
-            <span>Weighted</span>
+            <span>Street View</span>
           </div>
         </div>
 
@@ -1259,12 +1296,18 @@ function analysisShellHtml() {
 
 function analysisResultHtml(result) {
   const groups = result.candidate_groups || [];
+  const modelSummary = (result.model_votes || []).map((vote) => {
+    const status = vote.failed ? `failed: ${vote.error || 'unavailable'}` : `${vote.candidate_count || 0} candidate(s)`;
+    return `<span>${escapeHtml(vote.agent_name || 'AI agent')}: ${escapeHtml(status)}</span>`;
+  }).join('');
   return `
     <div class="jigsaw-result-summary">
       <strong>${escapeHtml(result.final_label)}</strong>
       <span>Score ${escapeHtml(String(result.final_score || 0))}</span>
     </div>
     <div class="jigsaw-result-copy">${escapeHtml(result.reasoning || '')}</div>
+    ${modelSummary ? `<div class="jigsaw-candidate-meta jigsaw-model-summary">${modelSummary}</div>` : ''}
+    ${result.persistence_warning ? `<div class="jigsaw-rejected-note">Result shown, but Supabase save needs server env: ${escapeHtml(result.persistence_warning)}</div>` : ''}
     ${result.rejected_candidates?.length ? `<div class="jigsaw-rejected-note">Some AI guesses were rejected because they were outside the selected coin's search radius.</div>` : ''}
     <div class="jigsaw-candidates">
       ${groups.length ? groups.map((group, index) => `
@@ -1276,8 +1319,11 @@ function analysisResultHtml(result) {
           <div class="jigsaw-candidate-meta">
             <span>${escapeHtml(group.label)}</span>
             <span>Weighted ${escapeHtml(String(group.weighted_score))}</span>
-            <span>Street View ${escapeHtml(String(group.streetview?.verification_score ?? 'unavailable'))}</span>
+            <span>Street View Visual Match: ${escapeHtml(formatStreetViewScore(group.streetview?.verification_score))}</span>
+            <span>Best heading: ${escapeHtml(formatHeading(group.streetview?.best_heading))}</span>
           </div>
+          ${modelVotesForGroupHtml(group)}
+          ${streetViewDetailHtml(group.streetview)}
           <button class="btn small jigsaw-select-candidate" data-index="${index}">Select Location</button>
         </div>
       `).join('') : '<div class="jigsaw-empty">No valid candidates inside selected coin radius.</div>'}
@@ -1286,6 +1332,52 @@ function analysisResultHtml(result) {
       <summary>Rejected outside-radius guesses</summary>
       ${(result.rejected_candidates || []).map((candidate) => `<div>${escapeHtml(candidate.location_name)} (${escapeHtml(String(candidate.distance_from_coin_center_m))} m)</div>`).join('')}
     </details>
+  `;
+}
+
+function formatStreetViewScore(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? `${Math.round(n)}%` : 'unavailable';
+}
+
+function formatHeading(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? `${Math.round(n)}°` : 'unavailable';
+}
+
+function compactListText(items = []) {
+  const clean = (Array.isArray(items) ? items : []).map((item) => String(item || '').trim()).filter(Boolean);
+  return clean.length ? clean.join(', ') : 'none reported';
+}
+
+function modelVotesForGroupHtml(group) {
+  const votes = Object.entries(group.model_votes || {});
+  if (!votes.length) return '';
+  return `
+    <div class="jigsaw-result-copy">
+      Model votes: ${votes.map(([agent, vote]) => {
+        const confidence = Number(vote?.confidence);
+        const suffix = Number.isFinite(confidence) ? ` (${Math.round(confidence * 100)}%)` : '';
+        return escapeHtml(`${agent}${suffix}`);
+      }).join(', ')}
+    </div>
+  `;
+}
+
+function streetViewDetailHtml(streetview) {
+  if (!streetview) {
+    return '<div class="jigsaw-result-copy">Street View verification unavailable. Manual verification required.</div>';
+  }
+  return `
+    <div class="jigsaw-result-copy">
+      Matching: ${escapeHtml(compactListText(streetview.matching_features))}
+    </div>
+    <div class="jigsaw-result-copy">
+      Mismatch: ${escapeHtml(compactListText(streetview.mismatching_features))}
+    </div>
+    <div class="jigsaw-result-copy">
+      Manual verification required${streetview.pixel_similarity_notes ? `: ${escapeHtml(streetview.pixel_similarity_notes)}` : ''}
+    </div>
   `;
 }
 
@@ -1539,7 +1631,7 @@ async function renderScanGlobe(isCinematic = false) {
       controls.enablePan = false;
       controls.enableRotate = true;
       controls.autoRotate = true;
-      controls.autoRotateSpeed = isCompactResultGlobe ? 0.42 : (isCinematic ? 0.28 : 0.65);
+      controls.autoRotateSpeed = isCompactResultGlobe ? 0.294 : (isCinematic ? 0.196 : 0.455);
     }
 
     setTimeout(() => {
@@ -1642,6 +1734,24 @@ function friendlyError(error) {
   }
   if (/mime|file size|payload too large/i.test(message)) {
     return `Supabase rejected the file. Use PNG, JPEG, WEBP, or GIF under the bucket size limit. ${message}`;
+  }
+  if (/AI service key missing|GEMINI_API_KEY|OPENROUTER_API_KEY/i.test(message)) {
+    return 'AI service key missing on server.';
+  }
+  if (/Gemini analysis unavailable/i.test(message)) {
+    return 'Gemini analysis unavailable.';
+  }
+  if (/OpenRouter model unavailable/i.test(message)) {
+    return 'OpenRouter model unavailable. Try again later or switch model.';
+  }
+  if (/Street View verification unavailable|Google Street View Static API failed/i.test(message)) {
+    return 'Street View verification unavailable. Manual verification required.';
+  }
+  if (/No valid candidates inside selected coin radius/i.test(message)) {
+    return 'No valid candidates inside selected coin radius.';
+  }
+  if (/Model malformed response/i.test(message)) {
+    return 'Model malformed response.';
   }
   if (/bucket|storage/i.test(message)) {
     return `Check Jigsaw storage setup. ${message}`;

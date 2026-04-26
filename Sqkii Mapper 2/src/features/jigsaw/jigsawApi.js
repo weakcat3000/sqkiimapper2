@@ -1,10 +1,9 @@
-import { openaiVisionAgent, geminiVisionAgent, singaporeReferenceAgent } from './jigsawAgents.js';
 import { normalizeCoin } from './jigsawUtils.js';
-import { runWeightedVoting } from './jigsawVoting.js';
 
 const PIECES_BUCKET = 'jigsaw-pieces';
 const STITCHED_BUCKET = 'jigsaw-stitched-boards';
 const ANALYSIS_UPLOADS_BUCKET = 'jigsaw-analysis-uploads';
+const DEFAULT_JIGSAW_API_BASE = 'https://sqkiimapper.wk-yeow-2024.workers.dev';
 
 function assertSupabase(supabase) {
   if (!supabase) throw new Error('Supabase is not connected.');
@@ -18,6 +17,31 @@ function storagePath(prefix, fileName) {
 async function publicUrl(supabase, bucket, path) {
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data?.publicUrl || '';
+}
+
+function jigsawAnalyseEndpoint() {
+  const configured = import.meta.env?.VITE_JIGSAW_ANALYSE_URL
+    || window.SQKII_JIGSAW_ANALYSE_URL
+    || '';
+  if (configured) return configured;
+
+  if (/\.workers\.dev$/i.test(window.location.hostname)) return '/api/jigsaw/analyse';
+  const base = (import.meta.env?.VITE_JIGSAW_API_BASE || window.SQKII_JIGSAW_API_BASE || DEFAULT_JIGSAW_API_BASE).replace(/\/+$/, '');
+  return `${base}/api/jigsaw/analyse`;
+}
+
+async function readErrorMessage(response) {
+  const fallback = `Analysis request failed (${response.status}).`;
+  try {
+    const data = await response.json();
+    return data?.ui_error || data?.error || data?.message || fallback;
+  } catch {
+    try {
+      return await response.text() || fallback;
+    } catch {
+      return fallback;
+    }
+  }
 }
 
 export async function getOrCreatePuzzle(supabase, coin) {
@@ -177,98 +201,36 @@ export async function uploadAnalysisImage(supabase, { coin, file }) {
 }
 
 export async function analyseJigsawImage(supabase, { puzzle_id, coin, input_type, image_url, stitched_image_url, notes, onProgress }) {
-  assertSupabase(supabase);
   const c = normalizeCoin(coin);
-  const { data: analysis, error: insertError } = await supabase
-    .from('jigsaw_analyses')
-    .insert({
-      puzzle_id,
-      coin_id: c.coin_id,
-      input_type,
-      input_image_url: image_url || null,
-      stitched_image_url: stitched_image_url || null,
-      notes: notes || null,
-      status: 'running'
-    })
-    .select('*')
-    .single();
-  if (insertError) throw insertError;
-
   const payload = {
-    image_url: image_url || stitched_image_url,
-    notes,
-    coin: c,
-    search_boundary: {
-      country: 'Singapore',
+    puzzle_id,
+    coin: {
+      coin_id: c.coin_id,
+      coin_name: c.coin_name,
       center_lat: c.center_lat,
       center_lng: c.center_lng,
       radius_m: c.radius_m
-    }
+    },
+    input_type,
+    image_url: image_url || stitched_image_url,
+    stitched_image_url: stitched_image_url || null,
+    notes,
   };
 
-  onProgress?.('OpenAI Vision scanning selected coin circle...');
-  const openai = await openaiVisionAgent(payload);
-  onProgress?.('Gemini Vision checking only inside-radius options...');
-  const gemini = await geminiVisionAgent(payload);
-  onProgress?.('Singapore Reference Search rejecting out-of-circle matches...');
-  const reference = await singaporeReferenceAgent(payload);
-  onProgress?.('Running deterministic radius validation and weighted voting...');
-
-  const agentResults = [openai, gemini, reference];
-  const result = await runWeightedVoting({
-    agentResults,
-    coin: c,
-    notes,
-    inputImageUrl: payload.image_url
+  onProgress?.('Sending clue image to secure AI analysis endpoint...');
+  const response = await fetch(jigsawAnalyseEndpoint(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
   });
 
-  const rawResult = { agentResults, ...result };
-  const { error: updateError } = await supabase
-    .from('jigsaw_analyses')
-    .update({
-      status: 'complete',
-      final_label: result.final_label,
-      final_score: result.final_score,
-      raw_result: rawResult
-    })
-    .eq('id', analysis.id);
-  if (updateError) throw updateError;
-
-  const candidateRows = [
-    ...result.candidate_groups.map((group) => ({
-      analysis_id: analysis.id,
-      location_name: group.location_name,
-      lat: group.lat,
-      lng: group.lng,
-      inside_radius: true,
-      distance_from_coin_center_m: group.representative.distance_from_coin_center_m,
-      model_votes: group.model_votes,
-      weighted_score: group.weighted_score,
-      streetview_score: group.streetview?.verification_score || null,
-      label: group.label,
-      reasoning: result.reasoning
-    })),
-    ...result.rejected_candidates.map((candidate) => ({
-      analysis_id: analysis.id,
-      location_name: candidate.location_name,
-      lat: candidate.lat,
-      lng: candidate.lng,
-      inside_radius: false,
-      distance_from_coin_center_m: candidate.distance_from_coin_center_m,
-      model_votes: { [candidate.agent_name || 'Unknown agent']: true },
-      weighted_score: 0,
-      streetview_score: null,
-      label: 'outside_radius',
-      reasoning: 'Rejected because it is outside the selected coin circle.'
-    }))
-  ];
-
-  if (candidateRows.length) {
-    const { error: rowsError } = await supabase.from('jigsaw_candidates').insert(candidateRows);
-    if (rowsError) throw rowsError;
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response));
   }
 
-  return { analysis: { ...analysis, status: 'complete' }, ...result, raw_result: rawResult };
+  onProgress?.('AI agents finished. Validating radius, votes, and Street View evidence...');
+  const result = await response.json();
+  return result;
 }
 
 export async function saveSelectedCandidate(supabase, { analysisId, coin, candidate, userNotes }) {

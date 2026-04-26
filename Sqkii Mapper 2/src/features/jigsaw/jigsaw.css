@@ -2038,10 +2038,10 @@
 
 .jigsaw-globegl-singapore-scan {
   position: absolute;
-  left: 50%;
-  top: 56%;
+  left: 52%;
+  top: 51%;
   z-index: 8;
-  width: clamp(118px, 30%, 170px);
+  width: clamp(142px, 36%, 204px);
   aspect-ratio: 3 / 2;
   transform: translate(-50%, -50%);
   display: grid;
@@ -2621,9 +2621,9 @@
 
 #jigsaw-cinematic-singapore-wrap.jigsaw-cinematic-singapore-wrap {
   position: absolute !important;
-  left: 50% !important;
-  top: 54% !important;
-  width: clamp(106px, 9.8vw, 163px) !important;
+  left: 52% !important;
+  top: 49% !important;
+  width: clamp(127px, 11.76vw, 196px) !important;
   aspect-ratio: 3 / 2 !important;
   transform: translate(-50%, -50%) !important;
   display: grid !important;

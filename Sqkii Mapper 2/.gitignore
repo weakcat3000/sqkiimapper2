@@ -1,5 +1,7 @@
 # Secrets
 .env
+.env.local
+.env.*.local
 .dev.vars
 
 # Python
@@ -52,5 +54,3 @@ telegram_bot.py
 test_*.py
 utils.py
 warmup_great_gold_hunt.py
-workers/
-wrangler.toml
