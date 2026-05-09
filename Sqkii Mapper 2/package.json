@@ -9,5 +9,8 @@
   },
   "devDependencies": {
     "vite": "^6.3.5"
+  },
+  "dependencies": {
+    "onnxruntime-web": "^1.26.0"
   }
 }

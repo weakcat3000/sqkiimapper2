@@ -3455,18 +3455,52 @@
       accent-color: #22d3ee;
     }
 
-    .jigsaw-finder-controls select {
-      width: 100%;
-      height: 24px;
-      border: 1px solid rgba(34, 211, 238, 0.28);
+    .jigsaw-finder-segment {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 5px;
+    }
+
+    .jigsaw-finder-segment button {
+      min-height: 28px;
+      border: 1px solid rgba(34, 211, 238, 0.25);
       border-radius: 6px;
       background: rgba(15, 23, 42, 0.94);
       color: #dff7ff;
       font: inherit;
-      font-size: 11px;
+      font-size: 10px;
       letter-spacing: 0;
       text-transform: none;
-      outline: none;
+      cursor: pointer;
+    }
+
+    .jigsaw-finder-segment button[aria-pressed="true"] {
+      background: rgba(34, 211, 238, 0.9);
+      border-color: rgba(103, 232, 249, 0.95);
+      color: #041019;
+    }
+
+    .jigsaw-finder-focus-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .jigsaw-finder-focus-btn,
+    .jigsaw-finder-download-btn {
+      min-height: 42px;
+      border: 1px solid rgba(34, 211, 238, 0.35);
+      background: rgba(8, 47, 73, 0.82);
+      color: #dff7ff;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .jigsaw-finder-focus-btn:disabled,
+    .jigsaw-finder-download-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
     }
 
     .jigsaw-finder-toggle {

@@ -1,3 +1,4 @@
+import * as ort from 'onnxruntime-web/webgpu';
 import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsawFeature.js';
 
       let layerSeq = 1, featureSeq = 1;
@@ -6157,6 +6158,8 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       const jigsawFinderNight = document.getElementById('jigsaw-finder-night');
       const jigsawFinderDark = document.getElementById('jigsaw-finder-dark');
       const jigsawFinderReset = document.getElementById('jigsaw-finder-reset');
+      const jigsawFinderFocus = document.getElementById('jigsaw-finder-focus');
+      const jigsawFinderDownload = document.getElementById('jigsaw-finder-download');
       const jigsawFinderStatus = document.getElementById('jigsaw-finder-status');
       const htmIconsModal = document.getElementById('htm-icons-modal');
       const htmIconsCloseBtn = document.getElementById('htm-icons-close');
@@ -6168,6 +6171,9 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       const htmIconsListEl = document.getElementById('htm-icons-list');
       const SILVER_AI_DATASET_URL = new URL('silver-ai-dataset.json', document.baseURI || window.location.href).toString();
       const SILVER_AI_ANALYZE_URL = 'https://sqkiimapper.wk-yeow-2024.workers.dev/api/silver-ai/analyze';
+      const JIGSAW_DEBLUR_MODEL_URL = new URL('models/nafnet_deblur.onnx', document.baseURI || window.location.href).toString();
+      const JIGSAW_DEBLUR_MAX_SIZE = 512;
+      ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0/dist/';
       const SILVER_HTM_LAYER_IDS = ['htm-icons-silver'];
       const SQKII_VOUCHER_LAYER_IDS = HTM_ICONS_LAYER_DEFS
         .filter((layer) => layer.markerKind === 'sv-ticket')
@@ -6183,6 +6189,9 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       let jigsawFinderPreviewUrl = null;
       let jigsawFinderDarkOn = false;
       let jigsawFinderNightOn = false;
+      let jigsawFinderBlurMode = 'standard';
+      let jigsawFinderFocusSessionPromise = null;
+      let jigsawFinderFocusBusy = false;
       let lastUserPos = null; // [lng, lat]
       let lastUserAccuracyMeters = null;
       function setAudioIcon(on) {
@@ -6331,6 +6340,20 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       function setJigsawFinderStatus(message) {
         if (jigsawFinderStatus) jigsawFinderStatus.textContent = message || '';
       }
+      function syncJigsawFinderFocusButtons() {
+        const canProcess = !!jigsawFinderImage && !jigsawFinderFocusBusy;
+        if (jigsawFinderFocus) {
+          jigsawFinderFocus.disabled = !canProcess;
+          jigsawFinderFocus.textContent = jigsawFinderFocusBusy ? 'Focusing...' : 'Focus';
+        }
+        if (jigsawFinderDownload) {
+          jigsawFinderDownload.disabled = !jigsawFinderImage || jigsawFinderFocusBusy;
+        }
+      }
+      function setJigsawFinderFocusBusy(active) {
+        jigsawFinderFocusBusy = !!active;
+        syncJigsawFinderFocusButtons();
+      }
       function drawJigsawFinderImage() {
         if (!jigsawFinderCanvas || !jigsawFinderImage) return;
         const parentBox = jigsawFinderCanvas.parentElement?.getBoundingClientRect?.();
@@ -6351,7 +6374,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         if (!ctx) return;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         const blur = Number(jigsawFinderBlur?.value || 0);
-        const blurType = String(jigsawFinderBlurType?.value || 'standard');
+        const blurType = jigsawFinderBlurMode || 'standard';
         const brightness = Number(jigsawFinderBrightness?.value || 100);
         const contrast = jigsawFinderNightOn ? 126 : 100;
         const saturate = jigsawFinderNightOn ? 118 : 100;
@@ -6386,13 +6409,142 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       }
       function resetJigsawFinderAdjustments() {
         if (jigsawFinderBlur) jigsawFinderBlur.value = '0';
-        if (jigsawFinderBlurType) jigsawFinderBlurType.value = 'standard';
+        jigsawFinderBlurMode = 'standard';
+        jigsawFinderBlurType?.querySelectorAll('button[data-blur-type]')?.forEach((button) => {
+          button.setAttribute('aria-pressed', button.dataset.blurType === jigsawFinderBlurMode ? 'true' : 'false');
+        });
         if (jigsawFinderBrightness) jigsawFinderBrightness.value = '100';
         jigsawFinderNightOn = false;
         jigsawFinderDarkOn = false;
         jigsawFinderNight?.setAttribute('aria-pressed', 'false');
         jigsawFinderDark?.setAttribute('aria-pressed', 'false');
         drawJigsawFinderImage();
+      }
+      function getJigsawFinderInferenceSize(image) {
+        const sourceW = image.naturalWidth || image.width || JIGSAW_DEBLUR_MAX_SIZE;
+        const sourceH = image.naturalHeight || image.height || JIGSAW_DEBLUR_MAX_SIZE;
+        const scale = Math.min(JIGSAW_DEBLUR_MAX_SIZE / sourceW, JIGSAW_DEBLUR_MAX_SIZE / sourceH, 1);
+        return {
+          width: Math.max(8, Math.floor((sourceW * scale) / 8) * 8),
+          height: Math.max(8, Math.floor((sourceH * scale) / 8) * 8),
+        };
+      }
+      function imageToJigsawFinderTensor(image, width, height) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) throw new Error('Canvas preprocessing is unavailable in this browser.');
+        ctx.drawImage(image, 0, 0, width, height);
+        const pixels = ctx.getImageData(0, 0, width, height).data;
+        const planeSize = width * height;
+        const data = new Float32Array(planeSize * 3);
+        for (let i = 0, p = 0; i < planeSize; i += 1, p += 4) {
+          data[i] = pixels[p] / 255;
+          data[planeSize + i] = pixels[p + 1] / 255;
+          data[(planeSize * 2) + i] = pixels[p + 2] / 255;
+        }
+        return new ort.Tensor('float32', data, [1, 3, height, width]);
+      }
+      function drawJigsawFinderTensor(tensor, fallbackWidth, fallbackHeight) {
+        if (!jigsawFinderCanvas) return;
+        const dims = tensor.dims || [];
+        const data = tensor.data;
+        const nchw = dims.length === 4 && dims[1] === 3;
+        const nhwc = dims.length === 4 && dims[3] === 3;
+        const width = nchw ? dims[3] : nhwc ? dims[2] : fallbackWidth;
+        const height = nchw ? dims[2] : nhwc ? dims[1] : fallbackHeight;
+        const output = new ImageData(width, height);
+        const planeSize = width * height;
+        for (let i = 0, p = 0; i < planeSize; i += 1, p += 4) {
+          const r = nchw ? data[i] : nhwc ? data[(i * 3)] : data[i];
+          const g = nchw ? data[planeSize + i] : nhwc ? data[(i * 3) + 1] : data[planeSize + i];
+          const b = nchw ? data[(planeSize * 2) + i] : nhwc ? data[(i * 3) + 2] : data[(planeSize * 2) + i];
+          output.data[p] = Math.max(0, Math.min(255, Math.round(r * 255)));
+          output.data[p + 1] = Math.max(0, Math.min(255, Math.round(g * 255)));
+          output.data[p + 2] = Math.max(0, Math.min(255, Math.round(b * 255)));
+          output.data[p + 3] = 255;
+        }
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        jigsawFinderCanvas.width = Math.round(width * dpr);
+        jigsawFinderCanvas.height = Math.round(height * dpr);
+        jigsawFinderCanvas.style.width = `${width}px`;
+        jigsawFinderCanvas.style.height = `${height}px`;
+        jigsawFinderCanvas.style.aspectRatio = `${width} / ${height}`;
+        const ctx = jigsawFinderCanvas.getContext('2d', { alpha: false });
+        if (!ctx) return;
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = width;
+        tempCanvas.height = height;
+        tempCanvas.getContext('2d')?.putImageData(output, 0, 0);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(tempCanvas, 0, 0, width, height);
+      }
+      async function getJigsawFinderFocusSession() {
+        if (!jigsawFinderFocusSessionPromise) {
+          jigsawFinderFocusSessionPromise = (async () => {
+            const modelCheck = await fetch(JIGSAW_DEBLUR_MODEL_URL, { cache: 'no-store' });
+            if (!modelCheck.ok) {
+              throw new Error('Deblur model missing. Add /models/nafnet_deblur.onnx to enable Focus.');
+            }
+            // Replace public/models/nafnet_deblur.onnx with a real NAFNet ONNX export.
+            // The model should accept RGB float32 NCHW [1,3,H,W] normalized to 0-1.
+            const options = { graphOptimizationLevel: 'all' };
+            if (navigator.gpu) {
+              try {
+                return await ort.InferenceSession.create(JIGSAW_DEBLUR_MODEL_URL, {
+                  ...options,
+                  executionProviders: ['webgpu'],
+                });
+              } catch (error) {
+                console.warn('[Jigsaw Finder] WebGPU Focus unavailable, falling back to WASM:', error);
+              }
+            }
+            return ort.InferenceSession.create(JIGSAW_DEBLUR_MODEL_URL, {
+              ...options,
+              executionProviders: ['wasm'],
+            });
+          })();
+        }
+        return jigsawFinderFocusSessionPromise;
+      }
+      async function focusJigsawFinderImage() {
+        if (!jigsawFinderImage || jigsawFinderFocusBusy) return;
+        setJigsawFinderFocusBusy(true);
+        setJigsawFinderStatus('Loading deblur model...');
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          const session = await getJigsawFinderFocusSession();
+          const { width, height } = getJigsawFinderInferenceSize(jigsawFinderImage);
+          setJigsawFinderStatus(`Focusing image at ${width}x${height}...`);
+          const inputTensor = imageToJigsawFinderTensor(jigsawFinderImage, width, height);
+          const inputName = session.inputNames?.[0];
+          if (!inputName) throw new Error('Deblur model has no input tensor.');
+          const results = await session.run({ [inputName]: inputTensor });
+          const outputName = session.outputNames?.[0] || Object.keys(results)[0];
+          const outputTensor = results[outputName];
+          if (!outputTensor) throw new Error('Deblur model did not return an output image.');
+          drawJigsawFinderTensor(outputTensor, width, height);
+          setJigsawFinderStatus('Focused result ready. Download it or adjust the photo again.');
+        } catch (error) {
+          console.warn('[Jigsaw Finder] Focus failed:', error);
+          const message = String(error?.message || error || '');
+          if (/404|missing|not found/i.test(message)) {
+            setJigsawFinderStatus('Focus model missing. Add /models/nafnet_deblur.onnx to enable deblurring.');
+          } else {
+            setJigsawFinderStatus('Focus failed for this image/model. Try a smaller photo or another model.');
+          }
+        } finally {
+          setJigsawFinderFocusBusy(false);
+        }
+      }
+      function downloadJigsawFinderCanvas() {
+        if (!jigsawFinderCanvas || !jigsawFinderImage) return;
+        const link = document.createElement('a');
+        link.download = `jigsaw-focus-${Date.now()}.png`;
+        link.href = jigsawFinderCanvas.toDataURL('image/png');
+        link.click();
       }
       function setJigsawFinderImage(file) {
         if (!file) return;
@@ -6406,6 +6558,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           }
           resetJigsawFinderAdjustments();
           setJigsawFinderStatus('Photo captured. Adjust the image below.');
+          syncJigsawFinderFocusButtons();
         };
         img.onerror = () => setJigsawFinderStatus('Could not load that photo. Try taking another picture.');
         img.src = jigsawFinderPreviewUrl;
@@ -7280,9 +7433,18 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         if (file) setJigsawFinderImage(file);
         event.target.value = '';
       });
-      [jigsawFinderBlur, jigsawFinderBlurType, jigsawFinderBrightness].forEach((input) => {
+      [jigsawFinderBlur, jigsawFinderBrightness].forEach((input) => {
         input?.addEventListener('input', drawJigsawFinderImage);
         input?.addEventListener('change', drawJigsawFinderImage);
+      });
+      jigsawFinderBlurType?.addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-blur-type]');
+        if (!button) return;
+        jigsawFinderBlurMode = button.dataset.blurType || 'standard';
+        jigsawFinderBlurType.querySelectorAll('button[data-blur-type]').forEach((option) => {
+          option.setAttribute('aria-pressed', option === button ? 'true' : 'false');
+        });
+        drawJigsawFinderImage();
       });
       jigsawFinderNight?.addEventListener('click', () => {
         jigsawFinderNightOn = !jigsawFinderNightOn;
@@ -7295,6 +7457,8 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         drawJigsawFinderImage();
       });
       jigsawFinderReset?.addEventListener('click', resetJigsawFinderAdjustments);
+      jigsawFinderFocus?.addEventListener('click', focusJigsawFinderImage);
+      jigsawFinderDownload?.addEventListener('click', downloadJigsawFinderCanvas);
       window.addEventListener('resize', () => {
         if (jigsawFinderModalEl?.classList.contains('visible')) drawJigsawFinderImage();
       });

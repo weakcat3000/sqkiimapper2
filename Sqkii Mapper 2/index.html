@@ -400,12 +400,12 @@
             </label>
             <label>
               <span>Blur Type</span>
-              <select id="jigsaw-finder-blur-type">
-                <option value="standard">Standard</option>
-                <option value="soft">Soft focus</option>
-                <option value="glow">Glow blur</option>
-                <option value="shadow">Shadow blur</option>
-              </select>
+              <div id="jigsaw-finder-blur-type" class="jigsaw-finder-segment" role="group" aria-label="Blur type">
+                <button type="button" data-blur-type="standard" aria-pressed="true">Standard</button>
+                <button type="button" data-blur-type="soft" aria-pressed="false">Soft</button>
+                <button type="button" data-blur-type="glow" aria-pressed="false">Glow</button>
+                <button type="button" data-blur-type="shadow" aria-pressed="false">Shadow</button>
+              </div>
             </label>
             <label>
               <span>Brightness</span>
@@ -413,6 +413,10 @@
             </label>
             <button id="jigsaw-finder-night" class="jigsaw-finder-toggle" type="button" aria-pressed="false">Night</button>
             <button id="jigsaw-finder-dark" class="jigsaw-finder-toggle" type="button" aria-pressed="false">Dark</button>
+          </div>
+          <div class="jigsaw-finder-focus-actions">
+            <button id="jigsaw-finder-focus" class="btn jigsaw-finder-focus-btn" type="button" disabled>Focus</button>
+            <button id="jigsaw-finder-download" class="btn jigsaw-finder-download-btn" type="button" disabled>Download</button>
           </div>
           <div id="jigsaw-finder-status" class="jigsaw-finder-status">Take a picture to start editing.</div>
         </div>
