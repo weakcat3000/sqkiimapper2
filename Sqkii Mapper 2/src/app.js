@@ -6159,7 +6159,9 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       const jigsawFinderDark = document.getElementById('jigsaw-finder-dark');
       const jigsawFinderReset = document.getElementById('jigsaw-finder-reset');
       const jigsawFinderFocus = document.getElementById('jigsaw-finder-focus');
+      const jigsawFinderFindBlur = document.getElementById('jigsaw-finder-find-blur');
       const jigsawFinderDownload = document.getElementById('jigsaw-finder-download');
+      const jigsawFinderBlurGrid = document.getElementById('jigsaw-finder-blur-grid');
       const jigsawFinderStatus = document.getElementById('jigsaw-finder-status');
       const htmIconsModal = document.getElementById('htm-icons-modal');
       const htmIconsCloseBtn = document.getElementById('htm-icons-close');
@@ -6192,6 +6194,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       let jigsawFinderBlurMode = 'standard';
       let jigsawFinderFocusSessionPromise = null;
       let jigsawFinderFocusBusy = false;
+      let jigsawFinderFindBlurBusy = false;
       let lastUserPos = null; // [lng, lat]
       let lastUserAccuracyMeters = null;
       function setAudioIcon(on) {
@@ -6341,17 +6344,26 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         if (jigsawFinderStatus) jigsawFinderStatus.textContent = message || '';
       }
       function syncJigsawFinderFocusButtons() {
-        const canProcess = !!jigsawFinderImage && !jigsawFinderFocusBusy;
+        const busy = jigsawFinderFocusBusy || jigsawFinderFindBlurBusy;
+        const canProcess = !!jigsawFinderImage && !busy;
         if (jigsawFinderFocus) {
           jigsawFinderFocus.disabled = !canProcess;
           jigsawFinderFocus.textContent = jigsawFinderFocusBusy ? 'Focusing...' : 'Focus';
         }
+        if (jigsawFinderFindBlur) {
+          jigsawFinderFindBlur.disabled = !canProcess;
+          jigsawFinderFindBlur.textContent = jigsawFinderFindBlurBusy ? 'Finding...' : 'Find Blur';
+        }
         if (jigsawFinderDownload) {
-          jigsawFinderDownload.disabled = !jigsawFinderImage || jigsawFinderFocusBusy;
+          jigsawFinderDownload.disabled = !jigsawFinderImage || busy;
         }
       }
       function setJigsawFinderFocusBusy(active) {
         jigsawFinderFocusBusy = !!active;
+        syncJigsawFinderFocusButtons();
+      }
+      function setJigsawFinderFindBlurBusy(active) {
+        jigsawFinderFindBlurBusy = !!active;
         syncJigsawFinderFocusButtons();
       }
       function drawJigsawFinderImage() {
@@ -6418,6 +6430,10 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         jigsawFinderDarkOn = false;
         jigsawFinderNight?.setAttribute('aria-pressed', 'false');
         jigsawFinderDark?.setAttribute('aria-pressed', 'false');
+        if (jigsawFinderBlurGrid) {
+          jigsawFinderBlurGrid.hidden = true;
+          jigsawFinderBlurGrid.innerHTML = '';
+        }
         drawJigsawFinderImage();
       }
       function getJigsawFinderInferenceSize(image) {
@@ -6562,6 +6578,232 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         link.href = jigsawFinderCanvas.toDataURL('image/png');
         link.click();
       }
+      function waitForNextFrame() {
+        return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+      }
+      function createJigsawFinderWorkCanvas(maxSize = (window.matchMedia?.('(pointer: coarse)')?.matches ? 256 : 320)) {
+        if (!jigsawFinderImage) return null;
+        const sourceW = jigsawFinderImage.naturalWidth || jigsawFinderImage.width || maxSize;
+        const sourceH = jigsawFinderImage.naturalHeight || jigsawFinderImage.height || maxSize;
+        const scale = Math.min(maxSize / sourceW, maxSize / sourceH, 1);
+        const width = Math.max(1, Math.round(sourceW * scale));
+        const height = Math.max(1, Math.round(sourceH * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return null;
+        ctx.drawImage(jigsawFinderImage, 0, 0, width, height);
+        return canvas;
+      }
+      function createJigsawKernel({ type, sigma = 1, size = 3, direction = 'horizontal' }) {
+        if (type === 'box') {
+          const safeSize = Math.max(3, size | 1);
+          return {
+            width: safeSize,
+            height: safeSize,
+            data: new Float32Array(safeSize * safeSize).fill(1 / (safeSize * safeSize)),
+          };
+        }
+        if (type === 'motion') {
+          const safeSize = Math.max(3, size | 1);
+          const data = new Float32Array(safeSize * safeSize);
+          const mid = Math.floor(safeSize / 2);
+          for (let i = 0; i < safeSize; i += 1) {
+            const x = direction === 'vertical' ? mid : i;
+            const y = direction === 'vertical' ? i : mid;
+            data[(y * safeSize) + x] = 1 / safeSize;
+          }
+          return { width: safeSize, height: safeSize, data };
+        }
+        const radius = Math.max(1, Math.ceil(sigma * 2.35));
+        const safeSize = (radius * 2) + 1;
+        const data = new Float32Array(safeSize * safeSize);
+        let sum = 0;
+        for (let y = -radius; y <= radius; y += 1) {
+          for (let x = -radius; x <= radius; x += 1) {
+            const value = Math.exp(-(x * x + y * y) / (2 * sigma * sigma));
+            const index = ((y + radius) * safeSize) + x + radius;
+            data[index] = value;
+            sum += value;
+          }
+        }
+        for (let i = 0; i < data.length; i += 1) data[i] /= sum || 1;
+        return { width: safeSize, height: safeSize, data };
+      }
+      function flipJigsawKernel(kernel) {
+        const data = new Float32Array(kernel.data.length);
+        for (let y = 0; y < kernel.height; y += 1) {
+          for (let x = 0; x < kernel.width; x += 1) {
+            data[(y * kernel.width) + x] = kernel.data[((kernel.height - 1 - y) * kernel.width) + (kernel.width - 1 - x)];
+          }
+        }
+        return { ...kernel, data };
+      }
+      function convolveJigsawRgb(input, width, height, kernel) {
+        const output = new Float32Array(input.length);
+        const halfW = Math.floor(kernel.width / 2);
+        const halfH = Math.floor(kernel.height / 2);
+        for (let y = 0; y < height; y += 1) {
+          for (let x = 0; x < width; x += 1) {
+            const out = ((y * width) + x) * 3;
+            let r = 0;
+            let g = 0;
+            let b = 0;
+            for (let ky = 0; ky < kernel.height; ky += 1) {
+              const sy = Math.max(0, Math.min(height - 1, y + ky - halfH));
+              for (let kx = 0; kx < kernel.width; kx += 1) {
+                const sx = Math.max(0, Math.min(width - 1, x + kx - halfW));
+                const src = ((sy * width) + sx) * 3;
+                const weight = kernel.data[(ky * kernel.width) + kx];
+                r += input[src] * weight;
+                g += input[src + 1] * weight;
+                b += input[src + 2] * weight;
+              }
+            }
+            output[out] = r;
+            output[out + 1] = g;
+            output[out + 2] = b;
+          }
+        }
+        return output;
+      }
+      function imageDataToJigsawRgb(imageData) {
+        const rgb = new Float32Array(imageData.width * imageData.height * 3);
+        for (let i = 0, p = 0; i < rgb.length; i += 3, p += 4) {
+          rgb[i] = imageData.data[p] / 255;
+          rgb[i + 1] = imageData.data[p + 1] / 255;
+          rgb[i + 2] = imageData.data[p + 2] / 255;
+        }
+        return rgb;
+      }
+      function jigsawRgbToCanvas(rgb, width, height) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const imageData = new ImageData(width, height);
+        for (let i = 0, p = 0; i < rgb.length; i += 3, p += 4) {
+          imageData.data[p] = Math.max(0, Math.min(255, Math.round(rgb[i] * 255)));
+          imageData.data[p + 1] = Math.max(0, Math.min(255, Math.round(rgb[i + 1] * 255)));
+          imageData.data[p + 2] = Math.max(0, Math.min(255, Math.round(rgb[i + 2] * 255)));
+          imageData.data[p + 3] = 255;
+        }
+        canvas.getContext('2d')?.putImageData(imageData, 0, 0);
+        return canvas;
+      }
+      async function richardsonLucyJigsawRgb(observed, width, height, kernel, iterations, damping) {
+        const flippedKernel = flipJigsawKernel(kernel);
+        let estimate = new Float32Array(observed);
+        const epsilon = 0.0035;
+        for (let iter = 0; iter < iterations; iter += 1) {
+          const blurred = convolveJigsawRgb(estimate, width, height, kernel);
+          const ratio = new Float32Array(observed.length);
+          for (let i = 0; i < observed.length; i += 1) {
+            ratio[i] = (observed[i] + epsilon) / (blurred[i] + epsilon);
+          }
+          const correction = convolveJigsawRgb(ratio, width, height, flippedKernel);
+          for (let i = 0; i < estimate.length; i += 1) {
+            const next = estimate[i] * (1 + damping * (correction[i] - 1));
+            estimate[i] = Math.max(0, Math.min(1, (next * 0.982) + (observed[i] * 0.018)));
+          }
+          if (iter % 2 === 1) await waitForNextFrame();
+        }
+        return estimate;
+      }
+      function drawJigsawFinderCanvasResult(sourceCanvas) {
+        if (!jigsawFinderCanvas || !sourceCanvas) return;
+        const maxW = Math.max(1, jigsawFinderCanvas.parentElement?.clientWidth || sourceCanvas.width);
+        const scale = Math.min(maxW / sourceCanvas.width, 1);
+        const displayW = Math.max(1, Math.round(sourceCanvas.width * scale));
+        const displayH = Math.max(1, Math.round(sourceCanvas.height * scale));
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        jigsawFinderCanvas.width = Math.round(displayW * dpr);
+        jigsawFinderCanvas.height = Math.round(displayH * dpr);
+        jigsawFinderCanvas.style.width = `${displayW}px`;
+        jigsawFinderCanvas.style.height = `${displayH}px`;
+        jigsawFinderCanvas.style.aspectRatio = `${displayW} / ${displayH}`;
+        const ctx = jigsawFinderCanvas.getContext('2d', { alpha: false });
+        if (!ctx) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(sourceCanvas, 0, 0, displayW, displayH);
+      }
+      function renderJigsawFinderBlurAttempt({ label, canvas, selected = false }) {
+        if (!jigsawFinderBlurGrid) return;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'jigsaw-finder-blur-card';
+        button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        const preview = document.createElement('canvas');
+        preview.width = canvas.width;
+        preview.height = canvas.height;
+        preview.getContext('2d')?.drawImage(canvas, 0, 0);
+        const caption = document.createElement('span');
+        caption.textContent = label;
+        button.append(preview, caption);
+        button.addEventListener('click', () => {
+          jigsawFinderBlurGrid.querySelectorAll('.jigsaw-finder-blur-card').forEach((card) => {
+            card.setAttribute('aria-pressed', 'false');
+          });
+          button.setAttribute('aria-pressed', 'true');
+          drawJigsawFinderCanvasResult(canvas);
+          setJigsawFinderStatus(`${label} applied. Download it or try another preview.`);
+        });
+        jigsawFinderBlurGrid.appendChild(button);
+      }
+      async function findJigsawFinderBlurRadius() {
+        if (!jigsawFinderImage || jigsawFinderFindBlurBusy) return;
+        const sourceCanvas = createJigsawFinderWorkCanvas();
+        const sourceCtx = sourceCanvas?.getContext('2d', { willReadFrequently: true });
+        if (!sourceCanvas || !sourceCtx) {
+          setJigsawFinderStatus('Could not prepare this photo for blur search.');
+          return;
+        }
+        setJigsawFinderFindBlurBusy(true);
+        if (jigsawFinderBlurGrid) {
+          jigsawFinderBlurGrid.hidden = false;
+          jigsawFinderBlurGrid.innerHTML = '<div class="jigsaw-finder-blur-warning">If the blur destroyed too much detail, exact recovery may be impossible. These previews are guesses.</div>';
+        }
+        try {
+          setJigsawFinderStatus('Building blur guesses...');
+          const imageData = sourceCtx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+          const observed = imageDataToJigsawRgb(imageData);
+          renderJigsawFinderBlurAttempt({ label: 'Original', canvas: sourceCanvas, selected: true });
+          const attempts = [
+            { label: 'Gaussian sigma 0.9', kernel: createJigsawKernel({ type: 'gaussian', sigma: 0.9 }), iterations: 7, damping: 0.62 },
+            { label: 'Gaussian sigma 1.4', kernel: createJigsawKernel({ type: 'gaussian', sigma: 1.4 }), iterations: 8, damping: 0.58 },
+            { label: 'Gaussian sigma 2.0', kernel: createJigsawKernel({ type: 'gaussian', sigma: 2.0 }), iterations: 9, damping: 0.52 },
+            { label: 'Box 3px', kernel: createJigsawKernel({ type: 'box', size: 3 }), iterations: 8, damping: 0.58 },
+            { label: 'Box 5px', kernel: createJigsawKernel({ type: 'box', size: 5 }), iterations: 9, damping: 0.54 },
+            { label: 'Box 7px', kernel: createJigsawKernel({ type: 'box', size: 7 }), iterations: 10, damping: 0.5 },
+            { label: 'Motion H 9px', kernel: createJigsawKernel({ type: 'motion', size: 9, direction: 'horizontal' }), iterations: 9, damping: 0.55 },
+            { label: 'Motion V 9px', kernel: createJigsawKernel({ type: 'motion', size: 9, direction: 'vertical' }), iterations: 9, damping: 0.55 },
+          ];
+          for (let i = 0; i < attempts.length; i += 1) {
+            const attempt = attempts[i];
+            setJigsawFinderStatus(`Trying ${attempt.label} (${i + 1}/${attempts.length})...`);
+            await waitForNextFrame();
+            const result = await richardsonLucyJigsawRgb(
+              observed,
+              sourceCanvas.width,
+              sourceCanvas.height,
+              attempt.kernel,
+              attempt.iterations,
+              attempt.damping
+            );
+            renderJigsawFinderBlurAttempt({
+              label: attempt.label,
+              canvas: jigsawRgbToCanvas(result, sourceCanvas.width, sourceCanvas.height),
+            });
+          }
+          setJigsawFinderStatus('Blur guesses ready. Tap the best-looking preview to apply it.');
+        } catch (error) {
+          console.warn('[Jigsaw Finder] Blur radius search failed:', error);
+          setJigsawFinderStatus('Find Blur failed on this photo. Try a smaller crop or another image.');
+        } finally {
+          setJigsawFinderFindBlurBusy(false);
+        }
+      }
       function setJigsawFinderImage(file) {
         if (!file) return;
         if (jigsawFinderPreviewUrl) URL.revokeObjectURL(jigsawFinderPreviewUrl);
@@ -6571,6 +6813,10 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           jigsawFinderImage = img;
           if (jigsawFinderCapturePreview) {
             jigsawFinderCapturePreview.innerHTML = `<img src="${escapeHtml(jigsawFinderPreviewUrl)}" alt="Captured clue photo">`;
+          }
+          if (jigsawFinderBlurGrid) {
+            jigsawFinderBlurGrid.hidden = true;
+            jigsawFinderBlurGrid.innerHTML = '';
           }
           resetJigsawFinderAdjustments();
           setJigsawFinderStatus('Photo captured. Adjust the image below.');
@@ -7474,6 +7720,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       });
       jigsawFinderReset?.addEventListener('click', resetJigsawFinderAdjustments);
       jigsawFinderFocus?.addEventListener('click', focusJigsawFinderImage);
+      jigsawFinderFindBlur?.addEventListener('click', findJigsawFinderBlurRadius);
       jigsawFinderDownload?.addEventListener('click', downloadJigsawFinderCanvas);
       window.addEventListener('resize', () => {
         if (jigsawFinderModalEl?.classList.contains('visible')) drawJigsawFinderImage();

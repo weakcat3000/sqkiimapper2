@@ -15,7 +15,11 @@ How it works:
 - Images are resized into a safe max 512 px inference frame and edge-padded when needed so the NAFNet encoder has enough spatial area.
 - Pixels are converted to a Float32 RGB tensor in NCHW format: `[1, 3, H, W]`, normalized to `0-1`.
 - The model output tensor is converted back to a canvas image.
+- The Find Blur button runs a browser-only Blur Radius Finder for artificial software blur. It tries several Richardson-Lucy deconvolution guesses using Gaussian, box, and simple horizontal/vertical motion blur kernels.
+- The comparison grid shows the original image and labeled guesses; tap the best-looking preview to apply it.
 - The Download button saves the current adjusted/focused canvas as a PNG.
+
+NAFNet is best for natural photo blur and camera-like degradation. Blur Radius Finder is for artificial software blur where the blur radius may be guessed. If the blur destroyed too much detail, exact recovery may be impossible; the generated previews are educated guesses rather than guaranteed reconstruction.
 
 ## ONNX Model
 

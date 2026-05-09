@@ -3483,11 +3483,12 @@
 
     .jigsaw-finder-focus-actions {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 12px;
     }
 
     .jigsaw-finder-focus-btn,
+    .jigsaw-finder-find-blur-btn,
     .jigsaw-finder-download-btn {
       min-height: 42px;
       border: 1px solid rgba(34, 211, 238, 0.35);
@@ -3499,9 +3500,71 @@
     }
 
     .jigsaw-finder-focus-btn:disabled,
+    .jigsaw-finder-find-blur-btn:disabled,
     .jigsaw-finder-download-btn:disabled {
       opacity: 0.45;
       cursor: not-allowed;
+    }
+
+    .jigsaw-finder-blur-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid rgba(34, 211, 238, 0.18);
+      background: rgba(2, 8, 23, 0.58);
+      max-height: 48vh;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .jigsaw-finder-blur-grid[hidden] {
+      display: none;
+    }
+
+    .jigsaw-finder-blur-warning {
+      grid-column: 1 / -1;
+      color: #fde68a;
+      font-size: 11px;
+      line-height: 1.35;
+      text-align: center;
+      padding: 6px 8px;
+      border: 1px solid rgba(250, 204, 21, 0.24);
+      background: rgba(113, 63, 18, 0.22);
+    }
+
+    .jigsaw-finder-blur-card {
+      display: grid;
+      gap: 6px;
+      padding: 7px;
+      border: 1px solid rgba(34, 211, 238, 0.2);
+      background: rgba(15, 23, 42, 0.8);
+      color: #dff7ff;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .jigsaw-finder-blur-card[aria-pressed="true"] {
+      border-color: rgba(103, 232, 249, 0.95);
+      box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.25);
+      background: rgba(8, 47, 73, 0.88);
+    }
+
+    .jigsaw-finder-blur-card canvas {
+      width: 100%;
+      height: auto;
+      max-height: 150px;
+      object-fit: contain;
+      background: #020617;
+      border: 1px solid rgba(34, 211, 238, 0.12);
+    }
+
+    .jigsaw-finder-blur-card span {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0;
+      line-height: 1.2;
     }
 
     .jigsaw-finder-toggle {
@@ -3526,6 +3589,17 @@
       color: #67e8f9;
       font-size: 11px;
       text-align: center;
+    }
+
+    @media (max-width: 560px) {
+      .jigsaw-finder-controls,
+      .jigsaw-finder-focus-actions {
+        grid-template-columns: 1fr;
+      }
+
+      .jigsaw-finder-blur-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     .silver-ai-card {
