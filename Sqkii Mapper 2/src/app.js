@@ -6144,6 +6144,19 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       const silverAiPreviewEl = document.getElementById('silver-ai-preview');
       const silverAiStatusEl = document.getElementById('silver-ai-status');
       const silverAiResultsEl = document.getElementById('silver-ai-results');
+      const jigsawFinderOpenBtn = document.getElementById('jigsaw-finder-open');
+      const jigsawFinderModalEl = document.getElementById('jigsaw-finder-modal');
+      const jigsawFinderCloseBtn = document.getElementById('jigsaw-finder-close');
+      const jigsawFinderInput = document.getElementById('jigsaw-finder-input');
+      const jigsawFinderCameraBtn = document.getElementById('jigsaw-finder-camera');
+      const jigsawFinderCapturePreview = document.getElementById('jigsaw-finder-capture-preview');
+      const jigsawFinderCanvas = document.getElementById('jigsaw-finder-canvas');
+      const jigsawFinderBlur = document.getElementById('jigsaw-finder-blur');
+      const jigsawFinderBrightness = document.getElementById('jigsaw-finder-brightness');
+      const jigsawFinderNight = document.getElementById('jigsaw-finder-night');
+      const jigsawFinderDark = document.getElementById('jigsaw-finder-dark');
+      const jigsawFinderReset = document.getElementById('jigsaw-finder-reset');
+      const jigsawFinderStatus = document.getElementById('jigsaw-finder-status');
       const htmIconsModal = document.getElementById('htm-icons-modal');
       const htmIconsCloseBtn = document.getElementById('htm-icons-close');
       const htmIconsMasterBtn = document.getElementById('htm-icons-master-toggle');
@@ -6159,11 +6172,16 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         .filter((layer) => layer.markerKind === 'sv-ticket')
         .map((layer) => layer.id);
       const silverAiModal = silverAiModalEl ? ModalManager.create('silver-ai-modal') : null;
+      const jigsawFinderModal = jigsawFinderModalEl ? ModalManager.create('jigsaw-finder-modal') : null;
       let silverAiDatasetPromise = null;
       let silverAiSelectedFiles = [];
       let silverAiPreviewUrl = null;
       let silverAiLastMediaPayloads = [];
       let silverAiLastMediaIssues = [];
+      let jigsawFinderImage = null;
+      let jigsawFinderPreviewUrl = null;
+      let jigsawFinderDarkOn = false;
+      let jigsawFinderNightOn = false;
       let lastUserPos = null; // [lng, lat]
       let lastUserAccuracyMeters = null;
       function setAudioIcon(on) {
@@ -6308,6 +6326,64 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         if (capture) silverAiInput.setAttribute('capture', capture);
         else silverAiInput.removeAttribute('capture');
         silverAiInput.click();
+      }
+      function setJigsawFinderStatus(message) {
+        if (jigsawFinderStatus) jigsawFinderStatus.textContent = message || '';
+      }
+      function drawJigsawFinderImage() {
+        if (!jigsawFinderCanvas || !jigsawFinderImage) return;
+        const maxW = Math.max(1, jigsawFinderCanvas.clientWidth || 900);
+        const maxH = Math.max(1, jigsawFinderCanvas.clientHeight || 420);
+        const sourceW = jigsawFinderImage.naturalWidth || jigsawFinderImage.width || maxW;
+        const sourceH = jigsawFinderImage.naturalHeight || jigsawFinderImage.height || maxH;
+        const scale = Math.min(maxW / sourceW, maxH / sourceH, 1);
+        const width = Math.max(1, Math.round(sourceW * scale));
+        const height = Math.max(1, Math.round(sourceH * scale));
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        jigsawFinderCanvas.width = Math.round(width * dpr);
+        jigsawFinderCanvas.height = Math.round(height * dpr);
+        jigsawFinderCanvas.style.aspectRatio = `${width} / ${height}`;
+        const ctx = jigsawFinderCanvas.getContext('2d', { alpha: false });
+        if (!ctx) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const blur = Number(jigsawFinderBlur?.value || 0);
+        const brightness = Number(jigsawFinderBrightness?.value || 100);
+        const contrast = jigsawFinderNightOn ? 126 : 100;
+        const saturate = jigsawFinderNightOn ? 118 : 100;
+        ctx.filter = `blur(${blur}px) brightness(${brightness}%) contrast(${contrast}%) saturate(${saturate}%)`;
+        ctx.drawImage(jigsawFinderImage, 0, 0, width, height);
+        ctx.filter = 'none';
+        if (jigsawFinderDarkOn || jigsawFinderNightOn) {
+          ctx.globalCompositeOperation = jigsawFinderDarkOn ? 'multiply' : 'screen';
+          ctx.fillStyle = jigsawFinderDarkOn ? 'rgba(2, 6, 23, 0.38)' : 'rgba(36, 204, 255, 0.10)';
+          ctx.fillRect(0, 0, width, height);
+          ctx.globalCompositeOperation = 'source-over';
+        }
+      }
+      function resetJigsawFinderAdjustments() {
+        if (jigsawFinderBlur) jigsawFinderBlur.value = '0';
+        if (jigsawFinderBrightness) jigsawFinderBrightness.value = '100';
+        jigsawFinderNightOn = false;
+        jigsawFinderDarkOn = false;
+        jigsawFinderNight?.setAttribute('aria-pressed', 'false');
+        jigsawFinderDark?.setAttribute('aria-pressed', 'false');
+        drawJigsawFinderImage();
+      }
+      function setJigsawFinderImage(file) {
+        if (!file) return;
+        if (jigsawFinderPreviewUrl) URL.revokeObjectURL(jigsawFinderPreviewUrl);
+        jigsawFinderPreviewUrl = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          jigsawFinderImage = img;
+          if (jigsawFinderCapturePreview) {
+            jigsawFinderCapturePreview.innerHTML = `<img src="${escapeHtml(jigsawFinderPreviewUrl)}" alt="Captured clue photo">`;
+          }
+          resetJigsawFinderAdjustments();
+          setJigsawFinderStatus('Photo captured. Adjust the image below.');
+        };
+        img.onerror = () => setJigsawFinderStatus('Could not load that photo. Try taking another picture.');
+        img.src = jigsawFinderPreviewUrl;
       }
       function setSilverAiStatus(message, tone = 'info') {
         if (!silverAiStatusEl) return;
@@ -7168,6 +7244,34 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         setSilverAiFiles(event.target?.files || []);
       });
       silverAiAnalyzeBtn?.addEventListener('click', analyzeSilverAiUploads);
+      jigsawFinderOpenBtn?.addEventListener('click', () => {
+        jigsawFinderModal?.open();
+        requestAnimationFrame(drawJigsawFinderImage);
+      });
+      jigsawFinderCloseBtn?.addEventListener('click', () => jigsawFinderModal?.close());
+      jigsawFinderCameraBtn?.addEventListener('click', () => jigsawFinderInput?.click());
+      jigsawFinderInput?.addEventListener('change', (event) => {
+        const file = event.target?.files?.[0];
+        if (file) setJigsawFinderImage(file);
+        event.target.value = '';
+      });
+      [jigsawFinderBlur, jigsawFinderBrightness].forEach((input) => {
+        input?.addEventListener('input', drawJigsawFinderImage);
+      });
+      jigsawFinderNight?.addEventListener('click', () => {
+        jigsawFinderNightOn = !jigsawFinderNightOn;
+        jigsawFinderNight.setAttribute('aria-pressed', jigsawFinderNightOn ? 'true' : 'false');
+        drawJigsawFinderImage();
+      });
+      jigsawFinderDark?.addEventListener('click', () => {
+        jigsawFinderDarkOn = !jigsawFinderDarkOn;
+        jigsawFinderDark.setAttribute('aria-pressed', jigsawFinderDarkOn ? 'true' : 'false');
+        drawJigsawFinderImage();
+      });
+      jigsawFinderReset?.addEventListener('click', resetJigsawFinderAdjustments);
+      window.addEventListener('resize', () => {
+        if (jigsawFinderModalEl?.classList.contains('visible')) drawJigsawFinderImage();
+      });
       silverFlagsQuickBtn?.addEventListener('click', () => toggleHtmIconsGroup(SILVER_HTM_LAYER_IDS));
       sqkiiVoucherQuickBtn?.addEventListener('click', () => toggleHtmIconsGroup(SQKII_VOUCHER_LAYER_IDS));
       htmIconsListEl?.addEventListener('change', (e) => {

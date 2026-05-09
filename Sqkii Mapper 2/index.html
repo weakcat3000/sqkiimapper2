@@ -279,6 +279,16 @@
       <span class="compass-status" aria-hidden="true"></span>
     </button>
 
+    <button id="streetview-btn" class="streetview-btn" type="button" title="Open Google Street View" aria-label="Open Google Street View" aria-pressed="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="5.25" r="2.75"></circle>
+        <path d="M5.75 10.1c2.05-.7 4.15-1.05 6.25-1.05s4.2.35 6.25 1.05"></path>
+        <path d="M12 9.15v4.25"></path>
+        <path d="M8.25 21l2.25-7.6h3L15.75 21"></path>
+      </svg>
+      <span class="streetview-status-dot" aria-hidden="true"></span>
+    </button>
+
     <div id="silver-tool-rail" class="tool-rail tool-rail-silver" aria-label="Silver tools">
       <button
         id="silver-tool-rail-toggle"
@@ -331,10 +341,72 @@
         </button>
 
         <button
+          id="jigsaw-finder-open"
+          class="tool-rail-btn tool-rail-btn-jigsaw-finder"
+          title="Open Jigsaw Finder"
+          aria-label="Open Jigsaw Finder">
+          <img src="assets/jigsaw-puzzle-piece.png" alt="" class="jigsaw-finder-piece-icon" />
+          <svg class="jigsaw-finder-microscope-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 18h8"></path>
+            <path d="M3 22h18"></path>
+            <path d="M14 22a7 7 0 0 0 7-7"></path>
+            <path d="M5 6l3-3 7 7-3 3Z"></path>
+            <path d="m8 11-3 3"></path>
+            <path d="m12 3 3-3"></path>
+          </svg>
+        </button>
+
+        <button
           id="sonar-btn"
           class="tool-rail-btn tool-rail-btn-sonar sonar-btn disabled"
           title="Turn on GPS to use Sonar"
           aria-label="Turn on GPS to use Sonar"></button>
+      </div>
+    </div>
+
+    <div id="jigsaw-finder-modal" class="modal">
+      <div class="modal-card jigsaw-finder-card">
+        <button id="jigsaw-finder-close" class="style-editor-x lamp-search-close-top" aria-label="Close Jigsaw Finder">×</button>
+        <div class="jigsaw-finder-top">
+          <div class="jigsaw-finder-title-row">
+            <img src="assets/jigsaw-puzzle-piece.png" alt="" />
+            <div>
+              <div class="jigsaw-finder-kicker">JIGSAW FINDER</div>
+              <h3>Capture Clue Photo</h3>
+            </div>
+          </div>
+          <input id="jigsaw-finder-input" type="file" accept="image/*" capture="environment" hidden />
+          <button id="jigsaw-finder-camera" class="btn jigsaw-finder-camera-btn" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+            <span>Take Picture</span>
+          </button>
+          <div id="jigsaw-finder-capture-preview" class="jigsaw-finder-capture-preview">
+            <span>Use iPhone camera to capture a real-world clue photo.</span>
+          </div>
+        </div>
+        <div class="jigsaw-finder-editor">
+          <div class="jigsaw-finder-editor-head">
+            <div>
+              <div class="jigsaw-finder-kicker">ADJUST IMAGE</div>
+              <h4>Enhance Details</h4>
+            </div>
+            <button id="jigsaw-finder-reset" class="btn small" type="button">Reset</button>
+          </div>
+          <canvas id="jigsaw-finder-canvas"></canvas>
+          <div class="jigsaw-finder-controls">
+            <label>
+              <span>Blur</span>
+              <input id="jigsaw-finder-blur" type="range" min="0" max="8" step="0.1" value="0">
+            </label>
+            <label>
+              <span>Brightness</span>
+              <input id="jigsaw-finder-brightness" type="range" min="40" max="180" step="1" value="100">
+            </label>
+            <button id="jigsaw-finder-night" class="jigsaw-finder-toggle" type="button" aria-pressed="false">Night</button>
+            <button id="jigsaw-finder-dark" class="jigsaw-finder-toggle" type="button" aria-pressed="false">Dark</button>
+          </div>
+          <div id="jigsaw-finder-status" class="jigsaw-finder-status">Take a picture to start editing.</div>
+        </div>
       </div>
     </div>
 
