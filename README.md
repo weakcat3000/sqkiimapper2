@@ -12,17 +12,29 @@ How it works:
 - The original photo is previewed in the capture area.
 - The Adjust Image panel uses canvas for blur, brightness, night, and dark adjustments.
 - The Focus button loads an ONNX deblurring model with `onnxruntime-web`.
-- Images are resized to a safe max size of 512 px on the longest side before inference.
+- Images are resized into a safe max 512 px inference frame and edge-padded when needed so the NAFNet encoder has enough spatial area.
 - Pixels are converted to a Float32 RGB tensor in NCHW format: `[1, 3, H, W]`, normalized to `0-1`.
 - The model output tensor is converted back to a canvas image.
 - The Download button saves the current adjusted/focused canvas as a PNG.
 
 ## ONNX Model
 
-Put the real NAFNet ONNX deblurring model here:
+The real NAFNet ONNX deblurring model is included here:
 
 ```text
 Sqkii Mapper 2/public/models/nafnet_deblur.onnx
+```
+
+Model source:
+
+```text
+https://huggingface.co/opencv/deblurring_nafnet
+```
+
+Bundled file:
+
+```text
+deblurring_nafnet_2025may.onnx
 ```
 
 After Vite builds the site, that file is served on GitHub Pages at:
@@ -31,7 +43,7 @@ After Vite builds the site, that file is served on GitHub Pages at:
 /sqkiimapper2/models/nafnet_deblur.onnx
 ```
 
-The current integration intentionally uses this placeholder path. If the model file is missing, the UI shows a friendly message instead of failing silently.
+If the model file is missing or cannot be loaded, the UI shows a friendly message instead of failing silently.
 
 The expected model contract is:
 
@@ -59,4 +71,4 @@ npm install
 npm run build
 ```
 
-Deploy the generated `dist/` folder to GitHub Pages. Make sure the real model exists in `public/models/nafnet_deblur.onnx` before building if you want Focus to run live.
+Deploy the generated `dist/` folder to GitHub Pages. The included model is copied from `public/models/nafnet_deblur.onnx` into the static build.

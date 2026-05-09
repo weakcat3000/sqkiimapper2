@@ -6423,19 +6423,40 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       function getJigsawFinderInferenceSize(image) {
         const sourceW = image.naturalWidth || image.width || JIGSAW_DEBLUR_MAX_SIZE;
         const sourceH = image.naturalHeight || image.height || JIGSAW_DEBLUR_MAX_SIZE;
-        const scale = Math.min(JIGSAW_DEBLUR_MAX_SIZE / sourceW, JIGSAW_DEBLUR_MAX_SIZE / sourceH, 1);
+        let scale = Math.min(JIGSAW_DEBLUR_MAX_SIZE / sourceW, JIGSAW_DEBLUR_MAX_SIZE / sourceH, 1);
+        const scaledShortSide = Math.min(sourceW * scale, sourceH * scale);
+        if (scaledShortSide < 384) {
+          const minSideScale = 384 / Math.max(1, Math.min(sourceW, sourceH));
+          if (Math.max(sourceW, sourceH) * minSideScale <= JIGSAW_DEBLUR_MAX_SIZE) {
+            scale = minSideScale;
+          }
+        }
+        const cropWidth = Math.max(8, Math.round(sourceW * scale));
+        const cropHeight = Math.max(8, Math.round(sourceH * scale));
+        const padToModelSize = (value) => Math.min(
+          JIGSAW_DEBLUR_MAX_SIZE,
+          Math.max(384, Math.ceil(value / 32) * 32)
+        );
         return {
-          width: Math.max(8, Math.floor((sourceW * scale) / 8) * 8),
-          height: Math.max(8, Math.floor((sourceH * scale) / 8) * 8),
+          width: padToModelSize(cropWidth),
+          height: padToModelSize(cropHeight),
+          cropWidth,
+          cropHeight,
         };
       }
-      function imageToJigsawFinderTensor(image, width, height) {
+      function imageToJigsawFinderTensor(image, width, height, cropWidth = width, cropHeight = height) {
         const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         if (!ctx) throw new Error('Canvas preprocessing is unavailable in this browser.');
-        ctx.drawImage(image, 0, 0, width, height);
+        ctx.drawImage(image, 0, 0, cropWidth, cropHeight);
+        if (cropWidth < width) {
+          ctx.drawImage(canvas, cropWidth - 1, 0, 1, cropHeight, cropWidth, 0, width - cropWidth, cropHeight);
+        }
+        if (cropHeight < height) {
+          ctx.drawImage(canvas, 0, cropHeight - 1, width, 1, 0, cropHeight, width, height - cropHeight);
+        }
         const pixels = ctx.getImageData(0, 0, width, height).data;
         const planeSize = width * height;
         const data = new Float32Array(planeSize * 3);
@@ -6446,7 +6467,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         }
         return new ort.Tensor('float32', data, [1, 3, height, width]);
       }
-      function drawJigsawFinderTensor(tensor, fallbackWidth, fallbackHeight) {
+      function drawJigsawFinderTensor(tensor, fallbackWidth, fallbackHeight, cropWidth = fallbackWidth, cropHeight = fallbackHeight) {
         if (!jigsawFinderCanvas) return;
         const dims = tensor.dims || [];
         const data = tensor.data;
@@ -6465,12 +6486,14 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           output.data[p + 2] = Math.max(0, Math.min(255, Math.round(b * 255)));
           output.data[p + 3] = 255;
         }
+        const visibleW = Math.min(width, cropWidth);
+        const visibleH = Math.min(height, cropHeight);
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        jigsawFinderCanvas.width = Math.round(width * dpr);
-        jigsawFinderCanvas.height = Math.round(height * dpr);
-        jigsawFinderCanvas.style.width = `${width}px`;
-        jigsawFinderCanvas.style.height = `${height}px`;
-        jigsawFinderCanvas.style.aspectRatio = `${width} / ${height}`;
+        jigsawFinderCanvas.width = Math.round(visibleW * dpr);
+        jigsawFinderCanvas.height = Math.round(visibleH * dpr);
+        jigsawFinderCanvas.style.width = `${visibleW}px`;
+        jigsawFinderCanvas.style.height = `${visibleH}px`;
+        jigsawFinderCanvas.style.aspectRatio = `${visibleW} / ${visibleH}`;
         const ctx = jigsawFinderCanvas.getContext('2d', { alpha: false });
         if (!ctx) return;
         const tempCanvas = document.createElement('canvas');
@@ -6479,17 +6502,16 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         tempCanvas.getContext('2d')?.putImageData(output, 0, 0);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(tempCanvas, 0, 0, width, height);
+        ctx.drawImage(tempCanvas, 0, 0, visibleW, visibleH, 0, 0, visibleW, visibleH);
       }
       async function getJigsawFinderFocusSession() {
         if (!jigsawFinderFocusSessionPromise) {
           jigsawFinderFocusSessionPromise = (async () => {
-            const modelCheck = await fetch(JIGSAW_DEBLUR_MODEL_URL, { cache: 'no-store' });
-            if (!modelCheck.ok) {
+            const modelCheck = await fetch(JIGSAW_DEBLUR_MODEL_URL, { method: 'HEAD', cache: 'no-store' });
+            if (!modelCheck.ok && modelCheck.status !== 405) {
               throw new Error('Deblur model missing. Add /models/nafnet_deblur.onnx to enable Focus.');
             }
-            // Replace public/models/nafnet_deblur.onnx with a real NAFNet ONNX export.
-            // The model should accept RGB float32 NCHW [1,3,H,W] normalized to 0-1.
+            // The bundled NAFNet model expects RGB float32 NCHW [1,3,H,W] normalized to 0-1.
             const options = { graphOptimizationLevel: 'all' };
             if (navigator.gpu) {
               try {
@@ -6516,16 +6538,16 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         try {
           await new Promise((resolve) => setTimeout(resolve, 0));
           const session = await getJigsawFinderFocusSession();
-          const { width, height } = getJigsawFinderInferenceSize(jigsawFinderImage);
+          const { width, height, cropWidth, cropHeight } = getJigsawFinderInferenceSize(jigsawFinderImage);
           setJigsawFinderStatus(`Focusing image at ${width}x${height}...`);
-          const inputTensor = imageToJigsawFinderTensor(jigsawFinderImage, width, height);
+          const inputTensor = imageToJigsawFinderTensor(jigsawFinderImage, width, height, cropWidth, cropHeight);
           const inputName = session.inputNames?.[0];
           if (!inputName) throw new Error('Deblur model has no input tensor.');
           const results = await session.run({ [inputName]: inputTensor });
           const outputName = session.outputNames?.[0] || Object.keys(results)[0];
           const outputTensor = results[outputName];
           if (!outputTensor) throw new Error('Deblur model did not return an output image.');
-          drawJigsawFinderTensor(outputTensor, width, height);
+          drawJigsawFinderTensor(outputTensor, width, height, cropWidth, cropHeight);
           setJigsawFinderStatus('Focused result ready. Download it or adjust the photo again.');
         } catch (error) {
           console.warn('[Jigsaw Finder] Focus failed:', error);
