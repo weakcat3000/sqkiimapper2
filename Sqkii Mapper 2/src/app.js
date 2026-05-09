@@ -6691,6 +6691,167 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         canvas.getContext('2d')?.putImageData(imageData, 0, 0);
         return canvas;
       }
+      function cloneJigsawRgb(input) {
+        return new Float32Array(input);
+      }
+      function sharpenJigsawRgb(observed, width, height, amount = 1.2, contrast = 1.16) {
+        const blur = convolveJigsawRgb(observed, width, height, createJigsawKernel({ type: 'gaussian', sigma: 1.1 }));
+        const output = new Float32Array(observed.length);
+        for (let i = 0; i < observed.length; i += 1) {
+          const sharpened = observed[i] + amount * (observed[i] - blur[i]);
+          output[i] = Math.max(0, Math.min(1, ((sharpened - 0.5) * contrast) + 0.5));
+        }
+        return output;
+      }
+      function edgeMapJigsawRgb(observed, width, height) {
+        const output = new Float32Array(observed.length);
+        const luma = new Float32Array(width * height);
+        for (let i = 0, p = 0; i < luma.length; i += 1, p += 3) {
+          luma[i] = 0.299 * observed[p] + 0.587 * observed[p + 1] + 0.114 * observed[p + 2];
+        }
+        const sx = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
+        const sy = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
+        for (let y = 0; y < height; y += 1) {
+          for (let x = 0; x < width; x += 1) {
+            let gx = 0;
+            let gy = 0;
+            for (let ky = -1; ky <= 1; ky += 1) {
+              const py = Math.max(0, Math.min(height - 1, y + ky));
+              for (let kx = -1; kx <= 1; kx += 1) {
+                const px = Math.max(0, Math.min(width - 1, x + kx));
+                const k = ((ky + 1) * 3) + kx + 1;
+                const value = luma[(py * width) + px];
+                gx += value * sx[k];
+                gy += value * sy[k];
+              }
+            }
+            const edge = Math.max(0, Math.min(1, Math.sqrt(gx * gx + gy * gy) * 2.4));
+            const dst = ((y * width) + x) * 3;
+            output[dst] = edge;
+            output[dst + 1] = edge;
+            output[dst + 2] = edge;
+          }
+        }
+        return output;
+      }
+      function fftJigsaw1d(real, imag, inverse = false) {
+        const n = real.length;
+        for (let i = 1, j = 0; i < n; i += 1) {
+          let bit = n >> 1;
+          for (; j & bit; bit >>= 1) j ^= bit;
+          j ^= bit;
+          if (i < j) {
+            [real[i], real[j]] = [real[j], real[i]];
+            [imag[i], imag[j]] = [imag[j], imag[i]];
+          }
+        }
+        for (let len = 2; len <= n; len <<= 1) {
+          const angle = (inverse ? 2 : -2) * Math.PI / len;
+          const wrStep = Math.cos(angle);
+          const wiStep = Math.sin(angle);
+          for (let i = 0; i < n; i += len) {
+            let wr = 1;
+            let wi = 0;
+            for (let j = 0; j < len / 2; j += 1) {
+              const even = i + j;
+              const odd = even + len / 2;
+              const tr = wr * real[odd] - wi * imag[odd];
+              const ti = wr * imag[odd] + wi * real[odd];
+              real[odd] = real[even] - tr;
+              imag[odd] = imag[even] - ti;
+              real[even] += tr;
+              imag[even] += ti;
+              const nextWr = wr * wrStep - wi * wiStep;
+              wi = wr * wiStep + wi * wrStep;
+              wr = nextWr;
+            }
+          }
+        }
+        if (inverse) {
+          for (let i = 0; i < n; i += 1) {
+            real[i] /= n;
+            imag[i] /= n;
+          }
+        }
+      }
+      function fftJigsaw2d(real, imag, width, height, inverse = false) {
+        const rowR = new Float32Array(width);
+        const rowI = new Float32Array(width);
+        for (let y = 0; y < height; y += 1) {
+          const offset = y * width;
+          rowR.set(real.subarray(offset, offset + width));
+          rowI.set(imag.subarray(offset, offset + width));
+          fftJigsaw1d(rowR, rowI, inverse);
+          real.set(rowR, offset);
+          imag.set(rowI, offset);
+        }
+        const colR = new Float32Array(height);
+        const colI = new Float32Array(height);
+        for (let x = 0; x < width; x += 1) {
+          for (let y = 0; y < height; y += 1) {
+            const index = y * width + x;
+            colR[y] = real[index];
+            colI[y] = imag[index];
+          }
+          fftJigsaw1d(colR, colI, inverse);
+          for (let y = 0; y < height; y += 1) {
+            const index = y * width + x;
+            real[index] = colR[y];
+            imag[index] = colI[y];
+          }
+        }
+      }
+      function nextPow2(value) {
+        let n = 1;
+        while (n < value) n <<= 1;
+        return n;
+      }
+      function wienerGaussianJigsawRgb(observed, width, height, sigma, balance) {
+        const fftW = nextPow2(width);
+        const fftH = nextPow2(height);
+        const planeSize = fftW * fftH;
+        const out = new Float32Array(observed.length);
+        const kernelR = new Float32Array(planeSize);
+        const kernelI = new Float32Array(planeSize);
+        for (let y = 0; y < fftH; y += 1) {
+          const dy = y <= fftH / 2 ? y : y - fftH;
+          for (let x = 0; x < fftW; x += 1) {
+            const dx = x <= fftW / 2 ? x : x - fftW;
+            kernelR[(y * fftW) + x] = Math.exp(-(dx * dx + dy * dy) / (2 * sigma * sigma));
+          }
+        }
+        const sum = kernelR.reduce((acc, value) => acc + value, 0) || 1;
+        for (let i = 0; i < kernelR.length; i += 1) kernelR[i] /= sum;
+        fftJigsaw2d(kernelR, kernelI, fftW, fftH, false);
+        for (let channel = 0; channel < 3; channel += 1) {
+          const real = new Float32Array(planeSize);
+          const imag = new Float32Array(planeSize);
+          for (let y = 0; y < height; y += 1) {
+            for (let x = 0; x < width; x += 1) {
+              real[(y * fftW) + x] = observed[((y * width + x) * 3) + channel];
+            }
+          }
+          fftJigsaw2d(real, imag, fftW, fftH, false);
+          for (let i = 0; i < planeSize; i += 1) {
+            const hr = kernelR[i];
+            const hi = kernelI[i];
+            const denom = hr * hr + hi * hi + balance;
+            const rr = real[i];
+            const ii = imag[i];
+            real[i] = (rr * hr + ii * hi) / denom;
+            imag[i] = (ii * hr - rr * hi) / denom;
+          }
+          fftJigsaw2d(real, imag, fftW, fftH, true);
+          for (let y = 0; y < height; y += 1) {
+            for (let x = 0; x < width; x += 1) {
+              const src = (y * fftW) + x;
+              const dst = ((y * width + x) * 3) + channel;
+              out[dst] = Math.max(0, Math.min(1, (real[src] * 0.92) + (observed[dst] * 0.08)));
+            }
+          }
+        }
+        return out;
+      }
       async function richardsonLucyJigsawRgb(observed, width, height, kernel, iterations, damping) {
         const flippedKernel = flipJigsawKernel(kernel);
         let estimate = new Float32Array(observed);
@@ -6770,15 +6931,44 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           const imageData = sourceCtx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
           const observed = imageDataToJigsawRgb(imageData);
           renderJigsawFinderBlurAttempt({ label: 'Original', canvas: sourceCanvas, selected: true });
+          const quickAttempts = [
+            { label: 'Clean sharpen', run: () => sharpenJigsawRgb(observed, sourceCanvas.width, sourceCanvas.height, 1.15, 1.18) },
+            { label: 'Edge map', run: () => edgeMapJigsawRgb(observed, sourceCanvas.width, sourceCanvas.height) },
+          ];
+          for (const attempt of quickAttempts) {
+            setJigsawFinderStatus(`Trying ${attempt.label}...`);
+            await waitForNextFrame();
+            renderJigsawFinderBlurAttempt({
+              label: attempt.label,
+              canvas: jigsawRgbToCanvas(attempt.run(), sourceCanvas.width, sourceCanvas.height),
+            });
+          }
+          const wienerAttempts = [];
+          [2, 3, 4, 5, 6, 8].forEach((sigma) => {
+            [0.02, 0.04, 0.06].forEach((balance) => {
+              wienerAttempts.push({ sigma, balance });
+            });
+          });
+          for (let i = 0; i < wienerAttempts.length; i += 1) {
+            const attempt = wienerAttempts[i];
+            const label = `Wiener G σ${attempt.sigma} k${attempt.balance.toFixed(2)}`;
+            setJigsawFinderStatus(`Trying ${label} (${i + 1}/${wienerAttempts.length})...`);
+            await waitForNextFrame();
+            renderJigsawFinderBlurAttempt({
+              label,
+              canvas: jigsawRgbToCanvas(
+                wienerGaussianJigsawRgb(observed, sourceCanvas.width, sourceCanvas.height, attempt.sigma, attempt.balance),
+                sourceCanvas.width,
+                sourceCanvas.height
+              ),
+            });
+          }
           const attempts = [
-            { label: 'Gaussian sigma 0.9', kernel: createJigsawKernel({ type: 'gaussian', sigma: 0.9 }), iterations: 7, damping: 0.62 },
-            { label: 'Gaussian sigma 1.4', kernel: createJigsawKernel({ type: 'gaussian', sigma: 1.4 }), iterations: 8, damping: 0.58 },
-            { label: 'Gaussian sigma 2.0', kernel: createJigsawKernel({ type: 'gaussian', sigma: 2.0 }), iterations: 9, damping: 0.52 },
-            { label: 'Box 3px', kernel: createJigsawKernel({ type: 'box', size: 3 }), iterations: 8, damping: 0.58 },
-            { label: 'Box 5px', kernel: createJigsawKernel({ type: 'box', size: 5 }), iterations: 9, damping: 0.54 },
-            { label: 'Box 7px', kernel: createJigsawKernel({ type: 'box', size: 7 }), iterations: 10, damping: 0.5 },
-            { label: 'Motion H 9px', kernel: createJigsawKernel({ type: 'motion', size: 9, direction: 'horizontal' }), iterations: 9, damping: 0.55 },
-            { label: 'Motion V 9px', kernel: createJigsawKernel({ type: 'motion', size: 9, direction: 'vertical' }), iterations: 9, damping: 0.55 },
+            { label: 'RL Gaussian σ3', kernel: createJigsawKernel({ type: 'gaussian', sigma: 3 }), iterations: 8, damping: 0.5 },
+            { label: 'RL Gaussian σ5', kernel: createJigsawKernel({ type: 'gaussian', sigma: 5 }), iterations: 9, damping: 0.45 },
+            { label: 'RL Box 5px', kernel: createJigsawKernel({ type: 'box', size: 5 }), iterations: 8, damping: 0.52 },
+            { label: 'RL Motion H 9px', kernel: createJigsawKernel({ type: 'motion', size: 9, direction: 'horizontal' }), iterations: 8, damping: 0.52 },
+            { label: 'RL Motion V 9px', kernel: createJigsawKernel({ type: 'motion', size: 9, direction: 'vertical' }), iterations: 8, damping: 0.52 },
           ];
           for (let i = 0; i < attempts.length; i += 1) {
             const attempt = attempts[i];
