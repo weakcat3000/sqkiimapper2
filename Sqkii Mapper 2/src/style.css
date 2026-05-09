@@ -3311,7 +3311,7 @@
     }
 
     .jigsaw-finder-card {
-      width: min(94vw, 520px);
+      width: min(96vw, 572px);
       max-height: min(92vh, 860px);
       padding: 0;
       overflow-y: auto;
@@ -3513,7 +3513,8 @@
       padding: 10px;
       border: 1px solid rgba(34, 211, 238, 0.18);
       background: rgba(2, 8, 23, 0.58);
-      max-height: 48vh;
+      min-height: 280px;
+      max-height: none;
       overflow-y: auto;
       overscroll-behavior: contain;
       -webkit-overflow-scrolling: touch;
@@ -3525,6 +3526,8 @@
 
     .jigsaw-finder-blur-warning {
       grid-column: 1 / -1;
+      display: grid;
+      gap: 4px;
       color: #fde68a;
       font-size: 11px;
       line-height: 1.35;
@@ -3534,9 +3537,21 @@
       background: rgba(113, 63, 18, 0.22);
     }
 
+    .jigsaw-finder-blur-warning strong {
+      color: #67e8f9;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .jigsaw-finder-blur-warning span {
+      display: block;
+    }
+
     .jigsaw-finder-blur-card {
       display: grid;
       gap: 6px;
+      align-content: start;
       padding: 7px;
       border: 1px solid rgba(34, 211, 238, 0.2);
       background: rgba(15, 23, 42, 0.8);
@@ -3554,8 +3569,7 @@
     .jigsaw-finder-blur-card canvas {
       width: 100%;
       height: auto;
-      max-height: 150px;
-      object-fit: contain;
+      display: block;
       background: #020617;
       border: 1px solid rgba(34, 211, 238, 0.12);
     }
@@ -3592,6 +3606,10 @@
     }
 
     @media (max-width: 560px) {
+      .jigsaw-finder-card {
+        width: min(98vw, 572px);
+      }
+
       .jigsaw-finder-controls,
       .jigsaw-finder-focus-actions {
         grid-template-columns: 1fr;
@@ -3599,6 +3617,7 @@
 
       .jigsaw-finder-blur-grid {
         grid-template-columns: 1fr;
+        min-height: 360px;
       }
     }
 

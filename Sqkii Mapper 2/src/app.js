@@ -6762,7 +6762,8 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         setJigsawFinderFindBlurBusy(true);
         if (jigsawFinderBlurGrid) {
           jigsawFinderBlurGrid.hidden = false;
-          jigsawFinderBlurGrid.innerHTML = '<div class="jigsaw-finder-blur-warning">If the blur destroyed too much detail, exact recovery may be impossible. These previews are guesses.</div>';
+          jigsawFinderBlurGrid.innerHTML = '<div class="jigsaw-finder-blur-warning"><strong>Blur Radius Finder</strong><span>If the blur destroyed too much detail, exact recovery may be impossible. These previews are guesses.</span></div>';
+          jigsawFinderBlurGrid.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
         try {
           setJigsawFinderStatus('Building blur guesses...');
