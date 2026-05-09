@@ -1,5 +1,11 @@
 import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsawFeature.js';
 
+      let layerSeq = 1, featureSeq = 1;
+      const layerList = []; // {id,name,visible,data,items,glSourceId,glLayerIds[],lfGroup,lfLayers:Map,_deletedLayer?}
+      const byId = id => document.getElementById(id);
+      let currentRoomCode = null;
+      let glHealScheduled = false;
+
       /* ===================== UTILITY FUNCTIONS MODULE ===================== */
       /**
        * Centralized utilities to eliminate code duplication and improve performance
@@ -2233,11 +2239,73 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         attribution: '&copy; OpenStreetMap contributors'
       }).addTo(mapleaf);
 
+      const streetViewBtn = byId('streetview-btn');
+      let streetViewEnabled = false;
+      let streetViewClickSuppressUntil = 0;
+
+      function syncStreetViewButton() {
+        if (!streetViewBtn) return;
+        streetViewBtn.classList.toggle('active', streetViewEnabled);
+        streetViewBtn.setAttribute('aria-pressed', streetViewEnabled ? 'true' : 'false');
+        streetViewBtn.title = streetViewEnabled ? 'Google Street View: click the map' : 'Open Google Street View';
+        streetViewBtn.setAttribute('aria-label', streetViewBtn.title);
+      }
+
+      function syncStreetViewCursor() {
+        const cursor = streetViewEnabled ? 'crosshair' : '';
+        if (mapgl?.getCanvas) mapgl.getCanvas().style.cursor = engine === 'gl' ? cursor : '';
+        mapleaf.getContainer().style.cursor = engine === 'leaf' ? cursor : '';
+      }
+
+      function googleStreetViewUrl(lat, lng, heading = 0) {
+        const url = new URL('https://www.google.com/maps/@');
+        url.searchParams.set('api', '1');
+        url.searchParams.set('map_action', 'pano');
+        url.searchParams.set('viewpoint', `${lat.toFixed(6)},${lng.toFixed(6)}`);
+        url.searchParams.set('heading', String(Math.round(heading)));
+        url.searchParams.set('pitch', '0');
+        url.searchParams.set('fov', '80');
+        return url.toString();
+      }
+
+      function openGoogleStreetView(lat, lng, heading = 0, originalEvent = null) {
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+        streetViewClickSuppressUntil = Date.now() + 650;
+        originalEvent?.preventDefault?.();
+        originalEvent?.stopPropagation?.();
+        window.open(googleStreetViewUrl(lat, lng, heading), '_blank', 'noopener');
+      }
+
+      function handleGoogleStreetViewGlClick(e) {
+        if (!streetViewEnabled || engine !== 'gl') return;
+        openGoogleStreetView(Number(e.lngLat?.lat), Number(e.lngLat?.lng), Number(mapgl.getBearing?.() || 0), e.originalEvent);
+      }
+
+      function handleGoogleStreetViewLeafClick(e) {
+        if (!streetViewEnabled || engine !== 'leaf') return;
+        openGoogleStreetView(Number(e.latlng?.lat), Number(e.latlng?.lng), 0, e.originalEvent);
+      }
+
+      function setStreetViewEnabled(enabled) {
+        streetViewEnabled = !!enabled;
+        syncStreetViewButton();
+        syncStreetViewCursor();
+      }
+
+      streetViewBtn?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        setStreetViewEnabled(!streetViewEnabled);
+      });
+      mapgl.on('click', handleGoogleStreetViewGlClick);
+      mapleaf.on('click', handleGoogleStreetViewLeafClick);
+      syncStreetViewButton();
+
       mapgl.on('load', () => mapgl.on('click', (e) => { if (!e.originalEvent.defaultPrevented) closeActivePopup(); }));
 
       // Global polygon click: choose the smallest polygon at the click point
       mapgl.on('click', (e) => {
-        if (popupsSuppressed()) return;
+        if (popupsSuppressed() || e.originalEvent.defaultPrevented) return;
         // Only check layers that still exist
         const layers = ALL_FILL_LAYER_IDS.filter(id => mapgl.getLayer(id));
         if (!layers.length) return;
@@ -2276,6 +2344,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         scheduleGlHeal('show-gl');
         scheduleHtmIconsOverlayRestore();
         if (typeof scheduleCompassRender === 'function') scheduleCompassRender();
+        syncStreetViewCursor();
       }
       function showLeaf() {
         const c = mapgl.getCenter(), z = mapgl.getZoom();
@@ -2285,6 +2354,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         mapleaf.setView([c.lat, c.lng], Math.round(z));
         engine = 'leaf';
         if (typeof scheduleCompassRender === 'function') scheduleCompassRender();
+        syncStreetViewCursor();
       }
       if (IS_LOCALHOST) {
         setTimeout(() => {
@@ -2351,9 +2421,6 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       document.head.appendChild(style);
 
       /* ================= App state / utils ================= */
-      let layerSeq = 1, featureSeq = 1;
-      const layerList = []; // {id,name,visible,data,items,glSourceId,glLayerIds[],lfGroup,lfLayers:Map,_deletedLayer?}
-      const byId = id => document.getElementById(id);
 
       function ensureUniqueLayerId(entry) {
         // If another layer already has this id, bump it until unique
@@ -2606,7 +2673,6 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         }
         return true;
       }
-      let glHealScheduled = false;
       function healMissingGlBindings(reason = '') {
         glReady(() => {
           if (!mapgl?.getStyle?.()) return;
@@ -2698,11 +2764,11 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
 
           await ensureAllIconsOnCurrentStyle();
           // ... rest of existing function
-          const srcId = 'src-' + entry.id, fillId = 'fill-' + entry.id, lineId = 'line-' + entry.id, iconId = 'icon-' + entry.id, lblId = 'lbl-' + entry.id, polyEdgeId = 'polyedge-' + entry.id;
-          entry.glSourceId = srcId; entry.glLayerIds = [fillId, lineId, polyEdgeId, iconId, lblId];
+          const srcId = 'src-' + entry.id, fillId = 'fill-' + entry.id, lineId = 'line-' + entry.id, iconId = 'icon-' + entry.id, lblId = 'lbl-' + entry.id, polyEdgeId = 'polyedge-' + entry.id, scheduledEdgeId = 'scheduled-polyedge-' + entry.id;
+          entry.glSourceId = srcId; entry.glLayerIds = [fillId, lineId, polyEdgeId, scheduledEdgeId, iconId, lblId];
 
           if (clearIfExists) {
-            [lblId, iconId, polyEdgeId, lineId, fillId].forEach(id => { if (mapgl.getLayer(id)) try { mapgl.removeLayer(id); } catch { } });
+            [lblId, iconId, scheduledEdgeId, polyEdgeId, lineId, fillId].forEach(id => { if (mapgl.getLayer(id)) try { mapgl.removeLayer(id); } catch { } });
           }
 
           if (mapgl.getSource(srcId)) mapgl.removeSource(srcId);
@@ -2720,8 +2786,23 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
 
           mapgl.addLayer({
             id: polyEdgeId, type: 'line', source: srcId,
-            filter: ['all', notHidden, ['match', ['geometry-type'], ['Polygon', 'MultiPolygon'], true, false]],
-            paint: { 'line-color': ['coalesce', ['get', '_stroke'], '#ffffff'], 'line-width': ['coalesce', ['get', '_weight'], 2], 'line-opacity': ['coalesce', ['get', '_strokeOpacity'], 0.2] }
+            filter: ['all', notHidden, ['match', ['geometry-type'], ['Polygon', 'MultiPolygon'], true, false], ['!=', ['get', '_coinStatus'], 'scheduled']],
+            paint: {
+              'line-color': ['coalesce', ['get', '_stroke'], '#ffffff'],
+              'line-width': ['coalesce', ['get', '_weight'], 2],
+              'line-opacity': ['coalesce', ['get', '_strokeOpacity'], 0.2]
+            }
+          });
+
+          mapgl.addLayer({
+            id: scheduledEdgeId, type: 'line', source: srcId,
+            filter: ['all', notHidden, ['match', ['geometry-type'], ['Polygon', 'MultiPolygon'], true, false], ['==', ['get', '_coinStatus'], 'scheduled']],
+            paint: {
+              'line-color': ['coalesce', ['get', '_stroke'], '#22d3ee'],
+              'line-width': ['coalesce', ['get', '_weight'], 1.6],
+              'line-opacity': ['coalesce', ['get', '_strokeOpacity'], 0.95],
+              'line-dasharray': [2, 2]
+            }
           });
 
           mapgl.addLayer({
@@ -2748,7 +2829,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           // Keep clicks working for POINT markers only (icons + labels)
           [iconId, lblId].forEach(lid => {
             mapgl.on('click', lid, (e) => {
-              if (popupsSuppressed()) return;
+              if (popupsSuppressed() || e.originalEvent?.defaultPrevented) return;
               if (!e.features || !e.features.length) return;
               const feature = e.features[0];
               if (!feature || !feature.properties) return;
@@ -2761,6 +2842,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           });
 
           function handleRapidDeleteGL(e) {
+            if (popupsSuppressed() || e.originalEvent?.defaultPrevented) return;
             if (!deleteModeEnabled || !editingEnabled || circleDragCtx) return;
             const chosen = pickSmallestPolygonAtPoint(e.point) || (e.features || []).find(isRapidDeleteTarget);
             if (!chosen || !isRapidDeleteTarget(chosen)) return;
@@ -2775,10 +2857,11 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
             deleteFeatureByFid(owner, String(fid), { confirmDelete: false, closeEditorOnDone: true });
           }
 
-          [fillId, polyEdgeId].forEach(lid => mapgl.on('click', lid, handleRapidDeleteGL));
+          [fillId, polyEdgeId, scheduledEdgeId].forEach(lid => mapgl.on('click', lid, handleRapidDeleteGL));
 
           attachLongPressGL(fillId, entry);
           attachLongPressGL(polyEdgeId, entry);
+          attachLongPressGL(scheduledEdgeId, entry);
           attachLongPressGL(lineId, entry);
 
           // Ensure fresh data binds and visibility is respected (prevents ghost layers)
@@ -2820,7 +2903,11 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const strokeOpacity = (props._strokeOpacity ?? 0.7);
         const weight = (props._weight ?? 2);
         const strokeOn = (strokeOpacity > 0) && (weight > 0);
-        return { color: stroke, weight, opacity: strokeOpacity, fillColor: fill, fillOpacity, stroke: strokeOn };
+        const style = { color: stroke, weight, opacity: strokeOpacity, fillColor: fill, fillOpacity, stroke: strokeOn };
+        if (props._lineDashArray) {
+          style.dashArray = Array.isArray(props._lineDashArray) ? props._lineDashArray.join(' ') : String(props._lineDashArray);
+        }
+        return style;
       }
       function lineStyleForLeaflet(props = {}) {
         return {
@@ -3725,7 +3812,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       }
 
       function popupsSuppressed() {
-        return !!circleDragCtx || Date.now() < suppressPopupUntil;
+        return !!circleDragCtx || Date.now() < streetViewClickSuppressUntil || Date.now() < suppressPopupUntil;
       }
 
       // Add Calculate Statistics/Glimpse button element (will be created dynamically)
@@ -4455,6 +4542,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
               if (p._stroke == null) p._stroke = '#ffffff';
               if (p._strokeOpacity == null) p._strokeOpacity = 0.7;
               if (p._weight == null) p._weight = 2;
+              if (String(p._coinStatus || '').toLowerCase() === 'scheduled' && p._lineDashArray == null) p._lineDashArray = [2, 2];
             }
           }
 
@@ -4659,7 +4747,6 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       const ROOM_PRESENCE_LAYER = 'room-presence-users-layer';
       const ROOM_PRESENCE_LABEL_LAYER = 'room-presence-users-label-layer';
       const ROOM_PRESENCE_COLORS = ['#60a5fa', '#f97316', '#22c55e', '#e879f9', '#facc15', '#38bdf8', '#fb7185', '#a78bfa', '#34d399', '#f59e0b'];
-      let currentRoomCode = null;
       const clientId = (() => crypto.getRandomValues(new Uint32Array(4)).join('-'))();
       const presenceSessionId = `${clientId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       let roomPresenceAvailable = true;
@@ -9291,6 +9378,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           for (const feature of (layer?.data?.features || [])) {
             const props = feature?.properties || {};
             if (props._deleted) continue;
+            if (String(props._coinStatus || 'ongoing').toLowerCase() === 'scheduled') continue;
 
             const coinId = coinDbRootCoinId(props._coinId || props.coin_id || props.fid || props._gid || '');
             const coinLabel = coinDbCanonicalLabel(props._coinLabel || props.coin_label || props.name || props.title || coinId);
@@ -9675,6 +9763,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           for (const feature of (layer?.data?.features || [])) {
             const props = feature?.properties || {};
             if (props._deleted) continue;
+            if (String(props._coinStatus || 'ongoing').toLowerCase() === 'scheduled') continue;
 
             const radius = Number(props._circleRadius);
             let lng = Number(props._circleLng);
