@@ -6858,10 +6858,46 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           </div>
         `;
       }
+      function isSilverAiFakeImageSpot(item = {}) {
+        const text = [
+          item.title,
+          item.reasoning,
+          item.searchInstruction,
+          item.matchedPattern,
+          item.focusTarget,
+        ].filter(Boolean).join(' ').toLowerCase();
+        if (!text) return true;
+        const imageOnlyTerms = [
+          'puzzle', 'jigsaw', 'puzzle piece', 'piece edge', 'puzzle edge', 'puzzle corner',
+          'image edge', 'image corner', 'photo edge', 'screenshot', 'screen shot',
+          'crop', 'frame boundary', 'media slot', 'uploaded image', 'visual artifact',
+          'abstract pattern', 'abstract shape', 'dark area boundary', 'color boundary'
+        ];
+        if (imageOnlyTerms.some((term) => text.includes(term))) return true;
+        const physicalTerms = [
+          'bench', 'drain', 'planter', 'wall', 'pole', 'lamp', 'post', 'sign', 'curb', 'kerb',
+          'railing', 'pipe', 'tile', 'brick', 'pavement', 'walkway', 'stair', 'step', 'ledge',
+          'shelter', 'void deck', 'hdb', 'tree', 'leaves', 'grass edge', 'root', 'fence',
+          'bollard', 'bin', 'box', 'cabinet', 'pillar', 'column', 'road', 'bridge', 'canal'
+        ];
+        return !physicalTerms.some((term) => text.includes(term));
+      }
       function renderSilverAiModelResults(result, { retrievalGroups = [], tokenCount = 0, fileCount = 0 } = {}) {
         if (!silverAiResultsEl) return;
-        const suggestions = Array.isArray(result?.suggestions) ? result.suggestions.slice(0, 5) : [];
+        const rawSuggestions = Array.isArray(result?.suggestions) ? result.suggestions.slice(0, 5) : [];
+        const rejectedImageSpots = rawSuggestions.filter(isSilverAiFakeImageSpot).length;
+        const suggestions = rawSuggestions.filter((item) => !isSilverAiFakeImageSpot(item));
         if (!suggestions.length) {
+          if (rejectedImageSpots) {
+            silverAiResultsEl.innerHTML = `
+              <div class="silver-ai-result-card">
+                <div class="silver-ai-result-title">No real hiding spot found</div>
+                <div class="silver-ai-result-copy">The upload looks like puzzle/image content rather than a real-world object a coin could be hidden at. Upload an outdoor clue photo, street scene, fixture, or add notes like bench, drain, planter, wall, pole, tiles, kerb, or railing.</div>
+              </div>
+            `;
+            setSilverAiStatus('AI rejected image-only suggestions. A coin needs a real-world hiding spot, not a puzzle edge or screenshot region.', 'error');
+            return;
+          }
           renderSilverAiResults(retrievalGroups, tokenCount, fileCount);
           return;
         }
