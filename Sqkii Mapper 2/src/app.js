@@ -6475,6 +6475,9 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const nhwc = dims.length === 4 && dims[3] === 3;
         const width = nchw ? dims[3] : nhwc ? dims[2] : fallbackWidth;
         const height = nchw ? dims[2] : nhwc ? dims[1] : fallbackHeight;
+        if (!data || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+          throw new Error('Deblur model returned an unreadable image tensor.');
+        }
         const output = new ImageData(width, height);
         const planeSize = width * height;
         for (let i = 0, p = 0; i < planeSize; i += 1, p += 4) {
@@ -6491,7 +6494,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         jigsawFinderCanvas.width = Math.round(visibleW * dpr);
         jigsawFinderCanvas.height = Math.round(visibleH * dpr);
-        jigsawFinderCanvas.style.width = `${visibleW}px`;
+        jigsawFinderCanvas.style.width = `${Math.min(visibleW, jigsawFinderCanvas.parentElement?.clientWidth || visibleW)}px`;
         jigsawFinderCanvas.style.height = `${visibleH}px`;
         jigsawFinderCanvas.style.aspectRatio = `${visibleW} / ${visibleH}`;
         const ctx = jigsawFinderCanvas.getContext('2d', { alpha: false });
@@ -6512,19 +6515,10 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
               throw new Error('Deblur model missing. Add /models/nafnet_deblur.onnx to enable Focus.');
             }
             // The bundled NAFNet model expects RGB float32 NCHW [1,3,H,W] normalized to 0-1.
-            const options = { graphOptimizationLevel: 'all' };
-            if (navigator.gpu) {
-              try {
-                return await ort.InferenceSession.create(JIGSAW_DEBLUR_MODEL_URL, {
-                  ...options,
-                  executionProviders: ['webgpu'],
-                });
-              } catch (error) {
-                console.warn('[Jigsaw Finder] WebGPU Focus unavailable, falling back to WASM:', error);
-              }
-            }
+            // The current WebGPU execution path can return corrupted pixels for this model in some browsers,
+            // so Focus uses WASM until the WebGPU backend is reliable for this graph.
             return ort.InferenceSession.create(JIGSAW_DEBLUR_MODEL_URL, {
-              ...options,
+              graphOptimizationLevel: 'all',
               executionProviders: ['wasm'],
             });
           })();

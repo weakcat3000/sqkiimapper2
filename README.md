@@ -55,10 +55,9 @@ If your exported NAFNet model uses different input or output names, the app uses
 
 ## Browser Support
 
-The Focus feature uses ONNX Runtime Web. It tries WebGPU first when the browser exposes `navigator.gpu`, then falls back to WASM.
+The Focus feature uses ONNX Runtime Web with the WASM backend for the bundled NAFNet model. WebGPU remains a future optimization, but the WASM path is currently used because it gives reliable pixels for this graph across browsers.
 
-- WebGPU is best on recent Chrome or Edge.
-- Safari and iPhone browsers generally use the WASM fallback.
+- Recent Chrome, Edge, Safari, and iPhone browsers use the WASM path.
 - ONNX Runtime Web WASM files are loaded from the pinned jsDelivr package path for `onnxruntime-web@1.26.0`, so GitHub Pages does not need a Node server after deployment.
 
 ## Deployment Notes

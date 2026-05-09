@@ -3426,6 +3426,7 @@
       width: 100%;
       height: auto;
       min-height: 0;
+      max-width: 100%;
       background: #020617;
       border: 1px solid rgba(34, 211, 238, 0.16);
       justify-self: center;
