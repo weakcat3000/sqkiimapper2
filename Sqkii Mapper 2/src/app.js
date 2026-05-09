@@ -2299,6 +2299,8 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       });
       mapgl.on('click', handleGoogleStreetViewGlClick);
       mapleaf.on('click', handleGoogleStreetViewLeafClick);
+      mapgl.on('zoomend', syncAllScheduledCoinCallouts);
+      mapleaf.on('zoomend', syncAllScheduledCoinCallouts);
       syncStreetViewButton();
 
       mapgl.on('load', () => mapgl.on('click', (e) => { if (!e.originalEvent.defaultPrevented) closeActivePopup(); }));
@@ -2345,6 +2347,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         scheduleHtmIconsOverlayRestore();
         if (typeof scheduleCompassRender === 'function') scheduleCompassRender();
         syncStreetViewCursor();
+        syncAllScheduledCoinCallouts();
       }
       function showLeaf() {
         const c = mapgl.getCenter(), z = mapgl.getZoom();
@@ -2355,6 +2358,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         engine = 'leaf';
         if (typeof scheduleCompassRender === 'function') scheduleCompassRender();
         syncStreetViewCursor();
+        syncAllScheduledCoinCallouts();
       }
       if (IS_LOCALHOST) {
         setTimeout(() => {
@@ -2416,6 +2420,50 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
 /* Hide duplicate geolocate controls - keep only the first one */
 .maplibregl-ctrl-top-right .maplibregl-ctrl-group:has(.maplibregl-ctrl-geolocate) ~ .maplibregl-ctrl-group:has(.maplibregl-ctrl-geolocate) {
   display: none !important;
+}
+.scheduled-coin-callout,
+.scheduled-coin-callout-leaflet {
+  pointer-events: none;
+}
+.scheduled-coin-callout {
+  position: relative;
+  width: 240px;
+  height: 74px;
+  transform: translateY(-6px);
+}
+.scheduled-coin-callout-card {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  min-height: 44px;
+  padding: 8px 14px 9px;
+  box-sizing: border-box;
+  color: #dff8ff;
+  text-align: center;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.25;
+  text-shadow: 0 1px 1px rgba(5, 18, 36, 0.45);
+  background: linear-gradient(180deg, rgba(18, 201, 242, 0.88), rgba(8, 126, 190, 0.88));
+  border: 1px solid rgba(54, 226, 255, 0.75);
+  border-radius: 5px;
+  box-shadow: 0 8px 18px rgba(0, 6, 20, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+.scheduled-coin-callout-card strong,
+.scheduled-coin-callout-card span {
+  display: block;
+}
+.scheduled-coin-callout-pointer {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 1px;
+  height: 12px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, rgba(34, 211, 238, 0.85), rgba(34, 211, 238, 0));
 }
 `;
       document.head.appendChild(style);
@@ -2628,6 +2676,147 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         }, 10000);
       }
 
+      const scheduledCoinCallouts = {
+        gl: new Map(),
+        leaf: new Map()
+      };
+      const SCHEDULED_CALLOUT_MIN_ZOOM = 12;
+
+      function scheduledCoinCalloutText(props = {}) {
+        const startAt = props._coinStartAt || props.start_at || props.scheduled_at || props.scheduledAt;
+        const startMs = Date.parse(startAt || '');
+        if (!Number.isFinite(startMs)) return 'will be hidden here soon';
+        const remainingMs = startMs - Date.now();
+        if (remainingMs <= 0) return 'will be hidden here soon';
+        const totalMinutes = Math.max(1, Math.round(remainingMs / 60000));
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        const timeLabel = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+        return `will be hidden here in ${timeLabel}`;
+      }
+
+      function scheduledCoinCalloutLngLat(feature) {
+        const props = feature?.properties || {};
+        const lng = Number(props._circleLng ?? props.center_lng ?? props.lng);
+        const lat = Number(props._circleLat ?? props.center_lat ?? props.lat);
+        const radius = Number(props._circleRadius ?? props.radius_m ?? props.radius);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(radius)) return null;
+        const offsetMeters = radius + Math.max(120, Math.min(360, radius * 0.08));
+        const nextLat = lat + (offsetMeters / 111320);
+        return [lng, nextLat];
+      }
+
+      function scheduledCoinCalloutElement(feature) {
+        const props = feature?.properties || {};
+        const el = document.createElement('div');
+        el.className = 'scheduled-coin-callout';
+        el.innerHTML = `
+          <div class="scheduled-coin-callout-card">
+            <strong>${escapeHtml(coinDbCanonicalLabel(props._coinLabel || props.coin_label || props.name || 'Silver Coin'))}</strong>
+            <span>${escapeHtml(scheduledCoinCalloutText(props))}</span>
+          </div>
+          <span class="scheduled-coin-callout-pointer"></span>
+        `;
+        return el;
+      }
+
+      function clearScheduledCoinCalloutsForEntry(entry) {
+        const keyPrefix = `${entry?.id}:`;
+        for (const [key, marker] of scheduledCoinCallouts.gl.entries()) {
+          if (!key.startsWith(keyPrefix)) continue;
+          try { marker.remove(); } catch { }
+          scheduledCoinCallouts.gl.delete(key);
+        }
+        for (const [key, marker] of scheduledCoinCallouts.leaf.entries()) {
+          if (!key.startsWith(keyPrefix)) continue;
+          try { marker.remove(); } catch { }
+          scheduledCoinCallouts.leaf.delete(key);
+        }
+      }
+
+      function syncScheduledCoinCallouts(entry) {
+        if (!entry) return;
+        const features = (entry.data?.features || [])
+          .filter((feature) => {
+            const props = feature?.properties || {};
+            return !props._deleted
+              && !props.hidden
+              && String(props._coinStatus || '').toLowerCase() === 'scheduled'
+              && ['Polygon', 'MultiPolygon'].includes(feature?.geometry?.type);
+          });
+        const wanted = new Set(features.map((feature) => `${entry.id}:${feature.properties?.fid || feature.properties?._gid || feature.properties?._coinId || feature.properties?.name || ''}`));
+
+        for (const [key, marker] of scheduledCoinCallouts.gl.entries()) {
+          if (!key.startsWith(`${entry.id}:`) || wanted.has(key)) continue;
+          try { marker.remove(); } catch { }
+          scheduledCoinCallouts.gl.delete(key);
+        }
+        for (const [key, marker] of scheduledCoinCallouts.leaf.entries()) {
+          if (!key.startsWith(`${entry.id}:`) || wanted.has(key)) continue;
+          try { marker.remove(); } catch { }
+          scheduledCoinCallouts.leaf.delete(key);
+        }
+
+        const visible = entry.visible !== false && !entry._deletedLayer;
+        const showGl = visible && engine === 'gl' && mapgl.getZoom() >= SCHEDULED_CALLOUT_MIN_ZOOM;
+        const showLeaf = visible && engine === 'leaf' && mapleaf.getZoom() >= SCHEDULED_CALLOUT_MIN_ZOOM;
+
+        for (const feature of features) {
+          const coord = scheduledCoinCalloutLngLat(feature);
+          if (!coord) continue;
+          const key = `${entry.id}:${feature.properties?.fid || feature.properties?._gid || feature.properties?._coinId || feature.properties?.name || ''}`;
+
+          let glMarker = scheduledCoinCallouts.gl.get(key);
+          if (!glMarker) {
+            glMarker = new maptilersdk.Marker({
+              element: scheduledCoinCalloutElement(feature),
+              anchor: 'bottom',
+              offset: [0, 0]
+            }).setLngLat(coord);
+            scheduledCoinCallouts.gl.set(key, glMarker);
+          } else {
+            glMarker.setLngLat(coord);
+            const nextEl = scheduledCoinCalloutElement(feature);
+            const currentEl = glMarker.getElement?.();
+            if (currentEl) currentEl.innerHTML = nextEl.innerHTML;
+          }
+          const glOnMap = !!glMarker._map;
+          if (showGl && !glOnMap) glMarker.addTo(mapgl);
+          if (!showGl && glOnMap) glMarker.remove();
+
+          let leafMarker = scheduledCoinCallouts.leaf.get(key);
+          if (!leafMarker) {
+            const html = scheduledCoinCalloutElement(feature).outerHTML;
+            leafMarker = L.marker([coord[1], coord[0]], {
+              interactive: false,
+              icon: L.divIcon({
+                className: 'scheduled-coin-callout-leaflet',
+                html,
+                iconSize: [240, 74],
+                iconAnchor: [120, 74]
+              })
+            });
+            scheduledCoinCallouts.leaf.set(key, leafMarker);
+          } else {
+            leafMarker.setLatLng([coord[1], coord[0]]);
+            leafMarker.setIcon(L.divIcon({
+              className: 'scheduled-coin-callout-leaflet',
+              html: scheduledCoinCalloutElement(feature).outerHTML,
+              iconSize: [240, 74],
+              iconAnchor: [120, 74]
+            }));
+          }
+          const leafOnMap = mapleaf.hasLayer(leafMarker);
+          if (showLeaf && !leafOnMap) leafMarker.addTo(mapleaf);
+          if (!showLeaf && leafOnMap) mapleaf.removeLayer(leafMarker);
+        }
+      }
+
+      function syncAllScheduledCoinCallouts() {
+        layerList.forEach(syncScheduledCoinCallouts);
+      }
+      setInterval(syncAllScheduledCoinCallouts, 60000);
+
       /* ---- VISIBILITY: single source of truth for GL + Leaflet ---- */
       function applyVisibility(entry) {
         // MapLibre GL
@@ -2644,6 +2833,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
             if (mapleaf.hasLayer(entry.lfGroup)) mapleaf.removeLayer(entry.lfGroup);
           }
         }
+        syncScheduledCoinCallouts(entry);
       }
 
       /* Timestamps (match Sonar & Draw exactly) */
@@ -3068,6 +3258,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           try { entry.lfGroup.clearLayers(); } catch { }
           createGroupOnLeaflet(entry, true);
         }
+        syncScheduledCoinCallouts(entry);
       }
 
 
@@ -4505,6 +4696,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       }
       function clearAllLayers() {
         for (const entry of [...layerList]) {
+          clearScheduledCoinCalloutsForEntry(entry);
           (entry.glLayerIds || []).forEach(id => { if (mapgl.getLayer(id)) try { mapgl.removeLayer(id); } catch { } });
           if (entry.glSourceId && mapgl.getSource(entry.glSourceId)) try { mapgl.removeSource(entry.glSourceId); } catch { };
           if (entry.lfGroup) try { entry.lfGroup.remove(); } catch { };
