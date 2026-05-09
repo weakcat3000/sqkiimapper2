@@ -2427,24 +2427,24 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
 }
 .scheduled-coin-callout {
   position: relative;
-  width: 240px;
-  height: 74px;
-  transform: translateY(-6px);
+  width: 214px;
+  height: 54px;
+  transform: translateY(-2px);
 }
 .scheduled-coin-callout-card {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 12px;
-  min-height: 44px;
-  padding: 8px 14px 9px;
+  bottom: 8px;
+  min-height: 38px;
+  padding: 6px 11px 7px;
   box-sizing: border-box;
   color: #dff8ff;
   text-align: center;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 750;
-  line-height: 1.25;
+  line-height: 1.18;
   text-shadow: 0 1px 1px rgba(5, 18, 36, 0.45);
   background: linear-gradient(180deg, rgba(18, 201, 242, 0.88), rgba(8, 126, 190, 0.88));
   border: 1px solid rgba(54, 226, 255, 0.75);
@@ -2452,16 +2452,21 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
   box-shadow: 0 8px 18px rgba(0, 6, 20, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.22);
   clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
 }
+.scheduled-coin-callout-card strong {
+  font-size: 14px;
+  line-height: 1.05;
+}
 .scheduled-coin-callout-card strong,
 .scheduled-coin-callout-card span {
   display: block;
+  white-space: nowrap;
 }
 .scheduled-coin-callout-pointer {
   position: absolute;
   left: 50%;
   bottom: 0;
   width: 1px;
-  height: 12px;
+  height: 8px;
   transform: translateX(-50%);
   background: linear-gradient(180deg, rgba(34, 211, 238, 0.85), rgba(34, 211, 238, 0));
 }
@@ -2681,12 +2686,27 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         leaf: new Map()
       };
       const SCHEDULED_CALLOUT_MIN_ZOOM = 12;
+      const SCHEDULED_CALLOUT_SIZE = [214, 54];
+
+      function scheduledCoinDropMs(props = {}) {
+        const raw = props._coinStartAt || props.start_at || props.scheduled_at || props.scheduledAt;
+        const numeric = Number(raw);
+        if (Number.isFinite(numeric) && numeric > 0) {
+          return numeric > 10000000000 ? numeric : numeric * 1000;
+        }
+        const parsed = Date.parse(raw || '');
+        return Number.isFinite(parsed) ? parsed : null;
+      }
+
+      function scheduledCoinCalloutTitle(props = {}) {
+        const raw = coinDbCanonicalLabel(props._coinLabel || props.coin_label || props.name || 'Silver Coin');
+        return raw.replace(/\s+Coin\s+\d+\b/i, ' Coin').replace(/\s+\d+\b/g, '').trim() || 'Silver Coin';
+      }
 
       function scheduledCoinCalloutText(props = {}) {
-        const startAt = props._coinStartAt || props.start_at || props.scheduled_at || props.scheduledAt;
-        const startMs = Date.parse(startAt || '');
-        if (!Number.isFinite(startMs)) return 'will be hidden here soon';
-        const remainingMs = startMs - Date.now();
+        const dropMs = scheduledCoinDropMs(props);
+        if (!Number.isFinite(dropMs)) return 'will be hidden here soon';
+        const remainingMs = dropMs - Date.now();
         if (remainingMs <= 0) return 'will be hidden here soon';
         const totalMinutes = Math.max(1, Math.round(remainingMs / 60000));
         const hours = Math.floor(totalMinutes / 60);
@@ -2701,7 +2721,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const lat = Number(props._circleLat ?? props.center_lat ?? props.lat);
         const radius = Number(props._circleRadius ?? props.radius_m ?? props.radius);
         if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(radius)) return null;
-        const offsetMeters = radius + Math.max(120, Math.min(360, radius * 0.08));
+        const offsetMeters = radius + Math.max(24, Math.min(70, radius * 0.015));
         const nextLat = lat + (offsetMeters / 111320);
         return [lng, nextLat];
       }
@@ -2712,7 +2732,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         el.className = 'scheduled-coin-callout';
         el.innerHTML = `
           <div class="scheduled-coin-callout-card">
-            <strong>${escapeHtml(coinDbCanonicalLabel(props._coinLabel || props.coin_label || props.name || 'Silver Coin'))}</strong>
+            <strong>${escapeHtml(scheduledCoinCalloutTitle(props))}</strong>
             <span>${escapeHtml(scheduledCoinCalloutText(props))}</span>
           </div>
           <span class="scheduled-coin-callout-pointer"></span>
@@ -2792,8 +2812,8 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
               icon: L.divIcon({
                 className: 'scheduled-coin-callout-leaflet',
                 html,
-                iconSize: [240, 74],
-                iconAnchor: [120, 74]
+                iconSize: SCHEDULED_CALLOUT_SIZE,
+                iconAnchor: [SCHEDULED_CALLOUT_SIZE[0] / 2, SCHEDULED_CALLOUT_SIZE[1]]
               })
             });
             scheduledCoinCallouts.leaf.set(key, leafMarker);
@@ -2802,8 +2822,8 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
             leafMarker.setIcon(L.divIcon({
               className: 'scheduled-coin-callout-leaflet',
               html: scheduledCoinCalloutElement(feature).outerHTML,
-              iconSize: [240, 74],
-              iconAnchor: [120, 74]
+              iconSize: SCHEDULED_CALLOUT_SIZE,
+              iconAnchor: [SCHEDULED_CALLOUT_SIZE[0] / 2, SCHEDULED_CALLOUT_SIZE[1]]
             }));
           }
           const leafOnMap = mapleaf.hasLayer(leafMarker);
@@ -2815,7 +2835,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       function syncAllScheduledCoinCallouts() {
         layerList.forEach(syncScheduledCoinCallouts);
       }
-      setInterval(syncAllScheduledCoinCallouts, 60000);
+      setInterval(syncAllScheduledCoinCallouts, 15000);
 
       /* ---- VISIBILITY: single source of truth for GL + Leaflet ---- */
       function applyVisibility(entry) {
