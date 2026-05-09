@@ -6152,6 +6152,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       const jigsawFinderCapturePreview = document.getElementById('jigsaw-finder-capture-preview');
       const jigsawFinderCanvas = document.getElementById('jigsaw-finder-canvas');
       const jigsawFinderBlur = document.getElementById('jigsaw-finder-blur');
+      const jigsawFinderBlurType = document.getElementById('jigsaw-finder-blur-type');
       const jigsawFinderBrightness = document.getElementById('jigsaw-finder-brightness');
       const jigsawFinderNight = document.getElementById('jigsaw-finder-night');
       const jigsawFinderDark = document.getElementById('jigsaw-finder-dark');
@@ -6332,8 +6333,9 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       }
       function drawJigsawFinderImage() {
         if (!jigsawFinderCanvas || !jigsawFinderImage) return;
-        const maxW = Math.max(1, jigsawFinderCanvas.clientWidth || 900);
-        const maxH = Math.max(1, jigsawFinderCanvas.clientHeight || 420);
+        const parentBox = jigsawFinderCanvas.parentElement?.getBoundingClientRect?.();
+        const maxW = Math.max(1, Math.floor(parentBox?.width || jigsawFinderCanvas.clientWidth || 900));
+        const maxH = Math.max(1, Math.floor(Math.min(window.innerHeight * 0.34, parentBox?.height || 420)));
         const sourceW = jigsawFinderImage.naturalWidth || jigsawFinderImage.width || maxW;
         const sourceH = jigsawFinderImage.naturalHeight || jigsawFinderImage.height || maxH;
         const scale = Math.min(maxW / sourceW, maxH / sourceH, 1);
@@ -6342,17 +6344,39 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         jigsawFinderCanvas.width = Math.round(width * dpr);
         jigsawFinderCanvas.height = Math.round(height * dpr);
+        jigsawFinderCanvas.style.width = `${width}px`;
+        jigsawFinderCanvas.style.height = `${height}px`;
         jigsawFinderCanvas.style.aspectRatio = `${width} / ${height}`;
         const ctx = jigsawFinderCanvas.getContext('2d', { alpha: false });
         if (!ctx) return;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         const blur = Number(jigsawFinderBlur?.value || 0);
+        const blurType = String(jigsawFinderBlurType?.value || 'standard');
         const brightness = Number(jigsawFinderBrightness?.value || 100);
         const contrast = jigsawFinderNightOn ? 126 : 100;
         const saturate = jigsawFinderNightOn ? 118 : 100;
-        ctx.filter = `blur(${blur}px) brightness(${brightness}%) contrast(${contrast}%) saturate(${saturate}%)`;
+        const baseFilter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturate}%)`;
+        const blurAmount = blurType === 'soft' ? blur * 0.55 : blur;
+        ctx.filter = `blur(${blurAmount}px) ${baseFilter}`;
         ctx.drawImage(jigsawFinderImage, 0, 0, width, height);
         ctx.filter = 'none';
+        if (blur > 0 && blurType === 'glow') {
+          ctx.globalCompositeOperation = 'screen';
+          ctx.globalAlpha = 0.36;
+          ctx.filter = `blur(${blur * 1.45}px) brightness(${Math.max(brightness, 118)}%)`;
+          ctx.drawImage(jigsawFinderImage, 0, 0, width, height);
+          ctx.filter = 'none';
+          ctx.globalAlpha = 1;
+          ctx.globalCompositeOperation = 'source-over';
+        } else if (blur > 0 && blurType === 'shadow') {
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.globalAlpha = 0.32;
+          ctx.filter = `blur(${blur * 1.35}px) brightness(74%)`;
+          ctx.drawImage(jigsawFinderImage, 0, 0, width, height);
+          ctx.filter = 'none';
+          ctx.globalAlpha = 1;
+          ctx.globalCompositeOperation = 'source-over';
+        }
         if (jigsawFinderDarkOn || jigsawFinderNightOn) {
           ctx.globalCompositeOperation = jigsawFinderDarkOn ? 'multiply' : 'screen';
           ctx.fillStyle = jigsawFinderDarkOn ? 'rgba(2, 6, 23, 0.38)' : 'rgba(36, 204, 255, 0.10)';
@@ -6362,6 +6386,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       }
       function resetJigsawFinderAdjustments() {
         if (jigsawFinderBlur) jigsawFinderBlur.value = '0';
+        if (jigsawFinderBlurType) jigsawFinderBlurType.value = 'standard';
         if (jigsawFinderBrightness) jigsawFinderBrightness.value = '100';
         jigsawFinderNightOn = false;
         jigsawFinderDarkOn = false;
@@ -7255,8 +7280,9 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         if (file) setJigsawFinderImage(file);
         event.target.value = '';
       });
-      [jigsawFinderBlur, jigsawFinderBrightness].forEach((input) => {
+      [jigsawFinderBlur, jigsawFinderBlurType, jigsawFinderBrightness].forEach((input) => {
         input?.addEventListener('input', drawJigsawFinderImage);
+        input?.addEventListener('change', drawJigsawFinderImage);
       });
       jigsawFinderNight?.addEventListener('click', () => {
         jigsawFinderNightOn = !jigsawFinderNightOn;

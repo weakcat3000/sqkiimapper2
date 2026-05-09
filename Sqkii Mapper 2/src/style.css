@@ -2906,7 +2906,9 @@
 
     .tool-rail-silver {
       bottom: calc(16px + var(--tool-rail-size) + var(--tool-rail-gap));
-      --tool-rail-actions-width: 328px;
+      --tool-rail-size: 52px;
+      --tool-rail-gap: 8px;
+      --tool-rail-actions-width: 292px;
       z-index: 981;
     }
 
@@ -3402,25 +3404,30 @@
     }
 
     .jigsaw-finder-capture-preview img {
-      width: 100%;
-      height: 100%;
+      width: auto;
+      height: auto;
+      max-width: 100%;
+      max-height: 100%;
       object-fit: contain;
       display: block;
     }
 
     .jigsaw-finder-editor {
       display: grid;
-      grid-template-rows: auto minmax(0, 1fr) auto auto;
+      grid-template-rows: auto auto auto auto;
       gap: 14px;
       background: #060a12;
     }
 
     #jigsaw-finder-canvas {
       width: 100%;
-      height: 100%;
+      height: auto;
       min-height: 0;
       background: #020617;
       border: 1px solid rgba(34, 211, 238, 0.16);
+      justify-self: center;
+      max-height: 34vh;
+      object-fit: contain;
     }
 
     .jigsaw-finder-controls {
@@ -3443,6 +3450,20 @@
     .jigsaw-finder-controls input[type="range"] {
       width: 100%;
       accent-color: #22d3ee;
+    }
+
+    .jigsaw-finder-controls select {
+      width: 100%;
+      height: 24px;
+      border: 1px solid rgba(34, 211, 238, 0.28);
+      border-radius: 6px;
+      background: rgba(15, 23, 42, 0.94);
+      color: #dff7ff;
+      font: inherit;
+      font-size: 11px;
+      letter-spacing: 0;
+      text-transform: none;
+      outline: none;
     }
 
     .jigsaw-finder-toggle {
@@ -4221,7 +4242,9 @@
       }
 
       .tool-rail-silver {
-        --tool-rail-actions-width: 338px;
+        --tool-rail-size: 42px;
+        --tool-rail-gap: 7px;
+        --tool-rail-actions-width: 238px;
       }
 
       .map-edit-fab,
