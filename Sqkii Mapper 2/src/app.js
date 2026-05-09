@@ -2299,6 +2299,8 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       });
       mapgl.on('click', handleGoogleStreetViewGlClick);
       mapleaf.on('click', handleGoogleStreetViewLeafClick);
+      mapgl.on('zoom', syncAllScheduledCoinCallouts);
+      mapleaf.on('zoom', syncAllScheduledCoinCallouts);
       mapgl.on('zoomend', syncAllScheduledCoinCallouts);
       mapleaf.on('zoomend', syncAllScheduledCoinCallouts);
       syncStreetViewButton();
@@ -2443,7 +2445,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
   text-align: center;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 500;
   line-height: 1.18;
   text-shadow: 0 1px 1px rgba(5, 18, 36, 0.45);
   background: linear-gradient(180deg, rgba(18, 201, 242, 0.88), rgba(8, 126, 190, 0.88));
@@ -2455,6 +2457,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
 .scheduled-coin-callout-card strong {
   font-size: 14px;
   line-height: 1.05;
+  font-weight: 500;
 }
 .scheduled-coin-callout-card strong,
 .scheduled-coin-callout-card span {
@@ -2699,8 +2702,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       }
 
       function scheduledCoinCalloutTitle(props = {}) {
-        const raw = coinDbCanonicalLabel(props._coinLabel || props.coin_label || props.name || 'Silver Coin');
-        return raw.replace(/\s+Coin\s+\d+\b/i, ' Coin').replace(/\s+\d+\b/g, '').trim() || 'Silver Coin';
+        return coinDbCanonicalLabel(props._coinLabel || props.coin_label || props.name || 'Silver Coin') || 'Silver Coin';
       }
 
       function scheduledCoinCalloutText(props = {}) {
