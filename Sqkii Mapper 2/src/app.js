@@ -2797,11 +2797,15 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           mapgl.addLayer({
             id: scheduledEdgeId, type: 'line', source: srcId,
             filter: ['all', notHidden, ['match', ['geometry-type'], ['Polygon', 'MultiPolygon'], true, false], ['==', ['get', '_coinStatus'], 'scheduled']],
+            layout: {
+              'line-cap': 'round',
+              'line-join': 'round'
+            },
             paint: {
               'line-color': ['coalesce', ['get', '_stroke'], '#22d3ee'],
               'line-width': ['coalesce', ['get', '_weight'], 1.6],
               'line-opacity': ['coalesce', ['get', '_strokeOpacity'], 0.95],
-              'line-dasharray': [2, 2]
+              'line-dasharray': [0.15, 2.4]
             }
           });
 
@@ -2906,6 +2910,8 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const style = { color: stroke, weight, opacity: strokeOpacity, fillColor: fill, fillOpacity, stroke: strokeOn };
         if (props._lineDashArray) {
           style.dashArray = Array.isArray(props._lineDashArray) ? props._lineDashArray.join(' ') : String(props._lineDashArray);
+          style.lineCap = 'round';
+          style.lineJoin = 'round';
         }
         return style;
       }
@@ -4542,7 +4548,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
               if (p._stroke == null) p._stroke = '#ffffff';
               if (p._strokeOpacity == null) p._strokeOpacity = 0.7;
               if (p._weight == null) p._weight = 2;
-              if (String(p._coinStatus || '').toLowerCase() === 'scheduled' && p._lineDashArray == null) p._lineDashArray = [2, 2];
+              if (String(p._coinStatus || '').toLowerCase() === 'scheduled' && p._lineDashArray == null) p._lineDashArray = [1, 8];
             }
           }
 
