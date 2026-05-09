@@ -2908,7 +2908,7 @@
       bottom: calc(16px + var(--tool-rail-size) + var(--tool-rail-gap));
       --tool-rail-size: 52px;
       --tool-rail-gap: 8px;
-      --tool-rail-actions-width: 292px;
+      --tool-rail-actions-width: 332px;
       z-index: 981;
     }
 
@@ -3312,14 +3312,16 @@
 
     .jigsaw-finder-card {
       width: min(94vw, 520px);
-      height: min(92vh, 860px);
+      max-height: min(92vh, 860px);
       padding: 0;
-      overflow: hidden;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
       background: #080d16;
       border: 1px solid rgba(34, 211, 238, 0.25);
       box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55);
       display: grid;
-      grid-template-rows: 1fr 1fr;
+      grid-template-rows: auto auto;
     }
 
     .jigsaw-finder-top,
@@ -3330,7 +3332,7 @@
 
     .jigsaw-finder-top {
       display: grid;
-      grid-template-rows: auto auto 1fr;
+      grid-template-rows: auto auto auto;
       gap: 16px;
       border-bottom: 1px solid rgba(34, 211, 238, 0.16);
       background: radial-gradient(circle at 20% 10%, rgba(14, 165, 233, 0.18), transparent 38%), #09111d;
@@ -3393,7 +3395,8 @@
     }
 
     .jigsaw-finder-capture-preview {
-      min-height: 0;
+      min-height: 180px;
+      max-height: 42vh;
       border: 1px dashed rgba(34, 211, 238, 0.35);
       background: rgba(2, 8, 23, 0.72);
       display: grid;
@@ -4244,7 +4247,7 @@
       .tool-rail-silver {
         --tool-rail-size: 42px;
         --tool-rail-gap: 7px;
-        --tool-rail-actions-width: 238px;
+        --tool-rail-actions-width: 282px;
       }
 
       .map-edit-fab,
