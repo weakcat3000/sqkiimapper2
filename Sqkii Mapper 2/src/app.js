@@ -6933,14 +6933,26 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           renderJigsawFinderBlurAttempt({ label: 'Original', canvas: sourceCanvas, selected: true });
           const quickAttempts = [
             { label: 'Clean sharpen', run: () => sharpenJigsawRgb(observed, sourceCanvas.width, sourceCanvas.height, 1.15, 1.18) },
+            {
+              label: 'RL Gaussian sigma 5',
+              run: () => richardsonLucyJigsawRgb(
+                observed,
+                sourceCanvas.width,
+                sourceCanvas.height,
+                createJigsawKernel({ type: 'gaussian', sigma: 5 }),
+                9,
+                0.45
+              )
+            },
             { label: 'Edge map', run: () => edgeMapJigsawRgb(observed, sourceCanvas.width, sourceCanvas.height) },
           ];
           for (const attempt of quickAttempts) {
             setJigsawFinderStatus(`Trying ${attempt.label}...`);
             await waitForNextFrame();
+            const result = await attempt.run();
             renderJigsawFinderBlurAttempt({
               label: attempt.label,
-              canvas: jigsawRgbToCanvas(attempt.run(), sourceCanvas.width, sourceCanvas.height),
+              canvas: jigsawRgbToCanvas(result, sourceCanvas.width, sourceCanvas.height),
             });
           }
           const wienerAttempts = [];
@@ -6965,7 +6977,6 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           }
           const attempts = [
             { label: 'RL Gaussian σ3', kernel: createJigsawKernel({ type: 'gaussian', sigma: 3 }), iterations: 8, damping: 0.5 },
-            { label: 'RL Gaussian σ5', kernel: createJigsawKernel({ type: 'gaussian', sigma: 5 }), iterations: 9, damping: 0.45 },
             { label: 'RL Box 5px', kernel: createJigsawKernel({ type: 'box', size: 5 }), iterations: 8, damping: 0.52 },
             { label: 'RL Motion H 9px', kernel: createJigsawKernel({ type: 'motion', size: 9, direction: 'horizontal' }), iterations: 8, damping: 0.52 },
             { label: 'RL Motion V 9px', kernel: createJigsawKernel({ type: 'motion', size: 9, direction: 'vertical' }), iterations: 8, damping: 0.52 },
