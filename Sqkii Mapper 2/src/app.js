@@ -6149,7 +6149,9 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       const jigsawFinderModalEl = document.getElementById('jigsaw-finder-modal');
       const jigsawFinderCloseBtn = document.getElementById('jigsaw-finder-close');
       const jigsawFinderInput = document.getElementById('jigsaw-finder-input');
+      const jigsawFinderCameraInput = document.getElementById('jigsaw-finder-camera-input');
       const jigsawFinderCameraBtn = document.getElementById('jigsaw-finder-camera');
+      const jigsawFinderGalleryBtn = document.getElementById('jigsaw-finder-gallery');
       const jigsawFinderCapturePreview = document.getElementById('jigsaw-finder-capture-preview');
       const jigsawFinderCanvas = document.getElementById('jigsaw-finder-canvas');
       const jigsawFinderBlur = document.getElementById('jigsaw-finder-blur');
@@ -6366,6 +6368,35 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         jigsawFinderFindBlurBusy = !!active;
         syncJigsawFinderFocusButtons();
       }
+      function getJigsawFinderPreviewFilter() {
+        const blur = Number(jigsawFinderBlur?.value || 0);
+        const blurType = jigsawFinderBlurMode || 'standard';
+        const brightness = Number(jigsawFinderBrightness?.value || 100);
+        const contrast = jigsawFinderNightOn ? 126 : 100;
+        const saturate = jigsawFinderNightOn ? 118 : 100;
+        const blurAmount = blurType === 'soft' ? blur * 0.55 : blur;
+        return {
+          blur,
+          blurAmount,
+          brightness,
+          contrast,
+          saturate,
+          css: `blur(${blurAmount}px) brightness(${brightness}%) contrast(${contrast}%) saturate(${saturate}%)`,
+        };
+      }
+      function applyJigsawFinderCanvasFilter() {
+        if (!jigsawFinderCanvas) return;
+        const filter = jigsawFinderImage
+          ? getJigsawFinderPreviewFilter().css
+          : 'none';
+        jigsawFinderCanvas.style.filter = filter;
+        jigsawFinderCanvas.style.webkitFilter = filter;
+      }
+      function clearJigsawFinderCanvasFilter() {
+        if (!jigsawFinderCanvas) return;
+        jigsawFinderCanvas.style.filter = 'none';
+        jigsawFinderCanvas.style.webkitFilter = 'none';
+      }
       function drawJigsawFinderImage() {
         if (!jigsawFinderCanvas || !jigsawFinderImage) return;
         const parentBox = jigsawFinderCanvas.parentElement?.getBoundingClientRect?.();
@@ -6385,16 +6416,10 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const ctx = jigsawFinderCanvas.getContext('2d', { alpha: false });
         if (!ctx) return;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        const blur = Number(jigsawFinderBlur?.value || 0);
+        const { blur, brightness } = getJigsawFinderPreviewFilter();
         const blurType = jigsawFinderBlurMode || 'standard';
-        const brightness = Number(jigsawFinderBrightness?.value || 100);
-        const contrast = jigsawFinderNightOn ? 126 : 100;
-        const saturate = jigsawFinderNightOn ? 118 : 100;
-        const baseFilter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturate}%)`;
-        const blurAmount = blurType === 'soft' ? blur * 0.55 : blur;
-        ctx.filter = `blur(${blurAmount}px) ${baseFilter}`;
-        ctx.drawImage(jigsawFinderImage, 0, 0, width, height);
         ctx.filter = 'none';
+        ctx.drawImage(jigsawFinderImage, 0, 0, width, height);
         if (blur > 0 && blurType === 'glow') {
           ctx.globalCompositeOperation = 'screen';
           ctx.globalAlpha = 0.36;
@@ -6418,6 +6443,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           ctx.fillRect(0, 0, width, height);
           ctx.globalCompositeOperation = 'source-over';
         }
+        applyJigsawFinderCanvasFilter();
       }
       function resetJigsawFinderAdjustments() {
         if (jigsawFinderBlur) jigsawFinderBlur.value = '0';
@@ -6485,6 +6511,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       }
       function drawJigsawFinderTensor(tensor, fallbackWidth, fallbackHeight, cropWidth = fallbackWidth, cropHeight = fallbackHeight) {
         if (!jigsawFinderCanvas) return;
+        clearJigsawFinderCanvasFilter();
         const dims = tensor.dims || [];
         const data = tensor.data;
         const nchw = dims.length === 4 && dims[1] === 3;
@@ -6573,9 +6600,23 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       }
       function downloadJigsawFinderCanvas() {
         if (!jigsawFinderCanvas || !jigsawFinderImage) return;
+        const { css } = getJigsawFinderPreviewFilter();
+        const shouldBakeFilter = (jigsawFinderCanvas.style.filter || 'none') !== 'none';
+        let href = jigsawFinderCanvas.toDataURL('image/png');
+        if (shouldBakeFilter) {
+          const exportCanvas = document.createElement('canvas');
+          exportCanvas.width = jigsawFinderCanvas.width;
+          exportCanvas.height = jigsawFinderCanvas.height;
+          const exportCtx = exportCanvas.getContext('2d', { alpha: false });
+          if (exportCtx) {
+            exportCtx.filter = css;
+            exportCtx.drawImage(jigsawFinderCanvas, 0, 0);
+            href = exportCanvas.toDataURL('image/png');
+          }
+        }
         const link = document.createElement('a');
         link.download = `jigsaw-focus-${Date.now()}.png`;
-        link.href = jigsawFinderCanvas.toDataURL('image/png');
+        link.href = href;
         link.click();
       }
       function waitForNextFrame() {
@@ -6873,6 +6914,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       }
       function drawJigsawFinderCanvasResult(sourceCanvas) {
         if (!jigsawFinderCanvas || !sourceCanvas) return;
+        clearJigsawFinderCanvasFilter();
         const maxW = Math.max(1, jigsawFinderCanvas.parentElement?.clientWidth || sourceCanvas.width);
         const scale = Math.min(maxW / sourceCanvas.width, 1);
         const displayW = Math.max(1, Math.round(sourceCanvas.width * scale));
@@ -7026,6 +7068,21 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         };
         img.onerror = () => setJigsawFinderStatus('Could not load that photo. Try taking another picture.');
         img.src = jigsawFinderPreviewUrl;
+      }
+      function openJigsawFinderCameraPicker() {
+        if (!jigsawFinderCameraInput) return;
+        jigsawFinderCameraInput.value = '';
+        jigsawFinderCameraInput.click();
+      }
+      function openJigsawFinderGalleryPicker() {
+        if (!jigsawFinderInput) return;
+        jigsawFinderInput.value = '';
+        jigsawFinderInput.click();
+      }
+      function handleJigsawFinderPickerChange(event) {
+        const file = event.target?.files?.[0];
+        if (file) setJigsawFinderImage(file);
+        event.target.value = '';
       }
       function setSilverAiStatus(message, tone = 'info') {
         if (!silverAiStatusEl) return;
@@ -7891,12 +7948,10 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         requestAnimationFrame(drawJigsawFinderImage);
       });
       jigsawFinderCloseBtn?.addEventListener('click', () => jigsawFinderModal?.close());
-      jigsawFinderCameraBtn?.addEventListener('click', () => jigsawFinderInput?.click());
-      jigsawFinderInput?.addEventListener('change', (event) => {
-        const file = event.target?.files?.[0];
-        if (file) setJigsawFinderImage(file);
-        event.target.value = '';
-      });
+      jigsawFinderCameraBtn?.addEventListener('click', openJigsawFinderCameraPicker);
+      jigsawFinderGalleryBtn?.addEventListener('click', openJigsawFinderGalleryPicker);
+      jigsawFinderInput?.addEventListener('change', handleJigsawFinderPickerChange);
+      jigsawFinderCameraInput?.addEventListener('change', handleJigsawFinderPickerChange);
       [jigsawFinderBlur, jigsawFinderBrightness].forEach((input) => {
         input?.addEventListener('input', drawJigsawFinderImage);
         input?.addEventListener('change', drawJigsawFinderImage);

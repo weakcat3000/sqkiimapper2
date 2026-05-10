@@ -3370,7 +3370,14 @@
       letter-spacing: 0;
     }
 
-    .jigsaw-finder-camera-btn {
+    .jigsaw-finder-source-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .jigsaw-finder-camera-btn,
+    .jigsaw-finder-gallery-btn {
       height: 52px;
       display: flex;
       align-items: center;
@@ -3384,7 +3391,14 @@
       letter-spacing: 0.08em;
     }
 
-    .jigsaw-finder-camera-btn svg {
+    .jigsaw-finder-gallery-btn {
+      background: rgba(15, 23, 42, 0.94);
+      color: #dff7ff;
+      border: 1px solid rgba(34, 211, 238, 0.35);
+    }
+
+    .jigsaw-finder-camera-btn svg,
+    .jigsaw-finder-gallery-btn svg {
       width: 21px;
       height: 21px;
       fill: none;
@@ -3430,6 +3444,7 @@
       border: 1px solid rgba(34, 211, 238, 0.16);
       justify-self: center;
       object-fit: contain;
+      will-change: filter;
     }
 
     .jigsaw-finder-controls {
@@ -3608,6 +3623,7 @@
         width: min(98vw, 572px);
       }
 
+      .jigsaw-finder-source-actions,
       .jigsaw-finder-controls,
       .jigsaw-finder-focus-actions {
         grid-template-columns: 1fr;
