@@ -6190,6 +6190,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       let silverAiLastMediaPayloads = [];
       let silverAiLastMediaIssues = [];
       let jigsawFinderImage = null;
+      let jigsawFinderWorkingImage = null;
       let jigsawFinderPreviewUrl = null;
       let jigsawFinderDarkOn = false;
       let jigsawFinderNightOn = false;
@@ -6386,7 +6387,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       }
       function applyJigsawFinderCanvasFilter() {
         if (!jigsawFinderCanvas) return;
-        const filter = jigsawFinderImage
+        const filter = getJigsawFinderCurrentImage()
           ? getJigsawFinderPreviewFilter().css
           : 'none';
         jigsawFinderCanvas.style.filter = filter;
@@ -6397,13 +6398,17 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         jigsawFinderCanvas.style.filter = 'none';
         jigsawFinderCanvas.style.webkitFilter = 'none';
       }
+      function getJigsawFinderCurrentImage() {
+        return jigsawFinderWorkingImage || jigsawFinderImage;
+      }
       function drawJigsawFinderImage() {
-        if (!jigsawFinderCanvas || !jigsawFinderImage) return;
+        const sourceImage = getJigsawFinderCurrentImage();
+        if (!jigsawFinderCanvas || !sourceImage) return;
         const parentBox = jigsawFinderCanvas.parentElement?.getBoundingClientRect?.();
         const maxW = Math.max(1, Math.floor(parentBox?.width || jigsawFinderCanvas.clientWidth || 900));
         const maxH = Math.max(1, Math.floor(Math.min(window.innerHeight * 0.34, parentBox?.height || 420)));
-        const sourceW = jigsawFinderImage.naturalWidth || jigsawFinderImage.width || maxW;
-        const sourceH = jigsawFinderImage.naturalHeight || jigsawFinderImage.height || maxH;
+        const sourceW = sourceImage.naturalWidth || sourceImage.width || maxW;
+        const sourceH = sourceImage.naturalHeight || sourceImage.height || maxH;
         const scale = Math.min(maxW / sourceW, maxH / sourceH, 1);
         const width = Math.max(1, Math.round(sourceW * scale));
         const height = Math.max(1, Math.round(sourceH * scale));
@@ -6419,12 +6424,12 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const { blur, brightness } = getJigsawFinderPreviewFilter();
         const blurType = jigsawFinderBlurMode || 'standard';
         ctx.filter = 'none';
-        ctx.drawImage(jigsawFinderImage, 0, 0, width, height);
+        ctx.drawImage(sourceImage, 0, 0, width, height);
         if (blur > 0 && blurType === 'glow') {
           ctx.globalCompositeOperation = 'screen';
           ctx.globalAlpha = 0.36;
           ctx.filter = `blur(${blur * 1.45}px) brightness(${Math.max(brightness, 118)}%)`;
-          ctx.drawImage(jigsawFinderImage, 0, 0, width, height);
+          ctx.drawImage(sourceImage, 0, 0, width, height);
           ctx.filter = 'none';
           ctx.globalAlpha = 1;
           ctx.globalCompositeOperation = 'source-over';
@@ -6432,7 +6437,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           ctx.globalCompositeOperation = 'multiply';
           ctx.globalAlpha = 0.32;
           ctx.filter = `blur(${blur * 1.35}px) brightness(74%)`;
-          ctx.drawImage(jigsawFinderImage, 0, 0, width, height);
+          ctx.drawImage(sourceImage, 0, 0, width, height);
           ctx.filter = 'none';
           ctx.globalAlpha = 1;
           ctx.globalCompositeOperation = 'source-over';
@@ -6446,6 +6451,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         applyJigsawFinderCanvasFilter();
       }
       function resetJigsawFinderAdjustments() {
+        jigsawFinderWorkingImage = null;
         if (jigsawFinderBlur) jigsawFinderBlur.value = '0';
         jigsawFinderBlurMode = 'standard';
         jigsawFinderBlurType?.querySelectorAll('button[data-blur-type]')?.forEach((button) => {
@@ -6915,6 +6921,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       function drawJigsawFinderCanvasResult(sourceCanvas) {
         if (!jigsawFinderCanvas || !sourceCanvas) return;
         clearJigsawFinderCanvasFilter();
+        jigsawFinderWorkingImage = sourceCanvas;
         const maxW = Math.max(1, jigsawFinderCanvas.parentElement?.clientWidth || sourceCanvas.width);
         const scale = Math.min(maxW / sourceCanvas.width, 1);
         const displayW = Math.max(1, Math.round(sourceCanvas.width * scale));
@@ -7050,6 +7057,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       }
       function setJigsawFinderImage(file) {
         if (!file) return;
+        jigsawFinderWorkingImage = null;
         if (jigsawFinderPreviewUrl) URL.revokeObjectURL(jigsawFinderPreviewUrl);
         jigsawFinderPreviewUrl = URL.createObjectURL(file);
         const img = new Image();
