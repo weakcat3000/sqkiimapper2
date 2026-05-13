@@ -6530,25 +6530,26 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const maxH = Math.max(1, Math.floor(Math.min(window.innerHeight * 0.34, parentBox?.height || 420)));
         const sourceW = sourceImage.naturalWidth || sourceImage.width || maxW;
         const sourceH = sourceImage.naturalHeight || sourceImage.height || maxH;
-        const scale = Math.min(maxW / sourceW, maxH / sourceH, 1);
-        const width = Math.max(1, Math.round(sourceW * scale));
-        const height = Math.max(1, Math.round(sourceH * scale));
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        jigsawFinderCanvas.width = Math.round(width * dpr);
-        jigsawFinderCanvas.height = Math.round(height * dpr);
-        setJigsawFinderBaseDisplaySize(width, height);
+        const displayScale = Math.min(maxW / sourceW, maxH / sourceH, 1);
+        const displayW = Math.max(1, Math.round(sourceW * displayScale));
+        const displayH = Math.max(1, Math.round(sourceH * displayScale));
+        jigsawFinderCanvas.width = Math.max(1, Math.round(sourceW));
+        jigsawFinderCanvas.height = Math.max(1, Math.round(sourceH));
+        setJigsawFinderBaseDisplaySize(displayW, displayH);
         const ctx = jigsawFinderCanvas.getContext('2d', { alpha: false });
         if (!ctx) return;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         const { blur, brightness } = getJigsawFinderPreviewFilter();
         const blurType = jigsawFinderBlurMode || 'standard';
         ctx.filter = 'none';
-        ctx.drawImage(sourceImage, 0, 0, width, height);
+        ctx.drawImage(sourceImage, 0, 0, sourceW, sourceH);
         if (blur > 0 && blurType === 'glow') {
           ctx.globalCompositeOperation = 'screen';
           ctx.globalAlpha = 0.36;
           ctx.filter = `blur(${blur * 1.45}px) brightness(${Math.max(brightness, 118)}%)`;
-          ctx.drawImage(sourceImage, 0, 0, width, height);
+          ctx.drawImage(sourceImage, 0, 0, sourceW, sourceH);
           ctx.filter = 'none';
           ctx.globalAlpha = 1;
           ctx.globalCompositeOperation = 'source-over';
@@ -6556,7 +6557,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           ctx.globalCompositeOperation = 'multiply';
           ctx.globalAlpha = 0.32;
           ctx.filter = `blur(${blur * 1.35}px) brightness(74%)`;
-          ctx.drawImage(sourceImage, 0, 0, width, height);
+          ctx.drawImage(sourceImage, 0, 0, sourceW, sourceH);
           ctx.filter = 'none';
           ctx.globalAlpha = 1;
           ctx.globalCompositeOperation = 'source-over';
@@ -6564,7 +6565,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         if (jigsawFinderDarkOn || jigsawFinderNightOn) {
           ctx.globalCompositeOperation = jigsawFinderDarkOn ? 'multiply' : 'screen';
           ctx.fillStyle = jigsawFinderDarkOn ? 'rgba(2, 6, 23, 0.38)' : 'rgba(36, 204, 255, 0.10)';
-          ctx.fillRect(0, 0, width, height);
+          ctx.fillRect(0, 0, sourceW, sourceH);
           ctx.globalCompositeOperation = 'source-over';
         }
         applyJigsawFinderCanvasFilter();
@@ -6667,9 +6668,8 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         }
         const visibleW = Math.min(width, cropWidth);
         const visibleH = Math.min(height, cropHeight);
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        jigsawFinderCanvas.width = Math.round(visibleW * dpr);
-        jigsawFinderCanvas.height = Math.round(visibleH * dpr);
+        jigsawFinderCanvas.width = visibleW;
+        jigsawFinderCanvas.height = visibleH;
         const displayW = Math.min(visibleW, jigsawFinderImageStage?.clientWidth || jigsawFinderCanvas.parentElement?.clientWidth || visibleW);
         const displayH = Math.max(1, Math.round(visibleH * (displayW / Math.max(1, visibleW))));
         setJigsawFinderBaseDisplaySize(displayW, displayH);
@@ -6679,8 +6679,9 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         tempCanvas.width = width;
         tempCanvas.height = height;
         tempCanvas.getContext('2d')?.putImageData(output, 0, 0);
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.imageSmoothingEnabled = false;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(tempCanvas, 0, 0, visibleW, visibleH, 0, 0, visibleW, visibleH);
       }
       async function getJigsawFinderFocusSession() {
@@ -7053,15 +7054,15 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const scale = Math.min(maxW / sourceCanvas.width, 1);
         const displayW = Math.max(1, Math.round(sourceCanvas.width * scale));
         const displayH = Math.max(1, Math.round(sourceCanvas.height * scale));
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        jigsawFinderCanvas.width = Math.round(displayW * dpr);
-        jigsawFinderCanvas.height = Math.round(displayH * dpr);
+        jigsawFinderCanvas.width = sourceCanvas.width;
+        jigsawFinderCanvas.height = sourceCanvas.height;
         setJigsawFinderBaseDisplaySize(displayW, displayH);
         const ctx = jigsawFinderCanvas.getContext('2d', { alpha: false });
         if (!ctx) return;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.imageSmoothingEnabled = true;
-        ctx.drawImage(sourceCanvas, 0, 0, displayW, displayH);
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(sourceCanvas, 0, 0);
       }
       function renderJigsawFinderBlurAttempt({ label, canvas, selected = false }) {
         if (!jigsawFinderBlurGrid) return;
