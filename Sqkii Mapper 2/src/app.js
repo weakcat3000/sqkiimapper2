@@ -6157,6 +6157,8 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       const jigsawFinderBlur = document.getElementById('jigsaw-finder-blur');
       const jigsawFinderBlurType = document.getElementById('jigsaw-finder-blur-type');
       const jigsawFinderBrightness = document.getElementById('jigsaw-finder-brightness');
+      const jigsawFinderSaturation = document.getElementById('jigsaw-finder-saturation');
+      const jigsawFinderGreyscale = document.getElementById('jigsaw-finder-greyscale');
       const jigsawFinderNight = document.getElementById('jigsaw-finder-night');
       const jigsawFinderDark = document.getElementById('jigsaw-finder-dark');
       const jigsawFinderReset = document.getElementById('jigsaw-finder-reset');
@@ -6373,8 +6375,10 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const blur = Number(jigsawFinderBlur?.value || 0);
         const blurType = jigsawFinderBlurMode || 'standard';
         const brightness = Number(jigsawFinderBrightness?.value || 100);
+        const saturation = Number(jigsawFinderSaturation?.value || 100);
+        const greyscale = Number(jigsawFinderGreyscale?.value || 0);
         const contrast = jigsawFinderNightOn ? 126 : 100;
-        const saturate = jigsawFinderNightOn ? 118 : 100;
+        const saturate = saturation * (jigsawFinderNightOn ? 1.18 : 1);
         const blurAmount = blurType === 'soft' ? blur * 0.55 : blur;
         return {
           blur,
@@ -6382,7 +6386,9 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           brightness,
           contrast,
           saturate,
-          css: `blur(${blurAmount}px) brightness(${brightness}%) contrast(${contrast}%) saturate(${saturate}%)`,
+          saturation,
+          greyscale,
+          css: `blur(${blurAmount}px) brightness(${brightness}%) contrast(${contrast}%) saturate(${saturate}%) grayscale(${greyscale}%)`,
         };
       }
       function applyJigsawFinderCanvasFilter() {
@@ -6458,6 +6464,8 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           button.setAttribute('aria-pressed', button.dataset.blurType === jigsawFinderBlurMode ? 'true' : 'false');
         });
         if (jigsawFinderBrightness) jigsawFinderBrightness.value = '100';
+        if (jigsawFinderSaturation) jigsawFinderSaturation.value = '100';
+        if (jigsawFinderGreyscale) jigsawFinderGreyscale.value = '0';
         jigsawFinderNightOn = false;
         jigsawFinderDarkOn = false;
         jigsawFinderNight?.setAttribute('aria-pressed', 'false');
@@ -7960,7 +7968,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       jigsawFinderGalleryBtn?.addEventListener('click', openJigsawFinderGalleryPicker);
       jigsawFinderInput?.addEventListener('change', handleJigsawFinderPickerChange);
       jigsawFinderCameraInput?.addEventListener('change', handleJigsawFinderPickerChange);
-      [jigsawFinderBlur, jigsawFinderBrightness].forEach((input) => {
+      [jigsawFinderBlur, jigsawFinderBrightness, jigsawFinderSaturation, jigsawFinderGreyscale].forEach((input) => {
         input?.addEventListener('input', drawJigsawFinderImage);
         input?.addEventListener('change', drawJigsawFinderImage);
       });
