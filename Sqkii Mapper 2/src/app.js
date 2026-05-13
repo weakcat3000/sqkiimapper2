@@ -6153,7 +6153,9 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       const jigsawFinderCameraBtn = document.getElementById('jigsaw-finder-camera');
       const jigsawFinderGalleryBtn = document.getElementById('jigsaw-finder-gallery');
       const jigsawFinderCapturePreview = document.getElementById('jigsaw-finder-capture-preview');
+      const jigsawFinderImageStage = document.getElementById('jigsaw-finder-image-stage');
       const jigsawFinderCanvas = document.getElementById('jigsaw-finder-canvas');
+      const jigsawFinderZoom = document.getElementById('jigsaw-finder-zoom');
       const jigsawFinderBlur = document.getElementById('jigsaw-finder-blur');
       const jigsawFinderBlurType = document.getElementById('jigsaw-finder-blur-type');
       const jigsawFinderBrightness = document.getElementById('jigsaw-finder-brightness');
@@ -6197,6 +6199,11 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       let jigsawFinderDarkOn = false;
       let jigsawFinderNightOn = false;
       let jigsawFinderBlurMode = 'standard';
+      let jigsawFinderBaseDisplayWidth = 0;
+      let jigsawFinderBaseDisplayHeight = 0;
+      let jigsawFinderZoomPercent = 100;
+      let jigsawFinderPinchStart = null;
+      let jigsawFinderPanStart = null;
       let jigsawFinderFocusSessionPromise = null;
       let jigsawFinderFocusBusy = false;
       let jigsawFinderFindBlurBusy = false;
@@ -6407,10 +6414,118 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       function getJigsawFinderCurrentImage() {
         return jigsawFinderWorkingImage || jigsawFinderImage;
       }
+      function applyJigsawFinderZoom({ keepScrollRatio = true } = {}) {
+        if (!jigsawFinderCanvas || !jigsawFinderBaseDisplayWidth || !jigsawFinderBaseDisplayHeight) return;
+        const stage = jigsawFinderImageStage;
+        const prevScrollRatioX = stage && stage.scrollWidth > stage.clientWidth
+          ? stage.scrollLeft / Math.max(1, stage.scrollWidth - stage.clientWidth)
+          : 0.5;
+        const prevScrollRatioY = stage && stage.scrollHeight > stage.clientHeight
+          ? stage.scrollTop / Math.max(1, stage.scrollHeight - stage.clientHeight)
+          : 0;
+        const zoom = Math.max(1, Math.min(4, jigsawFinderZoomPercent / 100));
+        const width = Math.max(1, Math.round(jigsawFinderBaseDisplayWidth * zoom));
+        const height = Math.max(1, Math.round(jigsawFinderBaseDisplayHeight * zoom));
+        jigsawFinderCanvas.style.width = `${width}px`;
+        jigsawFinderCanvas.style.height = `${height}px`;
+        jigsawFinderCanvas.style.aspectRatio = `${jigsawFinderBaseDisplayWidth} / ${jigsawFinderBaseDisplayHeight}`;
+        if (jigsawFinderZoom) jigsawFinderZoom.value = String(Math.round(jigsawFinderZoomPercent));
+        if (stage && keepScrollRatio) {
+          requestAnimationFrame(() => {
+            stage.scrollLeft = Math.max(0, (stage.scrollWidth - stage.clientWidth) * prevScrollRatioX);
+            stage.scrollTop = Math.max(0, (stage.scrollHeight - stage.clientHeight) * prevScrollRatioY);
+          });
+        }
+      }
+      function setJigsawFinderBaseDisplaySize(width, height, { keepScrollRatio = true } = {}) {
+        jigsawFinderBaseDisplayWidth = Math.max(1, Math.round(width));
+        jigsawFinderBaseDisplayHeight = Math.max(1, Math.round(height));
+        applyJigsawFinderZoom({ keepScrollRatio });
+      }
+      function setJigsawFinderZoomPercent(value, { centerClientX = null, centerClientY = null } = {}) {
+        const stage = jigsawFinderImageStage;
+        const next = Math.max(100, Math.min(400, Number(value) || 100));
+        if (!stage || !jigsawFinderBaseDisplayWidth || !jigsawFinderBaseDisplayHeight) {
+          jigsawFinderZoomPercent = next;
+          applyJigsawFinderZoom();
+          return;
+        }
+        const beforeRect = stage.getBoundingClientRect();
+        const anchorX = Number.isFinite(centerClientX) ? centerClientX - beforeRect.left : stage.clientWidth / 2;
+        const anchorY = Number.isFinite(centerClientY) ? centerClientY - beforeRect.top : stage.clientHeight / 2;
+        const contentX = stage.scrollLeft + anchorX;
+        const contentY = stage.scrollTop + anchorY;
+        const prevZoom = Math.max(1, jigsawFinderZoomPercent / 100);
+        const nextZoom = next / 100;
+        jigsawFinderZoomPercent = next;
+        applyJigsawFinderZoom({ keepScrollRatio: false });
+        requestAnimationFrame(() => {
+          const scale = nextZoom / prevZoom;
+          stage.scrollLeft = Math.max(0, (contentX * scale) - anchorX);
+          stage.scrollTop = Math.max(0, (contentY * scale) - anchorY);
+        });
+      }
+      function getJigsawFinderTouchDistance(touches) {
+        if (!touches || touches.length < 2) return 0;
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.hypot(dx, dy);
+      }
+      function getJigsawFinderTouchCenter(touches) {
+        if (!touches || touches.length < 2) return null;
+        return {
+          x: (touches[0].clientX + touches[1].clientX) / 2,
+          y: (touches[0].clientY + touches[1].clientY) / 2,
+        };
+      }
+      function handleJigsawFinderStageTouchStart(event) {
+        if (event.touches?.length === 2) {
+          event.preventDefault();
+          jigsawFinderPinchStart = {
+            distance: getJigsawFinderTouchDistance(event.touches),
+            zoom: jigsawFinderZoomPercent,
+          };
+          jigsawFinderPanStart = null;
+        } else if (event.touches?.length === 1 && jigsawFinderZoomPercent > 100 && jigsawFinderImageStage) {
+          jigsawFinderPanStart = {
+            x: event.touches[0].clientX,
+            y: event.touches[0].clientY,
+            scrollLeft: jigsawFinderImageStage.scrollLeft,
+            scrollTop: jigsawFinderImageStage.scrollTop,
+          };
+        } else {
+          jigsawFinderPinchStart = null;
+          jigsawFinderPanStart = null;
+        }
+      }
+      function handleJigsawFinderStageTouchMove(event) {
+        if (!jigsawFinderImageStage) return;
+        if (event.touches?.length === 1 && jigsawFinderPanStart) {
+          event.preventDefault();
+          const dx = event.touches[0].clientX - jigsawFinderPanStart.x;
+          const dy = event.touches[0].clientY - jigsawFinderPanStart.y;
+          jigsawFinderImageStage.scrollLeft = jigsawFinderPanStart.scrollLeft - dx;
+          jigsawFinderImageStage.scrollTop = jigsawFinderPanStart.scrollTop - dy;
+          return;
+        }
+        if (event.touches?.length !== 2 || !jigsawFinderPinchStart?.distance) return;
+        event.preventDefault();
+        const distance = getJigsawFinderTouchDistance(event.touches);
+        const center = getJigsawFinderTouchCenter(event.touches);
+        const nextZoom = jigsawFinderPinchStart.zoom * (distance / Math.max(1, jigsawFinderPinchStart.distance));
+        setJigsawFinderZoomPercent(nextZoom, {
+          centerClientX: center?.x,
+          centerClientY: center?.y,
+        });
+      }
+      function handleJigsawFinderStageTouchEnd(event) {
+        if ((event.touches?.length || 0) < 2) jigsawFinderPinchStart = null;
+        if ((event.touches?.length || 0) === 0) jigsawFinderPanStart = null;
+      }
       function drawJigsawFinderImage() {
         const sourceImage = getJigsawFinderCurrentImage();
         if (!jigsawFinderCanvas || !sourceImage) return;
-        const parentBox = jigsawFinderCanvas.parentElement?.getBoundingClientRect?.();
+        const parentBox = jigsawFinderImageStage?.getBoundingClientRect?.() || jigsawFinderCanvas.parentElement?.getBoundingClientRect?.();
         const maxW = Math.max(1, Math.floor(parentBox?.width || jigsawFinderCanvas.clientWidth || 900));
         const maxH = Math.max(1, Math.floor(Math.min(window.innerHeight * 0.34, parentBox?.height || 420)));
         const sourceW = sourceImage.naturalWidth || sourceImage.width || maxW;
@@ -6421,9 +6536,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         jigsawFinderCanvas.width = Math.round(width * dpr);
         jigsawFinderCanvas.height = Math.round(height * dpr);
-        jigsawFinderCanvas.style.width = `${width}px`;
-        jigsawFinderCanvas.style.height = `${height}px`;
-        jigsawFinderCanvas.style.aspectRatio = `${width} / ${height}`;
+        setJigsawFinderBaseDisplaySize(width, height);
         const ctx = jigsawFinderCanvas.getContext('2d', { alpha: false });
         if (!ctx) return;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -6459,6 +6572,12 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       function resetJigsawFinderAdjustments() {
         jigsawFinderWorkingImage = null;
         if (jigsawFinderBlur) jigsawFinderBlur.value = '0';
+        jigsawFinderZoomPercent = 100;
+        if (jigsawFinderZoom) jigsawFinderZoom.value = '100';
+        if (jigsawFinderImageStage) {
+          jigsawFinderImageStage.scrollLeft = 0;
+          jigsawFinderImageStage.scrollTop = 0;
+        }
         jigsawFinderBlurMode = 'standard';
         jigsawFinderBlurType?.querySelectorAll('button[data-blur-type]')?.forEach((button) => {
           button.setAttribute('aria-pressed', button.dataset.blurType === jigsawFinderBlurMode ? 'true' : 'false');
@@ -6551,9 +6670,9 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         jigsawFinderCanvas.width = Math.round(visibleW * dpr);
         jigsawFinderCanvas.height = Math.round(visibleH * dpr);
-        jigsawFinderCanvas.style.width = `${Math.min(visibleW, jigsawFinderCanvas.parentElement?.clientWidth || visibleW)}px`;
-        jigsawFinderCanvas.style.height = `${visibleH}px`;
-        jigsawFinderCanvas.style.aspectRatio = `${visibleW} / ${visibleH}`;
+        const displayW = Math.min(visibleW, jigsawFinderImageStage?.clientWidth || jigsawFinderCanvas.parentElement?.clientWidth || visibleW);
+        const displayH = Math.max(1, Math.round(visibleH * (displayW / Math.max(1, visibleW))));
+        setJigsawFinderBaseDisplaySize(displayW, displayH);
         const ctx = jigsawFinderCanvas.getContext('2d', { alpha: false });
         if (!ctx) return;
         const tempCanvas = document.createElement('canvas');
@@ -6937,9 +7056,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         jigsawFinderCanvas.width = Math.round(displayW * dpr);
         jigsawFinderCanvas.height = Math.round(displayH * dpr);
-        jigsawFinderCanvas.style.width = `${displayW}px`;
-        jigsawFinderCanvas.style.height = `${displayH}px`;
-        jigsawFinderCanvas.style.aspectRatio = `${displayW} / ${displayH}`;
+        setJigsawFinderBaseDisplaySize(displayW, displayH);
         const ctx = jigsawFinderCanvas.getContext('2d', { alpha: false });
         if (!ctx) return;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -7968,6 +8085,16 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       jigsawFinderGalleryBtn?.addEventListener('click', openJigsawFinderGalleryPicker);
       jigsawFinderInput?.addEventListener('change', handleJigsawFinderPickerChange);
       jigsawFinderCameraInput?.addEventListener('change', handleJigsawFinderPickerChange);
+      jigsawFinderZoom?.addEventListener('input', (event) => {
+        setJigsawFinderZoomPercent(event.target?.value || 100);
+      });
+      jigsawFinderZoom?.addEventListener('change', (event) => {
+        setJigsawFinderZoomPercent(event.target?.value || 100);
+      });
+      jigsawFinderImageStage?.addEventListener('touchstart', handleJigsawFinderStageTouchStart, { passive: false });
+      jigsawFinderImageStage?.addEventListener('touchmove', handleJigsawFinderStageTouchMove, { passive: false });
+      jigsawFinderImageStage?.addEventListener('touchend', handleJigsawFinderStageTouchEnd, { passive: true });
+      jigsawFinderImageStage?.addEventListener('touchcancel', handleJigsawFinderStageTouchEnd, { passive: true });
       [jigsawFinderBlur, jigsawFinderBrightness, jigsawFinderSaturation, jigsawFinderGreyscale].forEach((input) => {
         input?.addEventListener('input', drawJigsawFinderImage);
         input?.addEventListener('change', drawJigsawFinderImage);

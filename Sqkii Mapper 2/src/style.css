@@ -3435,16 +3435,29 @@
       background: #060a12;
     }
 
-    #jigsaw-finder-canvas {
+    .jigsaw-finder-image-stage {
       width: 100%;
-      height: auto;
-      min-height: 0;
-      max-width: 100%;
+      max-height: min(42vh, 520px);
+      display: block;
+      overflow: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
       background: #020617;
       border: 1px solid rgba(34, 211, 238, 0.16);
+      touch-action: none;
+      text-align: center;
+    }
+
+    #jigsaw-finder-canvas {
+      height: auto;
+      min-height: 0;
+      max-width: none;
+      background: #020617;
       justify-self: center;
       object-fit: contain;
       will-change: filter;
+      display: block;
+      margin: 0 auto;
     }
 
     .jigsaw-finder-controls {

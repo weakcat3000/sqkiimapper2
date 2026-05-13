@@ -399,8 +399,14 @@
             </div>
             <button id="jigsaw-finder-reset" class="btn small" type="button">Reset</button>
           </div>
-          <canvas id="jigsaw-finder-canvas"></canvas>
+          <div id="jigsaw-finder-image-stage" class="jigsaw-finder-image-stage">
+            <canvas id="jigsaw-finder-canvas"></canvas>
+          </div>
           <div class="jigsaw-finder-controls">
+            <label>
+              <span>Image Zoom</span>
+              <input id="jigsaw-finder-zoom" type="range" min="100" max="400" step="5" value="100">
+            </label>
             <label>
               <span>Blur</span>
               <input id="jigsaw-finder-blur" type="range" min="0" max="8" step="0.1" value="0">
