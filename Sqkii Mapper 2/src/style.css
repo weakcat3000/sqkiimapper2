@@ -2896,8 +2896,9 @@
       --tool-rail-size: 56px;
       --tool-rail-gap: 12px;
       --tool-rail-actions-width: 192px;
+      --tool-rail-left: calc(var(--side) + 16px);
       position: fixed;
-      left: calc(var(--side) + 16px);
+      left: var(--tool-rail-left);
       bottom: 16px;
       z-index: 980;
       display: flex;
@@ -2914,16 +2915,16 @@
       bottom: calc(16px + var(--tool-rail-size) + var(--tool-rail-gap));
       --tool-rail-size: 52px;
       --tool-rail-gap: 8px;
-      --tool-rail-actions-width: 332px;
+      --tool-rail-actions-width: 292px;
       z-index: 981;
     }
 
     .app.ui-collapsed .tool-rail {
-      left: 16px;
+      --tool-rail-left: 16px;
     }
 
     .app:not(.ui-collapsed) .tool-rail {
-      left: calc(var(--side) + 16px);
+      --tool-rail-left: calc(var(--side) + 16px);
     }
 
     .tool-rail-toggle,
@@ -3101,15 +3102,24 @@
       align-items: center;
       gap: var(--tool-rail-gap);
       width: 0;
+      max-width: max(0px, calc(100vw - var(--tool-rail-left) - var(--tool-rail-size) - var(--tool-rail-gap) - 16px));
       opacity: 0;
       overflow: hidden;
       pointer-events: none;
       transition: width .36s cubic-bezier(.22, 1, .36, 1), opacity .2s ease;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .tool-rail-actions::-webkit-scrollbar {
+      display: none;
     }
 
     .tool-rail.open .tool-rail-actions {
-      width: var(--tool-rail-actions-width);
+      width: min(var(--tool-rail-actions-width), max(0px, calc(100vw - var(--tool-rail-left) - var(--tool-rail-size) - var(--tool-rail-gap) - 16px)));
       opacity: 1;
+      overflow-x: auto;
+      overflow-y: visible;
       pointer-events: auto;
     }
 
@@ -4409,7 +4419,7 @@
       .tool-rail-silver {
         --tool-rail-size: 42px;
         --tool-rail-gap: 7px;
-        --tool-rail-actions-width: 282px;
+        --tool-rail-actions-width: 238px;
       }
 
       .map-edit-fab,
