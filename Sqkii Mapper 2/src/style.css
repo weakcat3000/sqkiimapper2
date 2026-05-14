@@ -777,6 +777,12 @@
       filter: brightness(1.15)
     }
 
+    html.circle-dragging .maplibregl-popup,
+    html.circle-dragging .leaflet-popup,
+    html.circle-dragging .style-editor {
+      display: none !important;
+    }
+
     /* Style editor modal */
     .style-editor {
       position: fixed;

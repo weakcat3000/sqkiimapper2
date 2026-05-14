@@ -2658,6 +2658,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       }
 
       function showSinglePopup(popup, lngLat, content) {
+        if (popupsSuppressed()) return;
         closeActivePopup(); // Close any existing popup first
 
         if (engine === 'gl') {
@@ -3257,12 +3258,16 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         else mapleaf.getContainer().style.cursor = '';
 
         // Stop dragging
+        suppressPopups(1500);
         circleDragQueuedMove = null;
         if (circleDragRafId) {
           cancelAnimationFrame(circleDragRafId);
           circleDragRafId = 0;
         }
         circleDragCtx = null;
+        setCircleDragUi(false);
+        suppressPopups(1500);
+        syncDeleteModeCursor();
       });
 
 
@@ -4044,12 +4049,17 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       const DELETE_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M5 5L19 19M19 5L5 19' stroke='black' stroke-width='6' stroke-linecap='round' opacity='0.45'/%3E%3Cpath d='M5 5L19 19M19 5L5 19' stroke='%23f8fafc' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair`;
 
       function suppressPopups(ms = 550) {
-        suppressPopupUntil = Date.now() + ms;
+        suppressPopupUntil = Math.max(suppressPopupUntil, Date.now() + ms);
         closeActivePopup();
       }
 
       function popupsSuppressed() {
         return !!circleDragCtx || Date.now() < streetViewClickSuppressUntil || Date.now() < suppressPopupUntil;
+      }
+
+      function setCircleDragUi(active) {
+        document.documentElement.classList.toggle('circle-dragging', !!active);
+        document.body?.classList.toggle('circle-dragging', !!active);
       }
 
       // Add Calculate Statistics/Glimpse button element (will be created dynamically)
@@ -4061,11 +4071,14 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       let seJigsawAi = null;
 
 
-      seDrag.addEventListener('click', () => {
+      seDrag.addEventListener('click', (event) => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
         if (!editCtx) return;
 
-        const { entry, fid } = editCtx;
-        const feat = entry.data.features.find(f => f?.properties?.fid === fid);
+        const { entry } = editCtx;
+        const fid = String(editCtx.fid);
+        const feat = entry.data.features.find(f => String(f?.properties?.fid) === fid);
         if (!feat) return;
 
         // Only allow dragging circles
@@ -4075,10 +4088,11 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         }
 
         closeStyleEditor();
-        suppressPopups();
+        suppressPopups(1500);
 
         // Start drag mode
         circleDragCtx = { entry, fid };
+        setCircleDragUi(true);
 
         // Disable map pan while dragging
         if (engine === 'gl') {
@@ -4229,6 +4243,8 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           if (engine === 'gl') { try { mapgl.dragPan.enable(); } catch { } }
           else { try { mapleaf.dragging.enable(); } catch { } }
           circleDragCtx = null;
+          setCircleDragUi(false);
+          suppressPopups(1500);
           syncDeleteModeCursor();
         };
 
@@ -4247,8 +4263,10 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       });
 
       function openStyleEditor(entry, fid, screenX, screenY) {
+        if (circleDragCtx || popupsSuppressed()) return;
         if (!editingEnabled || deleteModeEnabled) return;
-        const f = entry.data.features.find(x => x.properties.fid === fid); if (!f) return;
+        fid = String(fid);
+        const f = entry.data.features.find(x => String(x?.properties?.fid) === fid); if (!f) return;
         const p = f.properties;
         const isLine = f.geometry?.type === 'LineString' || f.geometry?.type === 'MultiLineString';
         // Detect circles: either has metadata OR is a polygon (assume it might be a circle)
@@ -4671,9 +4689,10 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         }
 
         function start(e) {
-          if (!editingEnabled) return;
+          if (!editingEnabled || deleteModeEnabled || circleDragCtx || popupsSuppressed()) return;
 
           timer = setTimeout(() => {
+            if (!editingEnabled || deleteModeEnabled || circleDragCtx || popupsSuppressed()) return;
             if (!e || !e.point) return;
 
             let chosen;
@@ -4708,11 +4727,15 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
 
 
       function attachLongPressLeaf(ev, entry, fid) {
-        if (!editingEnabled) return;
+        if (!editingEnabled || deleteModeEnabled || circleDragCtx || popupsSuppressed()) return;
         let timer = null;
         function cancel() { if (timer) { clearTimeout(timer); timer = null; } }
         const src = ev.originalEvent && ev.originalEvent.touches && ev.originalEvent.touches[0] ? ev.originalEvent.touches[0] : ev.originalEvent;
-        timer = setTimeout(() => { const p = src; openStyleEditor(entry, fid, p.clientX, p.clientY); }, LONGPRESS_MS);
+        timer = setTimeout(() => {
+          if (!editingEnabled || deleteModeEnabled || circleDragCtx || popupsSuppressed()) return;
+          const p = src;
+          openStyleEditor(entry, fid, p.clientX, p.clientY);
+        }, LONGPRESS_MS);
         document.addEventListener('mouseup', () => cancel(), { once: true });
         document.addEventListener('touchend', () => cancel(), { once: true });
       }
@@ -9834,7 +9857,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
 
       function endCircleDrag(save = true) {
         if (!circleDragCtx) return;
-        suppressPopups();
+        suppressPopups(1500);
         flushQueuedCircleDragMove();
 
         // Re-enable normal map panning
@@ -9847,6 +9870,8 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         }
 
         circleDragCtx = null;
+        setCircleDragUi(false);
+        suppressPopups(1500);
         syncDeleteModeCursor();
         if (save) saveState();
       }
@@ -9931,6 +9956,11 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       mapleaf.on('click', (e) => {
         if (engine !== 'leaf' || !circleDragCtx) return;
         dropAt(e.latlng.lng, e.latlng.lat);
+        if (e.originalEvent) {
+          L.DomEvent.stop(e.originalEvent);
+          e.originalEvent.preventDefault?.();
+          e.originalEvent.stopPropagation?.();
+        }
       });
 
 
