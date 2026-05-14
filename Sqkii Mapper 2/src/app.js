@@ -3953,11 +3953,13 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           if (!toggleBtn || !actions) return;
 
           let isOpen = false;
-          const actionButtons = Array.from(actions.querySelectorAll('button'));
+          const getActionButtons = () => Array.from(actions.querySelectorAll('button'));
           const openLabel = toggleBtn.dataset.openLabel || toggleBtn.getAttribute('aria-label') || toggleBtn.title || 'Open quick tools';
           const closeLabel = toggleBtn.dataset.closeLabel || openLabel.replace(/^Open/i, 'Hide');
 
           const renderRail = () => {
+            const actionButtons = getActionButtons();
+            actions.style.setProperty('--tool-rail-action-count', String(actionButtons.length));
             toolRail.classList.toggle('open', isOpen);
             toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
             toggleBtn.setAttribute('aria-label', isOpen ? closeLabel : openLabel);
@@ -3984,11 +3986,14 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
             renderRail();
           });
 
-          actionButtons.forEach((button) => {
-            button.addEventListener('click', () => {
-              closeRail();
-            });
+          actions.addEventListener('click', (event) => {
+            if (!event.target.closest('button')) return;
+            closeRail();
           });
+
+          new MutationObserver(() => {
+            renderRail();
+          }).observe(actions, { childList: true });
 
           document.addEventListener('click', (event) => {
             if (!isOpen || toolRail.contains(event.target)) return;

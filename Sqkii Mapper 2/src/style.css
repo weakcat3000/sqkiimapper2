@@ -2895,7 +2895,6 @@
     .tool-rail {
       --tool-rail-size: 56px;
       --tool-rail-gap: 12px;
-      --tool-rail-actions-width: 192px;
       --tool-rail-left: calc(var(--side) + 16px);
       position: fixed;
       left: var(--tool-rail-left);
@@ -2915,7 +2914,6 @@
       bottom: calc(16px + var(--tool-rail-size) + var(--tool-rail-gap));
       --tool-rail-size: 52px;
       --tool-rail-gap: 8px;
-      --tool-rail-actions-width: 292px;
       z-index: 981;
     }
 
@@ -3121,11 +3119,6 @@
       transform: translateX(0) scaleX(1);
       pointer-events: auto;
       transition-delay: 0s;
-    }
-
-    .tool-rail-silver.open .tool-rail-actions {
-      width: calc((var(--tool-rail-size) * 5) + (var(--tool-rail-gap) * 4));
-      min-width: calc((var(--tool-rail-size) * 5) + (var(--tool-rail-gap) * 4));
     }
 
     .tool-rail-btn {
@@ -4418,13 +4411,11 @@
       .tool-rail {
         --tool-rail-size: 47.6px;
         --tool-rail-gap: 10px;
-        --tool-rail-actions-width: 163px;
       }
 
       .tool-rail-silver {
         --tool-rail-size: 42px;
         --tool-rail-gap: 7px;
-        --tool-rail-actions-width: 238px;
       }
 
       .map-edit-fab,
