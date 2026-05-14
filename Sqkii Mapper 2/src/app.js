@@ -2328,6 +2328,18 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         polys.sort((a, b) => turf.area(a) - turf.area(b));
         const chosen = polys[0];
 
+        if (deleteModeEnabled && editingEnabled && !circleDragCtx) {
+          const srcId = chosen.layer && chosen.layer.source;
+          const owner = layerList.find(l => l.glSourceId === srcId);
+          const fid = chosen.properties && chosen.properties.fid;
+          if (owner && fid) {
+            e.originalEvent.preventDefault();
+            e.originalEvent.stopPropagation();
+            deleteFeatureByFid(owner, String(fid), { confirmDelete: false, closeEditorOnDone: true });
+          }
+          return;
+        }
+
         const content = buildPopupHTMLFromProps(chosen.properties);
         showSinglePopup(null, e.lngLat, content);
 
@@ -4132,6 +4144,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         deleteModeEnabled = !!enabled;
         if (deleteModeEnabled) {
           editingEnabled = true;
+          closeActivePopup();
           closeStyleEditor();
           reflectEditUI();
         }
