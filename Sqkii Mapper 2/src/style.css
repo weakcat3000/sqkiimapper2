@@ -3103,25 +3103,29 @@
       align-items: center;
       gap: var(--tool-rail-gap);
       width: 0;
-      max-width: max(0px, calc(100vw - var(--tool-rail-left) - var(--tool-rail-size) - var(--tool-rail-gap) - 16px));
+      max-width: none;
       opacity: 0;
       overflow: hidden;
       pointer-events: none;
-      transition: width .36s cubic-bezier(.22, 1, .36, 1), opacity .2s ease;
-      scrollbar-width: none;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    .tool-rail-actions::-webkit-scrollbar {
-      display: none;
+      visibility: hidden;
+      transform: translateX(-12px) scaleX(0.72);
+      transform-origin: left center;
+      transition: opacity .2s ease, transform .28s cubic-bezier(.22, 1, .36, 1), visibility 0s linear .28s;
     }
 
     .tool-rail.open .tool-rail-actions {
-      width: min(var(--tool-rail-actions-width), max(0px, calc(100vw - var(--tool-rail-left) - var(--tool-rail-size) - var(--tool-rail-gap) - 16px)));
+      width: max-content;
       opacity: 1;
-      overflow-x: auto;
-      overflow-y: visible;
+      visibility: visible;
+      overflow: visible;
+      transform: translateX(0) scaleX(1);
       pointer-events: auto;
+      transition-delay: 0s;
+    }
+
+    .tool-rail-silver.open .tool-rail-actions {
+      width: calc((var(--tool-rail-size) * 5) + (var(--tool-rail-gap) * 4));
+      min-width: calc((var(--tool-rail-size) * 5) + (var(--tool-rail-gap) * 4));
     }
 
     .tool-rail-btn {
