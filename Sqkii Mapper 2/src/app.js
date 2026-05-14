@@ -3050,6 +3050,13 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
               if (!e.features || !e.features.length) return;
               const feature = e.features[0];
               if (!feature || !feature.properties) return;
+              if (deleteModeEnabled && editingEnabled && !circleDragCtx) {
+                e.originalEvent?.preventDefault?.();
+                e.originalEvent?.stopPropagation?.();
+                const owner = layerList.find(l => l.glSourceId === feature.layer?.source) || entry;
+                deleteFeatureByFid(owner, String(feature.properties.fid), { confirmDelete: false, closeEditorOnDone: true });
+                return;
+              }
 
               const content = buildPopupHTMLFromProps(feature.properties);
               showSinglePopup(null, e.lngLat, content);
@@ -3061,8 +3068,8 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           function handleRapidDeleteGL(e) {
             if (popupsSuppressed() || e.originalEvent?.defaultPrevented) return;
             if (!deleteModeEnabled || !editingEnabled || circleDragCtx) return;
-            const chosen = pickSmallestPolygonAtPoint(e.point) || (e.features || []).find(isRapidDeleteTarget);
-            if (!chosen || !isRapidDeleteTarget(chosen)) return;
+            const chosen = pickSmallestPolygonAtPoint(e.point) || (e.features || [])[0];
+            if (!chosen) return;
 
             const srcId = chosen.layer && chosen.layer.source;
             const owner = layerList.find(l => l.glSourceId === srcId);
@@ -3074,7 +3081,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
             deleteFeatureByFid(owner, String(fid), { confirmDelete: false, closeEditorOnDone: true });
           }
 
-          [fillId, polyEdgeId, scheduledEdgeId].forEach(lid => mapgl.on('click', lid, handleRapidDeleteGL));
+          [fillId, polyEdgeId, scheduledEdgeId, lineId].forEach(lid => mapgl.on('click', lid, handleRapidDeleteGL));
 
           attachLongPressGL(fillId, entry);
           attachLongPressGL(polyEdgeId, entry);
@@ -3144,7 +3151,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         entry.lfLayers = new Map();
 
         filteredFeatureCollection(entry).features.forEach(f => {
-          const fid = f.properties.fid;
+          const fid = String(f.properties.fid);
           const list = [];
 
           if (f.geometry.type === 'Point') {
@@ -3154,6 +3161,15 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
 
             function openMarkerPopup(ev) {
               if (popupsSuppressed()) return;
+              if (deleteModeEnabled && editingEnabled && !circleDragCtx) {
+                if (ev?.originalEvent) {
+                  ev.originalEvent.preventDefault();
+                  ev.originalEvent.stopPropagation();
+                }
+                L.DomEvent.stop(ev);
+                deleteFeatureByFid(entry, fid, { confirmDelete: false, closeEditorOnDone: true });
+                return;
+              }
               if (ev?.originalEvent) {
                 ev.originalEvent.preventDefault();
                 ev.originalEvent.stopPropagation();
@@ -3187,7 +3203,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
 
             function openGeomPopup(ev) {
               if (popupsSuppressed()) return;
-              if (deleteModeEnabled && editingEnabled && !circleDragCtx && isRapidDeleteTarget(f)) {
+              if (deleteModeEnabled && editingEnabled && !circleDragCtx) {
                 if (ev?.originalEvent) {
                   ev.originalEvent.preventDefault();
                   ev.originalEvent.stopPropagation();
@@ -3251,8 +3267,9 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
 
 
       function refreshLeafletFeature(entry, fid, feature = null) {
-        const layers = entry?.lfLayers?.get?.(fid);
-        const feat = feature || entry?.data?.features?.find?.((item) => item?.properties?.fid === fid);
+        const safeFid = String(fid);
+        const layers = entry?.lfLayers?.get?.(safeFid);
+        const feat = feature || entry?.data?.features?.find?.((item) => String(item?.properties?.fid) === safeFid);
         if (!layers || !feat) return;
 
         if (feat.geometry?.type === 'Point') {
@@ -4109,11 +4126,12 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
 
       function deleteFeatureByFid(entry, fid, { confirmDelete = true, closeEditorOnDone = true } = {}) {
         if (!entry || !fid) return false;
+        const safeFid = String(fid);
 
         // Are we deleting the circle that Recon is using?
         const isReconCircle =
           window.currentReconCircle &&
-          String(window.currentReconCircle.fid) === String(fid);
+          String(window.currentReconCircle.fid) === safeFid;
 
         // Close any open popup for this feature
         closeActivePopup();
@@ -4124,13 +4142,13 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           window.currentReconCircle = null;
         }
 
-        const ix = entry.data.features.findIndex(x => x.properties.fid === fid);
+        const ix = entry.data.features.findIndex(x => String(x?.properties?.fid) === safeFid);
         if (ix < 0) return false;
         const p = entry.data.features[ix].properties || {};
         if (confirmDelete && !confirm('Delete this feature?')) return false;
 
         entry.data.features.splice(ix, 1);
-        const key = p._gid || p.fid;
+        const key = String(p._gid ?? p.fid ?? safeFid);
         entry.data.features.push({
           type: 'Feature',
           geometry: { type: 'Point', coordinates: [0, 0] },
