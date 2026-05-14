@@ -2929,6 +2929,7 @@
 
     .tool-rail-toggle,
     .tool-rail-btn {
+      box-sizing: border-box;
       width: var(--tool-rail-size);
       height: var(--tool-rail-size);
       padding: 0;
