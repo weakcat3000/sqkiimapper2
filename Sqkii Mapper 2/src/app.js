@@ -6527,7 +6527,9 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         if (!jigsawFinderCanvas || !sourceImage) return;
         const parentBox = jigsawFinderImageStage?.getBoundingClientRect?.() || jigsawFinderCanvas.parentElement?.getBoundingClientRect?.();
         const maxW = Math.max(1, Math.floor(parentBox?.width || jigsawFinderCanvas.clientWidth || 900));
-        const maxH = Math.max(1, Math.floor(Math.min(window.innerHeight * 0.34, parentBox?.height || 420)));
+        const measuredHeight = Number(parentBox?.height) || 0;
+        const fallbackHeight = Math.min(window.innerHeight * 0.34, 420);
+        const maxH = Math.max(180, Math.floor(measuredHeight > 80 ? measuredHeight : fallbackHeight));
         const sourceW = sourceImage.naturalWidth || sourceImage.width || maxW;
         const sourceH = sourceImage.naturalHeight || sourceImage.height || maxH;
         const displayScale = Math.min(maxW / sourceW, maxH / sourceH, 1);

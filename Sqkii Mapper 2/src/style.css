@@ -3437,6 +3437,7 @@
 
     .jigsaw-finder-image-stage {
       width: 100%;
+      min-height: 180px;
       max-height: min(42vh, 520px);
       display: block;
       overflow: auto;
