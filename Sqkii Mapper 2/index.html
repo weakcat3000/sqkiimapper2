@@ -530,6 +530,18 @@
       </button>
 
       <div class="tool-rail-actions" aria-hidden="true">
+        <button
+          id="bus-stop-filter-open"
+          class="tool-rail-btn tool-rail-btn-filter"
+          title="Filter bus stops by excluded digits"
+          aria-label="Filter bus stops by excluded digits"
+          aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 5h16l-6.2 7.1v5.2l-3.6 1.8v-7z"></path>
+          </svg>
+          <span>Filter</span>
+        </button>
+
         <button id="geohash-open" class="tool-rail-btn tool-rail-btn-geohash" title="Open Geohashes Editor" aria-label="Open Geohashes Editor">
           <img src="geohash-fab-icon.png" alt="" />
         </button>
@@ -618,6 +630,41 @@
 
         <div id="htm-icons-status" class="hint htm-icons-status"></div>
         <div id="htm-icons-list" class="htm-icons-list"></div>
+      </div>
+    </div>
+
+    <div id="bus-stop-filter-modal" class="modal">
+      <div class="modal-card bus-stop-filter-card">
+        <button id="bus-stop-filter-close" class="style-editor-x bus-stop-filter-close" type="button" aria-label="Close bus stop filter">×</button>
+        <div class="bus-stop-filter-kicker">Daily Hint Tool</div>
+        <h3>Bus Stop Number Filter</h3>
+        <p class="bus-stop-filter-copy">Select every digit shown on the container-like structure. Bus stops whose 5-digit stop number contains any selected digit will be excluded from the map.</p>
+
+        <fieldset class="bus-stop-filter-fieldset">
+          <legend>Digits to exclude</legend>
+          <div id="bus-stop-filter-digits" class="bus-stop-filter-digits">
+            <button class="bus-stop-digit" type="button" data-digit="0" aria-pressed="false">0</button>
+            <button class="bus-stop-digit" type="button" data-digit="1" aria-pressed="false">1</button>
+            <button class="bus-stop-digit" type="button" data-digit="2" aria-pressed="false">2</button>
+            <button class="bus-stop-digit" type="button" data-digit="3" aria-pressed="false">3</button>
+            <button class="bus-stop-digit" type="button" data-digit="4" aria-pressed="false">4</button>
+            <button class="bus-stop-digit" type="button" data-digit="5" aria-pressed="false">5</button>
+            <button class="bus-stop-digit" type="button" data-digit="6" aria-pressed="false">6</button>
+            <button class="bus-stop-digit" type="button" data-digit="7" aria-pressed="false">7</button>
+            <button class="bus-stop-digit" type="button" data-digit="8" aria-pressed="false">8</button>
+            <button class="bus-stop-digit" type="button" data-digit="9" aria-pressed="false">9</button>
+          </div>
+        </fieldset>
+
+        <div id="bus-stop-filter-summary" class="bus-stop-filter-summary">No digits selected. Applying will show all bus stops.</div>
+        <div id="bus-stop-filter-status" class="bus-stop-filter-status" aria-live="polite"></div>
+
+        <div class="bus-stop-filter-actions">
+          <button id="bus-stop-filter-apply" class="btn bus-stop-filter-apply" type="button">Apply Filter</button>
+          <button id="bus-stop-filter-reset" class="btn small" type="button">Clear Digits</button>
+          <button id="bus-stop-filter-hide" class="btn small danger" type="button">Hide Stops</button>
+        </div>
+        <small class="bus-stop-filter-source">Source: Singapore government LTA Bus Stop dataset via data.gov.sg.</small>
       </div>
     </div>
 

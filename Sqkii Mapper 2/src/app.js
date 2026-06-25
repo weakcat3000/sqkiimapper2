@@ -14671,6 +14671,278 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         TRAFFIC_SIGN: "d_bbf0132c7290d6838f82003972d933d5",
       };
 
+      /* ================= Bus stop digit filter ================= */
+      const BUS_STOP_FILTER_SOURCE_ID = 'bus-stop-filter-source';
+      const BUS_STOP_FILTER_POINT_LAYER_ID = 'bus-stop-filter-points';
+      const BUS_STOP_FILTER_LABEL_LAYER_ID = 'bus-stop-filter-labels';
+      const busStopFilterModal = byId('bus-stop-filter-modal');
+      const busStopFilterOpen = byId('bus-stop-filter-open');
+      const busStopFilterStatus = byId('bus-stop-filter-status');
+      const busStopFilterSummary = byId('bus-stop-filter-summary');
+      const busStopFilterApply = byId('bus-stop-filter-apply');
+      const busStopFilterDigits = new Set();
+      let busStopFilterData = null;
+      let busStopFilterVisible = false;
+      let busStopFilterLeafletLayer = null;
+      let busStopFilterGlEventsBound = false;
+      let busStopFilterRestoreQueued = false;
+
+      function busStopNumber(feature) {
+        const props = feature?.properties || {};
+        const raw = props.BUS_STOP_NUM ?? props.bus_stop_num ?? props.BusStopCode ?? props.BUSSTOPCODE ?? '';
+        return String(raw).trim();
+      }
+
+      function setBusStopFilterStatus(message = '', isError = false) {
+        if (!busStopFilterStatus) return;
+        busStopFilterStatus.textContent = message;
+        busStopFilterStatus.classList.toggle('error', !!isError);
+      }
+
+      function syncBusStopDigitButtons() {
+        document.querySelectorAll('#bus-stop-filter-digits .bus-stop-digit').forEach((button) => {
+          const selected = busStopFilterDigits.has(button.dataset.digit);
+          button.classList.toggle('selected', selected);
+          button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        });
+        const digits = Array.from(busStopFilterDigits).sort();
+        if (busStopFilterSummary) {
+          busStopFilterSummary.textContent = digits.length
+            ? `Exclude every bus stop number containing: ${digits.join(', ')}`
+            : 'No digits selected. Applying will show all bus stops.';
+        }
+      }
+
+      function filteredBusStopCollection() {
+        const features = Array.isArray(busStopFilterData?.features) ? busStopFilterData.features : [];
+        const digits = Array.from(busStopFilterDigits);
+        return {
+          type: 'FeatureCollection',
+          features: features
+            .filter((feature) => {
+              const number = busStopNumber(feature);
+              return number && !digits.some((digit) => number.includes(digit));
+            })
+            .map((feature) => ({
+              ...feature,
+              properties: {
+                ...(feature.properties || {}),
+                _busStopNumber: busStopNumber(feature),
+              },
+            })),
+        };
+      }
+
+      function busStopPopupHtml(number) {
+        return `<div style="min-width:170px">
+          <div style="font-size:11px;color:#94a3b8;font-weight:800;text-transform:uppercase;letter-spacing:.08em">LTA Bus Stop</div>
+          <div style="margin-top:4px;font-size:22px;font-weight:900;color:#facc15">${escapeHtml(number || 'Unknown')}</div>
+          <div style="margin-top:5px;font-size:11px;color:#cbd5e1">Passed the selected digit exclusions.</div>
+        </div>`;
+      }
+
+      function bindBusStopFilterGlEvents() {
+        if (busStopFilterGlEventsBound) return;
+        busStopFilterGlEventsBound = true;
+        mapgl.on('click', BUS_STOP_FILTER_POINT_LAYER_ID, (event) => {
+          const feature = event.features?.[0];
+          const coordinates = feature?.geometry?.coordinates;
+          if (!feature || !Array.isArray(coordinates)) return;
+          showSinglePopup(null, coordinates, busStopPopupHtml(feature.properties?._busStopNumber));
+          event.originalEvent?.stopPropagation?.();
+        });
+        mapgl.on('mouseenter', BUS_STOP_FILTER_POINT_LAYER_ID, () => {
+          mapgl.getCanvas().style.cursor = 'pointer';
+        });
+        mapgl.on('mouseleave', BUS_STOP_FILTER_POINT_LAYER_ID, () => {
+          syncStreetViewCursor();
+        });
+      }
+
+      function renderBusStopFilterGl(collection) {
+        if (!mapgl?.getStyle?.()) return;
+        try {
+          const existing = mapgl.getSource(BUS_STOP_FILTER_SOURCE_ID);
+          if (existing) existing.setData(collection);
+          else mapgl.addSource(BUS_STOP_FILTER_SOURCE_ID, { type: 'geojson', data: collection });
+
+          if (!mapgl.getLayer(BUS_STOP_FILTER_POINT_LAYER_ID)) {
+            mapgl.addLayer({
+              id: BUS_STOP_FILTER_POINT_LAYER_ID,
+              type: 'circle',
+              source: BUS_STOP_FILTER_SOURCE_ID,
+              minzoom: 10,
+              paint: {
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 2.2, 14, 4.5, 17, 7],
+                'circle-color': '#facc15',
+                'circle-stroke-color': '#78350f',
+                'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 10, 1, 16, 2],
+                'circle-opacity': 0.92,
+              },
+            });
+          }
+
+          if (!mapgl.getLayer(BUS_STOP_FILTER_LABEL_LAYER_ID)) {
+            mapgl.addLayer({
+              id: BUS_STOP_FILTER_LABEL_LAYER_ID,
+              type: 'symbol',
+              source: BUS_STOP_FILTER_SOURCE_ID,
+              minzoom: 14,
+              layout: {
+                'text-field': ['get', '_busStopNumber'],
+                'text-size': ['interpolate', ['linear'], ['zoom'], 14, 9, 17, 12],
+                'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+                'text-offset': [0, 1.15],
+                'text-anchor': 'top',
+                'text-allow-overlap': false,
+                'text-optional': true,
+              },
+              paint: {
+                'text-color': '#fde68a',
+                'text-halo-color': 'rgba(17, 24, 39, .96)',
+                'text-halo-width': 1.5,
+              },
+            });
+          }
+          bindBusStopFilterGlEvents();
+        } catch (error) {
+          console.warn('Bus stop filter GL render deferred:', error);
+        }
+      }
+
+      function renderBusStopFilterLeaflet(collection) {
+        if (busStopFilterLeafletLayer) {
+          try { mapleaf.removeLayer(busStopFilterLeafletLayer); } catch { }
+          busStopFilterLeafletLayer = null;
+        }
+        if (!busStopFilterVisible || !collection.features.length) return;
+
+        const renderer = L.canvas({ padding: 0.5 });
+        busStopFilterLeafletLayer = L.geoJSON(collection, {
+          pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
+            renderer,
+            radius: 4,
+            color: '#78350f',
+            weight: 1.5,
+            fillColor: '#facc15',
+            fillOpacity: 0.92,
+          }),
+          onEachFeature: (feature, layer) => {
+            const number = feature.properties?._busStopNumber || busStopNumber(feature);
+            layer.bindTooltip(number, {
+              direction: 'top',
+              offset: [0, -4],
+              className: 'bus-stop-map-marker',
+            });
+            layer.bindPopup(busStopPopupHtml(number), { maxWidth: 260 });
+          },
+        }).addTo(mapleaf);
+      }
+
+      function removeBusStopFilterLayers() {
+        if (mapgl?.getStyle?.()) {
+          try {
+            if (mapgl.getLayer(BUS_STOP_FILTER_LABEL_LAYER_ID)) mapgl.removeLayer(BUS_STOP_FILTER_LABEL_LAYER_ID);
+            if (mapgl.getLayer(BUS_STOP_FILTER_POINT_LAYER_ID)) mapgl.removeLayer(BUS_STOP_FILTER_POINT_LAYER_ID);
+            if (mapgl.getSource(BUS_STOP_FILTER_SOURCE_ID)) mapgl.removeSource(BUS_STOP_FILTER_SOURCE_ID);
+          } catch { }
+        }
+        if (busStopFilterLeafletLayer) {
+          try { mapleaf.removeLayer(busStopFilterLeafletLayer); } catch { }
+          busStopFilterLeafletLayer = null;
+        }
+      }
+
+      function renderBusStopFilter() {
+        if (!busStopFilterVisible || !busStopFilterData) {
+          removeBusStopFilterLayers();
+          return;
+        }
+        const collection = filteredBusStopCollection();
+        renderBusStopFilterGl(collection);
+        renderBusStopFilterLeaflet(collection);
+        const excluded = busStopFilterData.features.length - collection.features.length;
+        const digits = Array.from(busStopFilterDigits).sort();
+        setBusStopFilterStatus(
+          `Showing ${collection.features.length.toLocaleString()} stops; ${excluded.toLocaleString()} excluded${digits.length ? ` by digits ${digits.join(', ')}` : ''}.`
+        );
+        busStopFilterOpen?.classList.add('active');
+        busStopFilterOpen?.setAttribute('aria-pressed', 'true');
+      }
+
+      async function applyBusStopFilter() {
+        if (busStopFilterApply) busStopFilterApply.disabled = true;
+        setBusStopFilterStatus('Loading current LTA bus stop data…');
+        try {
+          busStopFilterData = busStopFilterData || await getExactAnalysisCached(DATASET_IDS.BUS_STOP, 'Bus Stop');
+          if (!Array.isArray(busStopFilterData?.features)) throw new Error('The bus stop dataset could not be loaded.');
+          busStopFilterVisible = true;
+          renderBusStopFilter();
+          closeBusStopFilterModal();
+        } catch (error) {
+          setBusStopFilterStatus(error?.message || 'Unable to load bus stops.', true);
+        } finally {
+          if (busStopFilterApply) busStopFilterApply.disabled = false;
+        }
+      }
+
+      function hideBusStopFilter() {
+        busStopFilterVisible = false;
+        removeBusStopFilterLayers();
+        setBusStopFilterStatus('Bus stops hidden.');
+        busStopFilterOpen?.classList.remove('active');
+        busStopFilterOpen?.setAttribute('aria-pressed', 'false');
+      }
+
+      function openBusStopFilterModal() {
+        syncBusStopDigitButtons();
+        busStopFilterModal?.classList.add('visible');
+        appRoot?.classList.add('blocked-by-modal');
+      }
+
+      function closeBusStopFilterModal() {
+        busStopFilterModal?.classList.remove('visible');
+        appRoot?.classList.remove('blocked-by-modal');
+      }
+
+      document.querySelectorAll('#bus-stop-filter-digits .bus-stop-digit').forEach((button) => {
+        button.addEventListener('click', () => {
+          const digit = button.dataset.digit;
+          if (busStopFilterDigits.has(digit)) busStopFilterDigits.delete(digit);
+          else busStopFilterDigits.add(digit);
+          syncBusStopDigitButtons();
+        });
+      });
+      busStopFilterOpen?.addEventListener('click', openBusStopFilterModal);
+      byId('bus-stop-filter-close')?.addEventListener('click', closeBusStopFilterModal);
+      busStopFilterModal?.addEventListener('click', (event) => {
+        if (event.target === busStopFilterModal) closeBusStopFilterModal();
+      });
+      busStopFilterApply?.addEventListener('click', applyBusStopFilter);
+      byId('bus-stop-filter-reset')?.addEventListener('click', () => {
+        busStopFilterDigits.clear();
+        syncBusStopDigitButtons();
+        if (busStopFilterVisible) renderBusStopFilter();
+      });
+      byId('bus-stop-filter-hide')?.addEventListener('click', () => {
+        hideBusStopFilter();
+        closeBusStopFilterModal();
+      });
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && busStopFilterModal?.classList.contains('visible')) closeBusStopFilterModal();
+      });
+      mapgl.on('styledata', () => {
+        if (!busStopFilterVisible || !busStopFilterData || busStopFilterRestoreQueued) return;
+        busStopFilterRestoreQueued = true;
+        requestAnimationFrame(() => {
+          busStopFilterRestoreQueued = false;
+          if (busStopFilterVisible && !mapgl.getSource(BUS_STOP_FILTER_SOURCE_ID)) {
+            renderBusStopFilterGl(filteredBusStopCollection());
+          }
+        });
+      });
+      syncBusStopDigitButtons();
+
       // Keep recon/statistics/glimpse on the original worker-only data path so counts
       // match the old mapper exactly.
       function getExactAnalysisCached(datasetId, label) {
