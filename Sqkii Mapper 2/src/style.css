@@ -2528,6 +2528,16 @@
       border-top-color: #78350f !important;
     }
 
+    .bus-stop-map-marker-excluded {
+      border-color: #475569;
+      color: #0f172a;
+      background: #94a3b8;
+    }
+
+    .bus-stop-map-marker-excluded::before {
+      border-top-color: #475569 !important;
+    }
+
     .app.blocked-by-modal {
       pointer-events: none
     }
