@@ -14681,6 +14681,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       const busStopFilterSummary = byId('bus-stop-filter-summary');
       const busStopFilterApply = byId('bus-stop-filter-apply');
       const busStopFilterFirstTwo = byId('bus-stop-filter-first-two');
+      const busStopFilterShowAll = byId('bus-stop-filter-show-all');
       const busStopFilterDigits = new Set();
       let busStopFilterData = null;
       let busStopFilterVisible = false;
@@ -14708,39 +14709,51 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         });
         const digits = Array.from(busStopFilterDigits).sort();
         const scopeLabel = busStopFilterFirstTwo?.checked ? 'the first 2 digits' : 'all 5 digits';
+        const showAllLabel = busStopFilterShowAll?.checked ? ' Excluded stops remain visible in grey.' : '';
         if (busStopFilterSummary) {
           busStopFilterSummary.textContent = digits.length
-            ? `Exclude stops where ${scopeLabel} contain: ${digits.join(', ')}`
+            ? `Exclude stops where ${scopeLabel} contain: ${digits.join(', ')}.${showAllLabel}`
             : `No digits selected. Applying will show all bus stops (${scopeLabel} mode).`;
         }
+      }
+
+      function busStopIsExcluded(number, digits = Array.from(busStopFilterDigits)) {
+        const checkedNumber = busStopFilterFirstTwo?.checked ? number.slice(0, 2) : number;
+        return digits.some((digit) => checkedNumber.includes(digit));
       }
 
       function filteredBusStopCollection() {
         const features = Array.isArray(busStopFilterData?.features) ? busStopFilterData.features : [];
         const digits = Array.from(busStopFilterDigits);
+        const showAll = !!busStopFilterShowAll?.checked;
         return {
           type: 'FeatureCollection',
           features: features
-            .filter((feature) => {
+            .map((feature) => {
               const number = busStopNumber(feature);
-              const checkedNumber = busStopFilterFirstTwo?.checked ? number.slice(0, 2) : number;
-              return number && !digits.some((digit) => checkedNumber.includes(digit));
+              const excluded = number ? busStopIsExcluded(number, digits) : true;
+              return {
+                ...feature,
+                properties: {
+                  ...(feature.properties || {}),
+                  _busStopNumber: number,
+                  _busStopExcluded: excluded,
+                },
+              };
             })
-            .map((feature) => ({
-              ...feature,
-              properties: {
-                ...(feature.properties || {}),
-                _busStopNumber: busStopNumber(feature),
-              },
-            })),
+            .filter((feature) => feature.properties._busStopNumber && (showAll || !feature.properties._busStopExcluded)),
         };
       }
 
-      function busStopPopupHtml(number) {
+      function busStopPopupHtml(number, excluded = false) {
+        const color = excluded ? '#94a3b8' : '#facc15';
+        const verdict = excluded
+          ? 'Excluded by the selected digit rule.'
+          : 'Passed the selected digit exclusions.';
         return `<div style="min-width:170px">
           <div style="font-size:11px;color:#94a3b8;font-weight:800;text-transform:uppercase;letter-spacing:.08em">LTA Bus Stop</div>
-          <div style="margin-top:4px;font-size:22px;font-weight:900;color:#facc15">${escapeHtml(number || 'Unknown')}</div>
-          <div style="margin-top:5px;font-size:11px;color:#cbd5e1">Passed the selected digit exclusions.</div>
+          <div style="margin-top:4px;font-size:22px;font-weight:900;color:${color}">${escapeHtml(number || 'Unknown')}</div>
+          <div style="margin-top:5px;font-size:11px;color:#cbd5e1">${verdict}</div>
         </div>`;
       }
 
@@ -14751,7 +14764,14 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           const feature = event.features?.[0];
           const coordinates = feature?.geometry?.coordinates;
           if (!feature || !Array.isArray(coordinates)) return;
-          showSinglePopup(null, coordinates, busStopPopupHtml(feature.properties?._busStopNumber));
+          showSinglePopup(
+            null,
+            coordinates,
+            busStopPopupHtml(
+              feature.properties?._busStopNumber,
+              feature.properties?._busStopExcluded === true || feature.properties?._busStopExcluded === 'true'
+            )
+          );
           event.originalEvent?.stopPropagation?.();
         });
         mapgl.on('mouseenter', BUS_STOP_FILTER_POINT_LAYER_ID, () => {
@@ -14777,10 +14797,10 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
               minzoom: 10,
               paint: {
                 'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 2.2, 14, 4.5, 17, 7],
-                'circle-color': '#facc15',
-                'circle-stroke-color': '#78350f',
+                'circle-color': ['case', ['get', '_busStopExcluded'], '#94a3b8', '#facc15'],
+                'circle-stroke-color': ['case', ['get', '_busStopExcluded'], '#475569', '#78350f'],
                 'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 10, 1, 16, 2],
-                'circle-opacity': 0.92,
+                'circle-opacity': ['case', ['get', '_busStopExcluded'], 0.68, 0.92],
               },
             });
           }
@@ -14801,7 +14821,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
                 'text-optional': true,
               },
               paint: {
-                'text-color': '#fde68a',
+                'text-color': ['case', ['get', '_busStopExcluded'], '#cbd5e1', '#fde68a'],
                 'text-halo-color': 'rgba(17, 24, 39, .96)',
                 'text-halo-width': 1.5,
               },
@@ -14822,22 +14842,26 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
 
         const renderer = L.canvas({ padding: 0.5 });
         busStopFilterLeafletLayer = L.geoJSON(collection, {
-          pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
-            renderer,
-            radius: 4,
-            color: '#78350f',
-            weight: 1.5,
-            fillColor: '#facc15',
-            fillOpacity: 0.92,
-          }),
+          pointToLayer: (feature, latlng) => {
+            const excluded = feature.properties?._busStopExcluded === true;
+            return L.circleMarker(latlng, {
+              renderer,
+              radius: 4,
+              color: excluded ? '#475569' : '#78350f',
+              weight: 1.5,
+              fillColor: excluded ? '#94a3b8' : '#facc15',
+              fillOpacity: excluded ? 0.68 : 0.92,
+            });
+          },
           onEachFeature: (feature, layer) => {
             const number = feature.properties?._busStopNumber || busStopNumber(feature);
+            const excluded = feature.properties?._busStopExcluded === true;
             layer.bindTooltip(number, {
               direction: 'top',
               offset: [0, -4],
-              className: 'bus-stop-map-marker',
+              className: excluded ? 'bus-stop-map-marker bus-stop-map-marker-excluded' : 'bus-stop-map-marker',
             });
-            layer.bindPopup(busStopPopupHtml(number), { maxWidth: 260 });
+            layer.bindPopup(busStopPopupHtml(number, excluded), { maxWidth: 260 });
           },
         }).addTo(mapleaf);
       }
@@ -14864,11 +14888,14 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const collection = filteredBusStopCollection();
         renderBusStopFilterGl(collection);
         renderBusStopFilterLeaflet(collection);
-        const excluded = busStopFilterData.features.length - collection.features.length;
         const digits = Array.from(busStopFilterDigits).sort();
+        const validFeatures = busStopFilterData.features.filter((feature) => busStopNumber(feature));
+        const excluded = validFeatures.filter((feature) => busStopIsExcluded(busStopNumber(feature), digits)).length;
+        const possible = validFeatures.length - excluded;
+        const shown = busStopFilterShowAll?.checked ? validFeatures.length : possible;
         const scope = busStopFilterFirstTwo?.checked ? 'first 2 digits' : 'all 5 digits';
         setBusStopFilterStatus(
-          `Showing ${collection.features.length.toLocaleString()} stops; ${excluded.toLocaleString()} excluded${digits.length ? ` by digits ${digits.join(', ')} in ${scope}` : ''}.`
+          `Showing ${shown.toLocaleString()} stops; ${possible.toLocaleString()} possible and ${excluded.toLocaleString()} excluded${busStopFilterShowAll?.checked ? ' (grey)' : ''}${digits.length ? ` by digits ${digits.join(', ')} in ${scope}` : ''}.`
         );
         busStopFilterOpen?.classList.add('active');
         busStopFilterOpen?.setAttribute('aria-pressed', 'true');
@@ -14924,6 +14951,10 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       });
       busStopFilterApply?.addEventListener('click', applyBusStopFilter);
       busStopFilterFirstTwo?.addEventListener('change', () => {
+        syncBusStopDigitButtons();
+        if (busStopFilterVisible) renderBusStopFilter();
+      });
+      busStopFilterShowAll?.addEventListener('change', () => {
         syncBusStopDigitButtons();
         if (busStopFilterVisible) renderBusStopFilter();
       });
