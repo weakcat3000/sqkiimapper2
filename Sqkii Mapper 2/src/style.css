@@ -2430,6 +2430,44 @@
       box-shadow: 0 5px 16px rgba(245, 158, 11, .22);
     }
 
+    .bus-stop-filter-scope {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: 12px;
+      padding: 11px 12px;
+      border: 1px solid rgba(250, 204, 21, .2);
+      border-radius: 12px;
+      color: #e2e8f0;
+      background: rgba(250, 204, 21, .06);
+      cursor: pointer;
+    }
+
+    .bus-stop-filter-scope input {
+      width: 18px;
+      height: 18px;
+      margin: 1px 0 0;
+      accent-color: #facc15;
+      flex: 0 0 auto;
+      cursor: pointer;
+    }
+
+    .bus-stop-filter-scope span {
+      display: grid;
+      gap: 3px;
+    }
+
+    .bus-stop-filter-scope strong {
+      color: #f8fafc;
+      font-size: 13px;
+    }
+
+    .bus-stop-filter-scope small {
+      color: #94a3b8;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
     .bus-stop-filter-summary,
     .bus-stop-filter-status {
       margin-top: 12px;
