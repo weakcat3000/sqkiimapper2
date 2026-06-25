@@ -14680,6 +14680,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       const busStopFilterStatus = byId('bus-stop-filter-status');
       const busStopFilterSummary = byId('bus-stop-filter-summary');
       const busStopFilterApply = byId('bus-stop-filter-apply');
+      const busStopFilterFirstTwo = byId('bus-stop-filter-first-two');
       const busStopFilterDigits = new Set();
       let busStopFilterData = null;
       let busStopFilterVisible = false;
@@ -14706,10 +14707,11 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           button.setAttribute('aria-pressed', selected ? 'true' : 'false');
         });
         const digits = Array.from(busStopFilterDigits).sort();
+        const scopeLabel = busStopFilterFirstTwo?.checked ? 'the first 2 digits' : 'all 5 digits';
         if (busStopFilterSummary) {
           busStopFilterSummary.textContent = digits.length
-            ? `Exclude every bus stop number containing: ${digits.join(', ')}`
-            : 'No digits selected. Applying will show all bus stops.';
+            ? `Exclude stops where ${scopeLabel} contain: ${digits.join(', ')}`
+            : `No digits selected. Applying will show all bus stops (${scopeLabel} mode).`;
         }
       }
 
@@ -14721,7 +14723,8 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           features: features
             .filter((feature) => {
               const number = busStopNumber(feature);
-              return number && !digits.some((digit) => number.includes(digit));
+              const checkedNumber = busStopFilterFirstTwo?.checked ? number.slice(0, 2) : number;
+              return number && !digits.some((digit) => checkedNumber.includes(digit));
             })
             .map((feature) => ({
               ...feature,
@@ -14863,8 +14866,9 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         renderBusStopFilterLeaflet(collection);
         const excluded = busStopFilterData.features.length - collection.features.length;
         const digits = Array.from(busStopFilterDigits).sort();
+        const scope = busStopFilterFirstTwo?.checked ? 'first 2 digits' : 'all 5 digits';
         setBusStopFilterStatus(
-          `Showing ${collection.features.length.toLocaleString()} stops; ${excluded.toLocaleString()} excluded${digits.length ? ` by digits ${digits.join(', ')}` : ''}.`
+          `Showing ${collection.features.length.toLocaleString()} stops; ${excluded.toLocaleString()} excluded${digits.length ? ` by digits ${digits.join(', ')} in ${scope}` : ''}.`
         );
         busStopFilterOpen?.classList.add('active');
         busStopFilterOpen?.setAttribute('aria-pressed', 'true');
@@ -14919,6 +14923,10 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         if (event.target === busStopFilterModal) closeBusStopFilterModal();
       });
       busStopFilterApply?.addEventListener('click', applyBusStopFilter);
+      busStopFilterFirstTwo?.addEventListener('change', () => {
+        syncBusStopDigitButtons();
+        if (busStopFilterVisible) renderBusStopFilter();
+      });
       byId('bus-stop-filter-reset')?.addEventListener('click', () => {
         busStopFilterDigits.clear();
         syncBusStopDigitButtons();
