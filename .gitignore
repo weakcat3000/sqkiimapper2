@@ -3,6 +3,23 @@ py-preview*.log
 vite-dev-*.log
 tmp_mainhunt*
 .vscode/
+_tmp*/
+_tmp*
+tmp-*
+*_tmp*
+sqkii_mapper.log
+channel_shorts_*.txt
+channel_shorts_*.html
+
+# Other local projects / generated research output
+Countered/
+School Projects/
+streetview_sg_download/
+exports/
+reports/
+_publish_tmp/
+_reference_mockup_2/
+godot_skills.md
 
 # Archived local scratch output
 archive/local_run_logs/
