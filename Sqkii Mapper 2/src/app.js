@@ -3351,7 +3351,14 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = entry.visible !== false;
           const name = document.createElement('div'); name.textContent = entry.name;
           const count = document.createElement('div'); count.className = 'hint'; count.textContent = (entry.items || []).length;
-          cb.onchange = () => { entry.visible = cb.checked; (entry.glLayerIds || []).forEach(lid => { if (mapgl.getLayer(lid)) mapgl.setLayoutProperty(lid, 'visibility', cb.checked ? 'visible' : 'none'); }); if (entry.lfGroup) { if (cb.checked) entry.lfGroup.addTo(mapleaf); else mapleaf.removeLayer(entry.lfGroup); } renderLayers(); saveState(); };
+          cb.onchange = () => {
+            rememberUndoSnapshot();
+            entry.visible = cb.checked;
+            markLayerVisibilityChanged(entry);
+            applyVisibility(entry);
+            renderLayers();
+            saveState({ immediate: true });
+          };
           row.style.display = 'grid'; row.style.gridTemplateColumns = 'auto 1fr auto'; row.style.gap = '8px';
           row.append(cb, name, count); host.appendChild(row);
         }
@@ -3378,16 +3385,25 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           const wrap = document.createElement('div'); wrap.className = 'layer';
           const head = document.createElement('div'); head.className = 'layer-head';
           const vis = document.createElement('div'); vis.className = visibleOnMap ? 'toggle checked' : 'toggle'; vis.title = 'Show/Hide layer';
-          vis.onclick = () => { entry.visible = !visibleOnMap; (entry.glLayerIds || []).forEach(lid => { if (mapgl.getLayer(lid)) mapgl.setLayoutProperty(lid, 'visibility', entry.visible ? 'visible' : 'none'); }); if (entry.lfGroup) { if (entry.visible) entry.lfGroup.addTo(mapleaf); else mapleaf.removeLayer(entry.lfGroup); } renderGroupsVisibility(); renderLayers(); saveState(); };
+          vis.onclick = () => {
+            rememberUndoSnapshot();
+            entry.visible = !visibleOnMap;
+            markLayerVisibilityChanged(entry);
+            applyVisibility(entry);
+            renderGroupsVisibility();
+            renderLayers();
+            saveState({ immediate: true });
+          };
 
           const ttl = document.createElement('div'); ttl.className = 'title'; ttl.textContent = entry.name;
 
           const actions = document.createElement('div'); actions.className = 'actions';
           const renameBtn = document.createElement('button'); renameBtn.className = 'btn small'; renameBtn.textContent = 'Rename';
-          renameBtn.onclick = () => { const nn = prompt('New layer name:', entry.name); if (!nn) return; entry.name = nn; renderGroupsVisibility(); renderLayers(); saveState(); };
+          renameBtn.onclick = () => { const nn = prompt('New layer name:', entry.name); if (!nn) return; rememberUndoSnapshot(); entry.name = nn; renderGroupsVisibility(); renderLayers(); saveState(); };
           const delBtn = document.createElement('button'); delBtn.className = 'btn small'; delBtn.textContent = 'Delete';
           delBtn.onclick = () => {
             if (!confirm('Delete this layer for everyone?')) return;
+            rememberUndoSnapshot();
             const tombs = [];
             for (const f of (entry.data?.features || [])) {
               if (f?.properties?._deleted) continue;
@@ -3401,7 +3417,8 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
             (entry.glLayerIds || []).forEach(id => { if (mapgl.getLayer(id)) try { mapgl.removeLayer(id); } catch { } });
             if (entry.glSourceId && mapgl.getSource(entry.glSourceId)) try { mapgl.removeSource(entry.glSourceId); } catch { };
             if (entry.lfGroup) try { entry.lfGroup.remove(); } catch { };
-            renderGroupsVisibility(); renderLayers(); saveState();
+            markLayerVisibilityChanged(entry);
+            renderGroupsVisibility(); renderLayers(); saveState({ immediate: true });
 
             // Re-assert visibility for the survivors (prevents GL defaults from flipping others)
             for (const other of layerList) {
@@ -3441,6 +3458,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
               });
 
               eyeBtn.addEventListener('click', () => {
+                rememberUndoSnapshot();
                 it.visible = !(it.visible !== false);
                 const gf = entry.data.features.find(f => String(f.properties.fid) === String(it.fid));
                 if (gf) {
@@ -3486,6 +3504,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       function moveFeatureToGroup(fromEntry, fid, targetName) {
         const idx = fromEntry.data.features.findIndex(f => String(f.properties?.fid) === String(fid));
         if (idx < 0) return;
+        rememberUndoSnapshot();
 
         const f = fromEntry.data.features[idx];
         const key = String(f.properties?._gid ?? f.properties?.fid ?? fid);
@@ -3547,6 +3566,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const metaList = extractKmlMeta(xml, opts || {});
         const gj = window.toGeoJSON.kml(xml);
         if (!gj || !gj.features || !gj.features.length) { alert('No features in ' + filename); return; }
+        rememberUndoSnapshot();
 
         const grouped = {}; metaList.forEach((m, i) => { const f = forceGroupName || m.topFolder || 'Untitled layer'; (grouped[f] || (grouped[f] = [])).push(i); });
 
@@ -3641,6 +3661,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
 
       // Add empty layer
       byId('add-layer').onclick = function () {
+        rememberUndoSnapshot();
         const entry = {
           id: layerSeq++,
           name: 'Untitled layer',
@@ -3669,6 +3690,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
 
       /* ======= Circles helper (separate from Sonar) ======= */
       function addCircleToLayer(centerLngLat, radius, color, layerName) {
+        rememberUndoSnapshot();
         const entry = getOrCreateLayerByName(layerName);
         const fid = String(featureSeq++);
         const hex = (color === 'green') ? '#22c55e' : '#ef4444';
@@ -3706,6 +3728,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const radius = parseFloat(byId('draw-radius').value);
         const m = coord.match(/^\s*([+-]?\d+(\.\d+)?)\s*,\s*([+-]?\d+(\.\d+)?)\s*$/);
         if (!m || !isFinite(radius) || radius <= 0) { alert('Please enter "lat,lng" and a positive radius.'); return; }
+        rememberUndoSnapshot();
         const lat = parseFloat(m[1]), lng = parseFloat(m[3]);
 
         // Store circle metadata for statistics
@@ -3765,6 +3788,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
 
       // Add line to layer
       function addLineToLayer(startLngLat, degree, lengthMeters, layerName) {
+        rememberUndoSnapshot();
         const entry = getOrCreateLayerByName(layerName);
         const fid = String(featureSeq++);
 
@@ -4054,6 +4078,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         seCloseTop = byId('se-close-top');
 
       let editCtx = null, editingEnabled = false;
+      let styleEditUndoCaptured = false;
       let circleDragCtx = null; // { entry, fid } while dragging
       let circleDragRafId = 0;
       let circleDragQueuedMove = null;
@@ -4104,6 +4129,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           return;
         }
 
+        rememberUndoSnapshot();
         closeStyleEditor();
         suppressPopups(1500);
 
@@ -4178,6 +4204,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         if (ix < 0) return false;
         const p = entry.data.features[ix].properties || {};
         if (confirmDelete && !confirm('Delete this feature?')) return false;
+        rememberUndoSnapshot();
 
         entry.data.features.splice(ix, 1);
         const key = String(p._gid ?? p.fid ?? safeFid);
@@ -4292,6 +4319,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const isPolygon = f.geometry?.type === 'Polygon' || f.geometry?.type === 'MultiPolygon';
         const isCircle = hasCircleMeta || isPolygon; // Show button for all polygons
         editCtx = { entry, fid };
+        styleEditUndoCaptured = false;
 
         // For lines, hide fill controls
         if (isLine) {
@@ -4631,6 +4659,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       function closeStyleEditor() {
         editorEl.style.display = 'none';
         editCtx = null;
+        styleEditUndoCaptured = false;
 
         // Clean up stats button, recon button, glimpse button and display
         if (seCalcStats) {
@@ -4661,6 +4690,10 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         const f = entry.data.features.find(x => x.properties.fid === fid); if (!f) return;
         const p = f.properties;
         const isLine = f.geometry?.type === 'LineString' || f.geometry?.type === 'MultiLineString';
+        if (!styleEditUndoCaptured) {
+          rememberUndoSnapshot();
+          styleEditUndoCaptured = true;
+        }
 
         if (!isLine) {
           p._fill = seFill.value;
@@ -4761,9 +4794,61 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
 
       /* ================= Autosave / Restore (local) ================= */
       const LS_KEY = 'sqkii-mapper-state-v1';
-      function shallowSerializableState() { return layerList.map(l => ({ id: l.id, name: l.name, visible: l.visible !== false, data: l.data, items: l.items, _deletedLayer: !!l._deletedLayer })); }
+      const UNDO_LIMIT = 50;
+      const undoStack = [];
+      let undoRestoreInFlight = false;
+      let undoSnapshotsSuppressed = false;
+      const undoBtn = byId('undo-action');
+      function cloneSerializableState(state) {
+        try { return JSON.parse(JSON.stringify(state || [])); }
+        catch { return []; }
+      }
+      function shallowSerializableState() { return layerList.map(l => ({ id: l.id, name: l.name, visible: l.visible !== false, _visibilityTs: l._visibilityTs || 0, data: l.data, items: l.items, _deletedLayer: !!l._deletedLayer })); }
+      function updateUndoButton() {
+        if (!undoBtn) return;
+        undoBtn.disabled = undoRestoreInFlight || undoStack.length === 0;
+        undoBtn.title = undoStack.length ? 'Undo last action' : 'Nothing to undo';
+      }
+      function rememberUndoSnapshot() {
+        if (undoRestoreInFlight || undoSnapshotsSuppressed) return;
+        undoStack.push(cloneSerializableState(shallowSerializableState()));
+        if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+        updateUndoButton();
+      }
+      function stampUndoStateForSync(state) {
+        const now = Date.now();
+        for (const layer of (state || [])) {
+          layer._visibilityTs = now;
+          for (const feature of (layer?.data?.features || [])) {
+            if (feature?.properties) feature.properties._ts = now;
+          }
+        }
+        return state;
+      }
+      async function undoLastAction() {
+        if (!undoStack.length || undoRestoreInFlight) return;
+        const previous = stampUndoStateForSync(undoStack.pop());
+        undoRestoreInFlight = true;
+        updateUndoButton();
+        try {
+          closeActivePopup();
+          closeStyleEditor();
+          await applyStateArray(previous);
+          localSaveOnly();
+          saveState({ immediate: true });
+        } finally {
+          undoRestoreInFlight = false;
+          updateUndoButton();
+        }
+      }
+      function markLayerVisibilityChanged(entry) {
+        if (!entry) return;
+        entry._visibilityTs = Date.now();
+      }
       function localSaveOnly() { try { localStorage.setItem(LS_KEY, JSON.stringify(shallowSerializableState())); } catch (e) { console.warn('Autosave failed', e); } }
       window.addEventListener('beforeunload', localSaveOnly);
+      undoBtn?.addEventListener('click', () => { undoLastAction().catch(e => console.warn('Undo failed:', e)); });
+      updateUndoButton();
 
       async function rebindFeatureIcons(entry) {
         for (const f of (entry.data?.features || [])) {
@@ -4796,6 +4881,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
             id: (saved.id != null ? saved.id : (layerSeq++)),
             name: saved.name ?? 'Layer',
             visible: saved.visible !== false,
+            _visibilityTs: Number(saved._visibilityTs || 0) || 0,
             data: saved.data,
             items: [],
             glSourceId: null,
@@ -5617,10 +5703,21 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       }
       function featureKey(f) { const p = f && f.properties || {}; return String(p._gid ?? p.fid ?? ''); }
       function newerFeature(a, b) { const ta = a?.properties?._ts ?? 0; const tb = b?.properties?._ts ?? 0; return (tb > ta) ? b : a; }
+      function layerVisibilityFromNewest(remoteL, localL) {
+        const remoteTs = Number(remoteL?._visibilityTs || 0) || 0;
+        const localTs = Number(localL?._visibilityTs || 0) || 0;
+        if (remoteTs || localTs) return localTs >= remoteTs ? (localL.visible !== false) : (remoteL.visible !== false);
+        return localL.visible !== false;
+      }
       function mergeLayer(remoteL, localL) {
         if (!remoteL) return localL; if (!localL) return remoteL;
+        const remoteVisibilityTs = Number(remoteL?._visibilityTs || 0) || 0;
+        const localVisibilityTs = Number(localL?._visibilityTs || 0) || 0;
         const out = {
-          id: remoteL.id ?? localL.id, name: remoteL.name ?? localL.name, visible: (localL.visible !== false) || (remoteL.visible !== false),
+          id: remoteL.id ?? localL.id,
+          name: remoteL.name ?? localL.name,
+          visible: layerVisibilityFromNewest(remoteL, localL),
+          _visibilityTs: Math.max(remoteVisibilityTs, localVisibilityTs),
           data: { type: 'FeatureCollection', features: [] }, items: [], glSourceId: null, glLayerIds: [], lfGroup: null, lfLayers: null, _deletedLayer: (remoteL._deletedLayer || localL._deletedLayer) || false
         };
         const byKey = new Map();
@@ -5697,7 +5794,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
       let suppressNextRemoteApply = false;
       let hasUnsavedMapChanges = false;
 
-      const syncToServerDebounced = debounce(async function () {
+      async function syncToServerNow() {
         if (!currentRoomCode) return;
         const state = shallowSerializableState();
         try {
@@ -5710,11 +5807,14 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         } finally {
           setTimeout(() => { suppressNextRemoteApply = false; }, 250);
         }
-      }, 8000);
+      }
 
-      function saveState() {
+      const syncToServerDebounced = debounce(syncToServerNow, 8000);
+
+      function saveState(options = {}) {
         hasUnsavedMapChanges = true;
-        syncToServerDebounced();
+        if (options?.immediate) syncToServerNow();
+        else syncToServerDebounced();
       }
 
       window.addEventListener('beforeunload', (e) => {
@@ -5796,6 +5896,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
                 const name = (L.name || "").toLowerCase();
                 if (["shrink pattern", "past coin shrinks"].includes(name)) {
                   L.visible = false; // ensure hidden when map loads
+                  L._visibilityTs = L._visibilityTs || Date.now();
                 }
                 return L;
               });
@@ -5860,6 +5961,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           } else {
             // No shared state yet — start a fresh room
             clearAllLayers();
+            undoSnapshotsSuppressed = true;
 
             try {
               await loadKMZFromUrl(encodeURI(PRELOAD_GEOHASHES), 'Geohashes');
@@ -5877,6 +5979,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
               }
             }
 
+            undoSnapshotsSuppressed = false;
             // Save initial room state
             await upsertRoomState(code, shallowSerializableState());
           }
@@ -8660,6 +8763,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         return getOrCreateLayerByName('Coin Sonar Scans');
       }
       function addSonarCircle(centerLngLat, radius, color) {
+        rememberUndoSnapshot();
         const entry = getOrCreateSonarLayer();
         const fid = `sonar-${clientId}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
         const hex = (color === 'green') ? '#22c55e' : '#ef4444';
@@ -9844,6 +9948,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
         p._circleLng = +lng;
         p._circleLat = +lat;
         p._circleCenter = [lng, lat];
+        p._ts = Date.now();
         feat.properties = p;
 
         refreshGroupGL(entry);
@@ -15823,6 +15928,7 @@ import { initJigsawFeature, openJigsawWorkspace } from './features/jigsaw/jigsaw
           }
 
           // ---- Store results on the feature ----
+          if (typeof rememberUndoSnapshot === 'function') rememberUndoSnapshot();
           feature.properties = feature.properties || {};
           feature.properties._statsCalculated = true;
           feature.properties._hdbCount = hdbCount;

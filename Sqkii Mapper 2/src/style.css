@@ -349,6 +349,29 @@
       color: #fecaca
     }
 
+    .btn:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    .mapstyle-right {
+      display: grid;
+      justify-items: end;
+      align-content: start;
+      gap: 6px;
+      color: var(--muted);
+    }
+
+    .autosave-label {
+      line-height: 1.2;
+    }
+
+    .undo-btn {
+      min-width: 72px;
+      border-color: rgba(96, 165, 250, 0.34);
+      background: rgba(28, 33, 46, 0.78);
+    }
+
     .hint {
       color: var(--muted);
       font-size: 12px
